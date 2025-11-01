@@ -22,11 +22,12 @@ func Test(args []string) error {
 
 func runGoTests() error {
 	ui.PrintInfo("Running Go tests...")
-	cmd := exec.Command("go", "test", "./...")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
+	cmd := exec.Command("go", "test", "-v", "./...")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Println(string(out))
 		return fmt.Errorf("failed to run Go tests: %w", err)
 	}
+	fmt.Println(string(out))
 	return nil
 }
