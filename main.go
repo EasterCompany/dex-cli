@@ -120,8 +120,23 @@ func main() {
 
 	case "model":
 		if err := cmd.Model(os.Args[2:]); err != nil {
-			ui.PrintError(fmt.Sprintf("Error: %v", err))
-			os.Exit(1)
+			if ui.PrintError(fmt.Sprintf("Error: %v", err)); err != nil {
+				os.Exit(1)
+			}
+		}
+
+	case "format":
+		if err := cmd.Format(os.Args[2:]); err != nil {
+			if ui.PrintError(fmt.Sprintf("Error: %v", err)); err != nil {
+				os.Exit(1)
+			}
+		}
+
+	case "test":
+		if err := cmd.Test(os.Args[2:]); err != nil {
+			if ui.PrintError(fmt.Sprintf("Error: %v", err)); err != nil {
+				os.Exit(1)
+			}
 		}
 
 	case "help", "-h", "--help":
@@ -150,6 +165,8 @@ func printUsage() {
 	ui.PrintInfo("watch      Show a live dashboard of all service statuses")
 	ui.PrintInfo("logs       <service> [-f] View service logs")
 	ui.PrintInfo("model      <list|delete> Manage Dexter models")
+	ui.PrintInfo("format     Format and lint all code")
+	ui.PrintInfo("test       Run all tests")
 	ui.PrintInfo("system     Show system info and manage packages")
 	ui.PrintInfo("version    Show version information")
 	ui.PrintInfo("help       Show this help message")
