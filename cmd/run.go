@@ -43,9 +43,7 @@ func runOnAllServices(command string, args []string, title string, showOutputOnF
 			out, err := cmd.CombinedOutput()
 			if err != nil {
 				status = "FAILED"
-				if showOutputOnFailure {
-					fmt.Println(string(out))
-				}
+				fmt.Println(string(out))
 			}
 		}
 		rows = append(rows, ui.FormatFormatTableRow(service.ID, status))
@@ -61,8 +59,8 @@ func runOnAllServices(command string, args []string, title string, showOutputOnF
 func createTable(rows []ui.TableRow) ui.Table {
 	return ui.Table{
 		Columns: []ui.TableColumn{
-			{Header: "SERVICE", Width: 25},
-			{Header: "STATUS", Width: 15},
+			{Header: "SERVICE", Width: 30},
+			{Header: "STATUS", Width: 10},
 		},
 		Rows: rows,
 	}
