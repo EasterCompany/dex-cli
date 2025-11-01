@@ -2,7 +2,32 @@
 
 Master command-line tool for managing all Dexter services.
 
-## Installation
+## Quick Install (Recommended)
+
+**One-line bootstrap installer** - Sets up the complete Dexter development environment:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/EasterCompany/dex-cli/main/bootstrap.sh | bash
+```
+
+This will:
+- ✓ Install system dependencies (git, go, python, redis)
+- ✓ Setup directory structure (`~/Dexter`, `~/EasterCompany`)
+- ✓ Clone and build the dex CLI tool
+- ✓ Create Python virtual environment
+- ✓ Clone all Dexter service repositories
+- ✓ Configure your shell PATH
+
+**Requirements:**
+- GitHub SSH access (script will guide you through setup)
+- One of: `yay`, `pacman`, `apt`, or `dnf` package manager
+- sudo access (for installing packages)
+
+---
+
+## Manual Installation
+
+If you prefer manual control:
 
 ```bash
 cd ~/Dexter/dex-cli
