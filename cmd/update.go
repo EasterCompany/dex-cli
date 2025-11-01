@@ -76,6 +76,7 @@ func updateFull() error {
 		{"Pull latest changes", "pending", "", "○"},
 		{"Build binary", "pending", "", "○"},
 		{"Install to ~/Dexter/bin", "pending", "", "○"},
+		{"Verify PATH configuration", "pending", "", "○"},
 	}
 
 	// Step 1: Check repository
@@ -186,6 +187,31 @@ func updateFull() error {
 	steps[3].message = "Installed to ~/Dexter/bin/dex"
 	steps[3].icon = "✓"
 	renderUpdateSteps(steps)
+
+	// Step 5: Verify PATH configuration
+	steps[4].status = "running"
+	renderUpdateSteps(steps)
+
+	status, err := verifyPathConfiguration()
+	if status == "error" {
+		steps[4].status = "error"
+		steps[4].message = fmt.Sprintf("Failed to verify PATH: %v", err)
+		steps[4].icon = "✗"
+		renderUpdateSteps(steps)
+		return err
+	}
+
+	if status == "warning" {
+		steps[4].status = "skipped"
+		steps[4].message = "PATH not configured. Please add ~/Dexter/bin to your PATH."
+		steps[4].icon = "⚠"
+		renderUpdateSteps(steps)
+	} else {
+		steps[4].status = "success"
+		steps[4].message = "PATH configuration verified"
+		steps[4].icon = "✓"
+		renderUpdateSteps(steps)
+	}
 
 	// Success summary
 	fmt.Println()
@@ -443,4 +469,31 @@ func renderUpdateSummary(success bool) {
 	summaryText.WriteString(versionStyle.Render("Run 'dex version' to see the new version"))
 
 	fmt.Println(summaryBox.Render(summaryText.String()))
+}
+
+func verifyPathConfiguration() (string, error) {
+	// Get the user's home directory.
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "error", fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	// Construct the full path to ~/Dexter/bin.
+	dexterBinPath := filepath.Join(homeDir, "Dexter", "bin")
+
+	// Get the PATH environment variable.
+	path := os.Getenv("PATH")
+
+	// Split the PATH into a slice of directories.
+	paths := strings.Split(path, string(os.PathListSeparator))
+
+	// Check if the ~/Dexter/bin path is already in the PATH.
+	for _, p := range paths {
+		if p == dexterBinPath {
+			return "success", nil
+		}
+	}
+
+	// If it's not in the PATH, return a message with instructions.
+	return "warning", fmt.Errorf("directory %s not in PATH", dexterBinPath)
 }
