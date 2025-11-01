@@ -5,21 +5,29 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/git"
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
-func handleCacheService() error {
+type pullResult struct {
+	serviceName string
+	status      string // "success", "skipped", "error"
+	message     string
+	icon        string
+}
+
+func handleCacheService() pullResult {
 	// Check for redis-cli or valkey-cli
 	cliPath, err := exec.LookPath("redis-cli")
 	if err != nil {
 		cliPath, err = exec.LookPath("valkey-cli")
 		if err != nil {
-			return fmt.Errorf("redis-cli or valkey-cli not found in PATH")
+			return pullResult{"cache", "error", "redis-cli or valkey-cli not found", "✗"}
 		}
 	}
-	ui.PrintInfo(fmt.Sprintf("Found cache CLI at: %s", cliPath))
 
 	// Check service status
 	cmd := exec.Command("systemctl", "is-active", "redis")
@@ -28,37 +36,32 @@ func handleCacheService() error {
 		cmd = exec.Command("systemctl", "is-active", "valkey")
 		out, err = cmd.Output()
 		if err != nil || strings.TrimSpace(string(out)) != "active" {
-			return fmt.Errorf("redis or valkey service is not active")
+			return pullResult{"cache", "error", "service not active", "✗"}
 		}
 	}
-	ui.PrintSuccess("Cache service is active")
 
 	// Ping the service
 	cmd = exec.Command(cliPath, "ping")
 	out, err = cmd.Output()
-	if err != nil {
-		return fmt.Errorf("failed to ping cache service: %w", err)
+	if err != nil || strings.TrimSpace(string(out)) != "PONG" {
+		return pullResult{"cache", "error", "ping failed", "✗"}
 	}
 
-	if strings.TrimSpace(string(out)) != "PONG" {
-		return fmt.Errorf("cache service did not respond with PONG")
-	}
-
-	ui.PrintSuccess("Cache service responded with PONG")
-	return nil
+	return pullResult{"cache", "success", "responding", "✓"}
 }
 
 // Pull synchronizes all Dexter services from their Git repositories
 func Pull() error {
-	ui.PrintTitle("DEXTER PULL COMMAND")
+	// Title
+	fmt.Println(ui.RenderTitle("DEXTER PULL"))
+	fmt.Println()
 
-	ui.PrintSectionTitle("ENSURING DIRECTORY STRUCTURE")
+	// Ensure directory structure
 	if err := config.EnsureDirectoryStructure(); err != nil {
 		return fmt.Errorf("failed to ensure directory structure: %w", err)
 	}
-	ui.PrintSuccess("Directory structure verified")
 
-	ui.PrintSectionTitle("VALIDATING SYSTEM PACKAGES")
+	// Validate packages
 	if sys, err := config.LoadSystemConfig(); err == nil {
 		missing := []string{}
 		for _, pkg := range sys.Packages {
@@ -67,28 +70,34 @@ func Pull() error {
 			}
 		}
 		if len(missing) > 0 {
-			ui.PrintWarning(fmt.Sprintf("Missing packages: %v", missing))
-			ui.PrintInfo("Run: dex system validate")
-		} else {
-			ui.PrintSuccess("All required packages present")
+			warningStyle := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("220")).
+				Padding(0, 1)
+			fmt.Println(warningStyle.Render(fmt.Sprintf("⚠ Missing packages: %v", missing)))
+			fmt.Println()
 		}
 	}
 
-	ui.PrintSectionTitle("LOADING SERVICE MAP")
+	// Load service map
 	serviceMap, err := config.LoadServiceMap()
 	if err != nil {
 		return fmt.Errorf("failed to load service map: %w", err)
 	}
-	ui.PrintInfo(fmt.Sprintf("Loaded %d service types", len(serviceMap.ServiceTypes)))
 
 	// Count total services
 	totalServices := 0
 	for _, services := range serviceMap.Services {
 		totalServices += len(services)
 	}
-	ui.PrintInfo(fmt.Sprintf("Found %d services to sync", totalServices))
 
-	// Process each service
+	infoStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("245")).
+		Italic(true)
+	fmt.Println(infoStyle.Render(fmt.Sprintf("Syncing %d services...", totalServices)))
+	fmt.Println()
+
+	// Process each service and collect results
+	var results []pullResult
 	successCount := 0
 	skipCount := 0
 	errorCount := 0
@@ -98,48 +107,57 @@ func Pull() error {
 			continue
 		}
 
+		// Get service type label
+		var serviceTypeLabel string
+		for _, st := range serviceMap.ServiceTypes {
+			if st.Type == serviceType {
+				serviceTypeLabel = st.Label
+				break
+			}
+		}
+		if serviceTypeLabel == "" {
+			serviceTypeLabel = serviceType
+		}
+
+		// Section header
+		sectionStyle := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("99")).
+			Padding(0, 1).
+			MarginTop(1)
+		fmt.Println(sectionStyle.Render(strings.ToUpper(serviceTypeLabel)))
+
 		if serviceType == "os" {
 			for _, service := range services {
-				ui.PrintSectionTitle(strings.ToUpper(service.ID))
 				if service.ID == "cache" {
-					if err := handleCacheService(); err != nil {
-						ui.PrintError(fmt.Sprintf("Cache service check failed: %v", err))
-						errorCount++
-					} else {
+					result := handleCacheService()
+					results = append(results, result)
+					renderServiceResult(result)
+					if result.status == "success" {
 						successCount++
+					} else if result.status == "error" {
+						errorCount++
 					}
 					continue
 				}
-				// Handle other special 'os' services here
 			}
 		} else {
-			// Find the label for the serviceType
-			var serviceTypeLabel string
-			for _, st := range serviceMap.ServiceTypes {
-				if st.Type == serviceType {
-					serviceTypeLabel = st.Label
-					break
-				}
-			}
-			if serviceTypeLabel == "" {
-				serviceTypeLabel = serviceType // Fallback if label not found
-			}
-			ui.PrintSectionTitle(strings.ToUpper(serviceTypeLabel))
-
 			for _, service := range services {
 				// Skip services without a repo URL
 				if service.Repo == "" {
-					ui.PrintWarning(fmt.Sprintf("%s: No repository configured, skipping", service.ID))
+					result := pullResult{service.ID, "skipped", "no repository configured", "○"}
+					results = append(results, result)
+					renderServiceResult(result)
 					skipCount++
 					continue
 				}
 
-				ui.PrintInfo(service.ID)
-
 				// Expand source path
 				sourcePath, err := config.ExpandPath(service.Source)
 				if err != nil {
-					ui.PrintError(fmt.Sprintf("Failed to expand path: %v", err))
+					result := pullResult{service.ID, "error", "path expansion failed", "✗"}
+					results = append(results, result)
+					renderServiceResult(result)
 					errorCount++
 					continue
 				}
@@ -147,75 +165,156 @@ func Pull() error {
 				// Check repository status
 				status, err := git.CheckRepoStatus(sourcePath)
 				if err != nil {
-					ui.PrintError(fmt.Sprintf("Error checking status: %v", err))
+					result := pullResult{service.ID, "error", err.Error(), "✗"}
+					results = append(results, result)
+					renderServiceResult(result)
 					errorCount++
 					continue
 				}
 
 				// Handle non-existent repository (clone)
 				if !status.Exists {
-					ui.PrintInfo(fmt.Sprintf("Repository does not exist at %s", sourcePath))
-
 					if err := git.Clone(service.Repo, sourcePath); err != nil {
-						ui.PrintError(fmt.Sprintf("Clone failed: %v", err))
+						result := pullResult{service.ID, "error", "clone failed", "✗"}
+						results = append(results, result)
+						renderServiceResult(result)
 						errorCount++
 						continue
 					}
 
-					ui.PrintSuccess("Successfully cloned")
+					result := pullResult{service.ID, "success", "cloned", "✓"}
+					results = append(results, result)
+					renderServiceResult(result)
 					successCount++
 					continue
 				}
 
 				// Repository exists, check if we can pull
-				ui.PrintInfo(fmt.Sprintf("Repository exists (branch: %s)", status.CurrentBranch))
-
 				if !status.IsClean {
-					ui.PrintWarning("Uncommitted changes detected, skipping pull for safety")
-					ui.PrintInfo("Please commit or stash your changes manually")
+					result := pullResult{service.ID, "skipped", "uncommitted changes", "⊘"}
+					results = append(results, result)
+					renderServiceResult(result)
 					skipCount++
 					continue
 				}
 
 				if status.AheadOfRemote {
-					ui.PrintWarning("Local commits ahead of remote, skipping pull for safety")
-					ui.PrintInfo("Please push your changes manually")
+					result := pullResult{service.ID, "skipped", "unpushed commits", "↑"}
+					results = append(results, result)
+					renderServiceResult(result)
 					skipCount++
 					continue
 				}
 
 				if !status.BehindRemote {
-					ui.PrintSuccess("Already up to date")
+					result := pullResult{service.ID, "success", "up to date", "✓"}
+					results = append(results, result)
+					renderServiceResult(result)
 					successCount++
 					continue
 				}
 
 				// Safe to pull
-				ui.PrintInfo("Updates available, pulling...")
 				if err := git.Pull(sourcePath); err != nil {
-					ui.PrintError(fmt.Sprintf("Pull failed: %v", err))
+					result := pullResult{service.ID, "error", "pull failed", "✗"}
+					results = append(results, result)
+					renderServiceResult(result)
 					errorCount++
 					continue
 				}
 
-				ui.PrintSuccess("Successfully updated")
+				result := pullResult{service.ID, "success", "updated", "✓"}
+				results = append(results, result)
+				renderServiceResult(result)
 				successCount++
 			}
 		}
 	}
 
-	ui.PrintSectionTitle("SUMMARY")
-	ui.PrintInfo(fmt.Sprintf("Total services: %d", totalServices))
-	ui.PrintSuccess(fmt.Sprintf("Success: %d", successCount))
-	ui.PrintWarning(fmt.Sprintf("Skipped: %d", skipCount))
-	if errorCount > 0 {
-		ui.PrintError(fmt.Sprintf("Errors: %d", errorCount))
-	}
+	// Summary
+	fmt.Println()
+	renderSummary(totalServices, successCount, skipCount, errorCount)
 
 	if errorCount > 0 {
 		return fmt.Errorf("completed with %d error(s)", errorCount)
 	}
 
-	ui.PrintSuccess("PULL COMPLETE!")
 	return nil
+}
+
+func renderServiceResult(result pullResult) {
+	var style lipgloss.Style
+	var statusText string
+
+	switch result.status {
+	case "success":
+		style = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+		statusText = result.message
+	case "skipped":
+		style = lipgloss.NewStyle().Foreground(lipgloss.Color("220"))
+		statusText = result.message
+	case "error":
+		style = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+		statusText = result.message
+	}
+
+	serviceStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("252")).
+		Width(25).
+		Padding(0, 1)
+
+	iconStyle := lipgloss.NewStyle().
+		Foreground(style.GetForeground()).
+		Bold(true)
+
+	line := fmt.Sprintf("%s %s %s",
+		iconStyle.Render(result.icon),
+		serviceStyle.Render(result.serviceName),
+		style.Render(statusText))
+
+	fmt.Println(line)
+}
+
+func renderSummary(total, success, skipped, errors int) {
+	summaryBox := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("99")).
+		Padding(1, 2).
+		Width(50)
+
+	var summaryText strings.Builder
+
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("99"))
+	summaryText.WriteString(titleStyle.Render("SYNC SUMMARY"))
+	summaryText.WriteString("\n\n")
+
+	totalStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	summaryText.WriteString(totalStyle.Render(fmt.Sprintf("Total services:  %d", total)))
+	summaryText.WriteString("\n")
+
+	successStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	summaryText.WriteString(successStyle.Render(fmt.Sprintf("✓ Success:       %d", success)))
+	summaryText.WriteString("\n")
+
+	if skipped > 0 {
+		skipStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("220"))
+		summaryText.WriteString(skipStyle.Render(fmt.Sprintf("⊘ Skipped:       %d", skipped)))
+		summaryText.WriteString("\n")
+	}
+
+	if errors > 0 {
+		errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+		summaryText.WriteString(errorStyle.Render(fmt.Sprintf("✗ Errors:        %d", errors)))
+	} else {
+		allGoodStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("42")).
+			Bold(true).
+			MarginTop(1)
+		summaryText.WriteString("\n")
+		summaryText.WriteString(allGoodStyle.Render("All services synchronized!"))
+	}
+
+	fmt.Println(summaryBox.Render(summaryText.String()))
 }
