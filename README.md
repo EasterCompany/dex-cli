@@ -1,139 +1,60 @@
-# Dexter CLI
+# dex-cli
 
-Master command-line tool for managing all Dexter services.
+Fast, simple command-line tool for managing Dexter services.
 
-## Quick Install (Recommended)
-
-**One-line bootstrap installer** - Sets up the complete Dexter development environment:
+## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/eastercompany/dex-cli/main/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/eastercompany/dex-cli/main/install.sh | bash
 ```
 
-This will:
-- ✓ Install system dependencies (git, go, python, redis)
-- ✓ Setup directory structure (`~/Dexter`, `~/EasterCompany`)
-- ✓ Clone and build the dex CLI tool
-- ✓ Create Python virtual environment
-- ✓ Clone all Dexter service repositories
-- ✓ Configure your shell PATH
-
-**Requirements:**
-- GitHub SSH access (script will guide you through setup)
-- One of: `yay`, `pacman`, `apt`, or `dnf` package manager
-- sudo access (for installing packages)
-
----
-
-## Manual Installation
-
-If you prefer manual control:
-
-```bash
-cd ~/Dexter/dex-cli
-./install.sh
-```
-
-Add to your shell configuration (`~/.bashrc` or `~/.zshrc`):
-
-```bash
-export PATH="$HOME/Dexter/bin:$PATH"
-```
-
-Then reload your shell:
-
-```bash
-source ~/.bashrc  # or ~/.zshrc
-```
+**Requirements:** git, go
 
 ## Usage
 
-### Pull Command
-
-Clones or pulls all Dexter services from GitHub:
-
 ```bash
-dex pull
-```
-
-**Features:**
-- Ensures `~/Dexter` and `~/EasterCompany` directory structure exists
-- Reads service definitions from `~/Dexter/config/service-map.json`
-- Clones repositories that don't exist
-- Pulls updates for existing repositories (only if safe)
-- Skips repositories with uncommitted changes
-- Skips repositories with unpushed commits
-- Provides detailed status for each service
-
-**Safety Features:**
-- Never pulls if there are uncommitted changes
-- Never pulls if local branch is ahead of remote
-- Uses `--ff-only` flag to prevent merge conflicts
-- Reports issues clearly so you can fix them manually
-
-### Other Commands
-
-```bash
+dex pull       # Clone/pull all services
 dex help       # Show help
 dex version    # Show version
 ```
 
-## Environment
+## What It Does
 
-The CLI expects and enforces this directory layout:
+- Manages `~/Dexter` (binaries, configs, models)
+- Manages `~/EasterCompany` (source code)
+- Clones and updates all dex-* services
+- Safe git operations (won't pull with uncommitted changes)
+
+## Directory Structure
 
 ```
-~/Dexter/               # Dexter installation root
-  ├── bin/              # Installed binaries
-  ├── config/           # Centralized configuration
-  │   ├── options.json
-  │   └── service-map.json
-  └── models/           # AI models
+~/Dexter/           # Installation root
+  ├── bin/          # Compiled binaries
+  ├── config/       # Configuration files
+  └── models/       # AI models
 
-~/EasterCompany/        # EasterCompany source code
-  ├── dex-event-service/
-  ├── dex-model-service/
-  ├── dex-chat-service/
-  ├── dex-stt-service/
-  ├── dex-tts-service/
-  ├── dex-web-service/
-  ├── dex-discord-service/
-  └── easter.company/
+~/EasterCompany/    # Source code
+  ├── dex-cli/
+  ├── dex-*-service/
+  └── ...
 ```
 
 ## Development
 
-### Building
-
+**Build from source:**
 ```bash
-go build -o dex
+cd ~/EasterCompany/dex-cli
+go build -o ~/Dexter/bin/dex
 ```
 
-### Project Structure
-
+**Project structure:**
 ```
-dex-cli/
-├── main.go           # CLI entry point
-├── cmd/              # Commands
-│   └── pull.go       # Pull command implementation
-├── config/           # Configuration management
-│   └── config.go     # Config loading and validation
-└── git/              # Git operations
-    └── git.go        # Git status, clone, pull operations
+main.go       # Entry point
+cmd/          # Commands
+config/       # Config management
+git/          # Git operations
 ```
 
-### Adding New Commands
+## License
 
-1. Create a new file in `cmd/` (e.g., `cmd/build.go`)
-2. Implement the command function
-3. Add the command to the switch statement in `main.go`
-4. Update this README
-
-## Configuration
-
-All configuration is centralized in `~/Dexter/config/`:
-
-- `service-map.json` - Service registry with repo URLs and ports
-- `options.json` - Shared configuration values
-
-The CLI automatically reads these files and uses them to manage services.
+MIT

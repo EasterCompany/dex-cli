@@ -1,36 +1,49 @@
 #!/bin/bash
-# Dexter CLI Build & Install Script
-
+# dex-cli installer
 set -e
 
-echo "=== Building Dexter CLI ==="
+echo "Installing dex-cli..."
+echo ""
 
-# Get the directory where this script is located
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+# Ensure directories exist
+mkdir -p ~/Dexter/bin ~/EasterCompany
 
-# Build the binary
-echo "Building dex binary..."
-go build -o dex
+# Clone or update repo
+if [ -d ~/EasterCompany/dex-cli/.git ]; then
+    echo "→ Updating dex-cli..."
+    cd ~/EasterCompany/dex-cli
+    git pull --ff-only
+else
+    echo "→ Cloning dex-cli..."
+    git clone https://github.com/eastercompany/dex-cli.git ~/EasterCompany/dex-cli
+    cd ~/EasterCompany/dex-cli
+fi
 
-# Install to ~/Dexter/bin
-echo "Installing to ~/Dexter/bin..."
-mkdir -p ~/Dexter/bin
-cp dex ~/Dexter/bin/dex
+# Build and install
+echo "→ Building..."
+go build -o ~/Dexter/bin/dex
 chmod +x ~/Dexter/bin/dex
 
+# Add to PATH if not already there
+SHELL_RC=""
+if [ -n "$BASH_VERSION" ]; then
+    SHELL_RC="$HOME/.bashrc"
+elif [ -n "$ZSH_VERSION" ]; then
+    SHELL_RC="$HOME/.zshrc"
+fi
+
+if [ -n "$SHELL_RC" ]; then
+    if ! grep -q 'export PATH="$HOME/Dexter/bin:$PATH"' "$SHELL_RC" 2>/dev/null; then
+        echo '' >> "$SHELL_RC"
+        echo '# dex-cli' >> "$SHELL_RC"
+        echo 'export PATH="$HOME/Dexter/bin:$PATH"' >> "$SHELL_RC"
+        echo "→ Added ~/Dexter/bin to PATH"
+    fi
+fi
+
 echo ""
-echo "✓ Installation complete!"
+echo "✓ Installed!"
 echo ""
-echo "The 'dex' command has been installed to ~/Dexter/bin/dex"
-echo ""
-echo "To use 'dex' from anywhere, add this to your ~/.bashrc or ~/.zshrc:"
-echo ""
-echo "    export PATH=\"\$HOME/Dexter/bin:\$PATH\""
-echo ""
-echo "Then run: source ~/.bashrc (or ~/.zshrc)"
-echo ""
-echo "Usage:"
-echo "  dex pull       # Clone/pull all Dexter services"
-echo "  dex help       # Show help"
+echo "Run: source ~/.bashrc (or restart terminal)"
+echo "Then: dex help"
 echo ""
