@@ -7,7 +7,7 @@ Master command-line tool for managing all Dexter services.
 **One-line bootstrap installer** - Sets up the complete Dexter development environment:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/EasterCompany/dex-cli/main/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/eastercompany/dex-cli/main/bootstrap.sh | bash
 ```
 
 This will:

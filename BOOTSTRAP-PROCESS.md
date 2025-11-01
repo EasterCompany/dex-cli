@@ -9,7 +9,7 @@ The bootstrap script (`bootstrap.sh`) provides a **one-command setup** that take
 ## One-Line Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/EasterCompany/dex-cli/main/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/eastercompany/dex-cli/main/bootstrap.sh | bash
 ```
 
 ## What Happens Behind the Scenes
@@ -244,7 +244,7 @@ The one-line installer runs a script directly from GitHub. If you're security-co
 
 1. Download and inspect the script first:
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/EasterCompany/dex-cli/main/bootstrap.sh > bootstrap.sh
+   curl -fsSL https://raw.githubusercontent.com/eastercompany/dex-cli/main/bootstrap.sh > bootstrap.sh
    less bootstrap.sh  # Review the script
    chmod +x bootstrap.sh
    ./bootstrap.sh
@@ -310,5 +310,5 @@ Then remove the PATH export from your `~/.bashrc` or `~/.zshrc`.
 
 If you encounter issues with the bootstrap script, please:
 1. Check the troubleshooting section above
-2. Open an issue at https://github.com/EasterCompany/dex-cli/issues
+2. Open an issue at https://github.com/eastercompany/dex-cli/issues
 3. Include your OS, shell, and error messages
