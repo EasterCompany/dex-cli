@@ -13,12 +13,12 @@ import (
 
 // SystemConfig represents the hardware and software state of the system
 type SystemConfig struct {
-	MemoryBytes int64       `json:"MEMORY_BYTES"`
-	CPU         []CPUInfo   `json:"CPU"`
-	GPU         []GPUInfo   `json:"GPU"`
-	Storage     []string    `json:"STORAGE"`
-	Packages    []Package   `json:"PACKAGES"`
-	LastUpdated int64       `json:"LAST_UPDATED,omitempty"`
+	MemoryBytes int64     `json:"MEMORY_BYTES"`
+	CPU         []CPUInfo `json:"CPU"`
+	GPU         []GPUInfo `json:"GPU"`
+	Storage     []string  `json:"STORAGE"`
+	Packages    []Package `json:"PACKAGES"`
+	LastUpdated int64     `json:"LAST_UPDATED,omitempty"`
 }
 
 type CPUInfo struct {
@@ -76,9 +76,9 @@ func LoadSystemConfig() (*SystemConfig, error) {
 // IntrospectSystem scans hardware and software
 func IntrospectSystem() (*SystemConfig, error) {
 	sys := &SystemConfig{
-		CPU:     detectCPU(),
-		GPU:     detectGPU(),
-		Storage: detectStorage(),
+		CPU:      detectCPU(),
+		GPU:      detectGPU(),
+		Storage:  detectStorage(),
 		Packages: detectPackages(),
 	}
 

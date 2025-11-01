@@ -9,14 +9,14 @@ import (
 
 // RepoStatus represents the state of a git repository
 type RepoStatus struct {
-	Exists           bool
-	IsClean          bool
-	HasUncommitted   bool
-	HasUnpushed      bool
-	CurrentBranch    string
-	BehindRemote     bool
-	AheadOfRemote    bool
-	CanSafelyPull    bool
+	Exists         bool
+	IsClean        bool
+	HasUncommitted bool
+	HasUnpushed    bool
+	CurrentBranch  string
+	BehindRemote   bool
+	AheadOfRemote  bool
+	CanSafelyPull  bool
 }
 
 // CheckRepoStatus checks the status of a git repository

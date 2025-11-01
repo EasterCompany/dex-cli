@@ -13,7 +13,7 @@ type commandResult struct {
 	status  string
 }
 
-func runOnAllServices(command string, args []string, title string) error {
+func runOnAllServices(command string, args []string, title string, showOutputOnFailure bool) error {
 	fmt.Println(ui.RenderTitle(title))
 
 	// Load the service map
@@ -40,8 +40,12 @@ func runOnAllServices(command string, args []string, title string) error {
 		} else {
 			cmd := exec.Command(command, args...)
 			cmd.Dir = path
-			if err := cmd.Run(); err != nil {
+			out, err := cmd.CombinedOutput()
+			if err != nil {
 				status = "FAILED"
+				if showOutputOnFailure {
+					fmt.Println(string(out))
+				}
 			}
 		}
 		rows = append(rows, ui.FormatFormatTableRow(service.ID, status))

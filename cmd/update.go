@@ -16,10 +16,10 @@ import (
 )
 
 type updateStep struct {
-	name   string
-	status string // "pending", "running", "success", "error", "skipped"
+	name    string
+	status  string // "pending", "running", "success", "error", "skipped"
 	message string
-	icon   string
+	icon    string
 }
 
 // Update manages the dex-cli update process
