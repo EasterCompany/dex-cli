@@ -5,8 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
-	"time"
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/ui"
@@ -27,8 +25,6 @@ func Build(serviceName string) error {
 	// Build logic
 	if serviceName == "all" {
 		return buildAll(serviceMap)
-	} else if serviceName == "self" {
-		return buildSelf()
 	} else {
 		return buildOne(serviceMap, serviceName)
 	}
@@ -57,38 +53,6 @@ func buildOne(serviceMap *config.ServiceMapConfig, serviceName string) error {
 		}
 	}
 	return fmt.Errorf("service '%s' not found in service-map.json", serviceName)
-}
-
-func buildSelf() error {
-	ui.PrintSectionTitle("BUILDING DEX-CLI")
-
-	// Get git commit hash
-	commitCmd := exec.Command("git", "rev-parse", "--short", "HEAD")
-	commitCmd.Dir, _ = config.ExpandPath("~/EasterCompany/dex-cli")
-	commit, err := commitCmd.Output()
-	if err != nil {
-		return fmt.Errorf("failed to get git commit: %w", err)
-	}
-
-	// Get current date
-	date := time.Now().UTC().Format("2006-01-02T15:04:05Z")
-
-	dexterBinPath, err := config.ExpandPath("~/Dexter/bin")
-	if err != nil {
-		return err
-	}
-
-	ldflags := fmt.Sprintf("-X main.commit=%s -X main.date=%s", strings.TrimSpace(string(commit)), date)
-
-	cmd := exec.Command("go", "build", "-ldflags", ldflags, "-o", filepath.Join(dexterBinPath, "dex"))
-	cmd.Dir, _ = config.ExpandPath("~/EasterCompany/dex-cli")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to build dex-cli: %w", err)
-	}
-	ui.PrintSuccess("dex-cli built successfully")
-	return nil
 }
 
 func buildService(service config.ServiceEntry) error {

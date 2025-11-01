@@ -38,6 +38,12 @@ func main() {
 			os.Exit(1)
 		}
 
+	case "update":
+		if err := cmd.Update(os.Args[2:]); err != nil {
+			ui.PrintError(fmt.Sprintf("Error: %v", err))
+			os.Exit(1)
+		}
+
 	case "system":
 		if err := cmd.System(os.Args[2:]); err != nil {
 			ui.PrintError(fmt.Sprintf("Error: %v", err))
@@ -128,7 +134,8 @@ func printUsage() {
 	ui.PrintInfo("dex <command> [options]")
 	ui.PrintSectionTitle("COMMANDS")
 	ui.PrintInfo("pull       Clone/pull all Dexter services from Git")
-	ui.PrintInfo("build      <service|all|self> Build one or all Dexter services")
+	ui.PrintInfo("update     Update dex-cli to latest version")
+	ui.PrintInfo("build      <service|all> Build one or all Dexter services")
 	ui.PrintInfo("status     [service] Check the health of one or all services")
 	ui.PrintInfo("start      <service> Start a Dexter service")
 	ui.PrintInfo("stop       <service> Stop a Dexter service")
