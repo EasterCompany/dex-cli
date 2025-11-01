@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os/exec"
+	"strings"
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/ui"
@@ -33,6 +34,9 @@ func runOnAllServices(command string, args []string, title string, showOutputOnF
 
 	var rows []ui.TableRow
 	for _, service := range services {
+		if service.ID != "dex-cli" && !strings.HasPrefix(service.ID, "dex-") {
+			continue
+		}
 		status := "PASSED"
 		path, err := config.ExpandPath(service.Source)
 		if err != nil {
