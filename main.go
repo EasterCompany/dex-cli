@@ -139,6 +139,13 @@ func main() {
 			}
 		}
 
+	case "lint":
+		if err := cmd.Lint(os.Args[2:]); err != nil {
+			if ui.PrintError(fmt.Sprintf("Error: %v", err)); err != nil {
+				os.Exit(1)
+			}
+		}
+
 	case "help", "-h", "--help":
 		printUsage()
 
@@ -166,6 +173,7 @@ func printUsage() {
 	ui.PrintInfo("logs       <service> [-f] View service logs")
 	ui.PrintInfo("model      <list|delete> Manage Dexter models")
 	ui.PrintInfo("format     Format and lint all code")
+	ui.PrintInfo("lint       Lint all code")
 	ui.PrintInfo("test       Run all tests")
 	ui.PrintInfo("system     Show system info and manage packages")
 	ui.PrintInfo("version    Show version information")
