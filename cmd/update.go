@@ -79,6 +79,11 @@ func updateFull() error {
 		{"Verify PATH configuration", "pending", "", "○"},
 	}
 
+	// Reserve space for the steps
+	for i := 0; i < len(steps); i++ {
+		fmt.Println()
+	}
+
 	// Step 1: Check repository
 	steps[0].status = "running"
 	renderUpdateSteps(steps)
