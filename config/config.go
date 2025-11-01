@@ -19,6 +19,8 @@ var RequiredDexterDirs = []string{
 	"config",
 	"models",
 	"bin",
+	"run",
+	"logs",
 }
 
 // ServiceMapConfig represents the structure of service-map.json
