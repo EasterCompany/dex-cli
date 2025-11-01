@@ -24,11 +24,6 @@ func Model(args []string) error {
 			return fmt.Errorf("model name required for 'delete' command")
 		}
 		return deleteModel(args[1])
-	case "edit":
-		if len(args) < 2 {
-			return fmt.Errorf("model name required for 'edit' command")
-		}
-		return editModel(args[1])
 	default:
 		return showModelUsage()
 	}
@@ -45,7 +40,6 @@ func showModelUsage() error {
 	cmdStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("111")).Padding(0, 2)
 	fmt.Println(cmdStyle.Render("dex model list        # List all models"))
 	fmt.Println(cmdStyle.Render("dex model delete <name> # Delete a model"))
-	fmt.Println(cmdStyle.Render("dex model edit <name>   # Edit a model"))
 
 	return nil
 }
@@ -90,29 +84,4 @@ func deleteModel(modelName string) error {
 	ui.PrintInfo(fmt.Sprintf("Model %s deleted successfully", modelName))
 
 	return nil
-}
-
-func editModel(modelName string) error {
-	modelsPath, err := config.ExpandPath(filepath.Join(config.DexterRoot, "models"))
-	if err != nil {
-		return fmt.Errorf("failed to expand models path: %w", err)
-	}
-
-	modelPath := filepath.Join(modelsPath, modelName)
-
-	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
-		return fmt.Errorf("model %s not found", modelName)
-	}
-
-	editor := os.Getenv("EDITOR")
-	if editor == "" {
-		editor = "vim"
-	}
-
-	cmd := ui.CreateCommand(editor, modelPath)
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	return cmd.Run()
 }
