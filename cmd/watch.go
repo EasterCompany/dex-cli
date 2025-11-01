@@ -3,7 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -40,15 +40,16 @@ func refreshWatchDashboard() error {
 	clearScreen()
 	ui.PrintTitle("DEXTER LIVE WATCH DASHBOARD")
 	fmt.Println("Press Ctrl+C to exit")
+	fmt.Println()
 
 	serviceMap, err := config.LoadServiceMap()
 	if err != nil {
 		return fmt.Errorf("failed to load service map: %w", err)
 	}
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
+	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "SERVICE\tVERSION\tSTATUS\tUPTIME\tLAST CHECK")
-	fmt.Fprintln(w, "-------\t------- \t-------\t-------	----------")
+	fmt.Fprintln(w, "-------\t-------\t------\t------\t----------")
 
 	for _, services := range serviceMap.Services {
 		for _, service := range services {
@@ -76,7 +77,7 @@ func refreshWatchDashboard() error {
 			}
 			defer resp.Body.Close()
 
-			body, err := ioutil.ReadAll(resp.Body)
+			body, err := io.ReadAll(resp.Body)
 			if err != nil {
 				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 					ui.Colorize(service.ID, ui.ColorRed),
@@ -105,11 +106,12 @@ func refreshWatchDashboard() error {
 				statusColor = ui.ColorRed
 			}
 
+			uptime := formatUptime(time.Duration(statusResp.Uptime) * time.Second)
 			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
 				ui.Colorize(statusResp.Service, ui.ColorWhite),
 				statusResp.Version,
 				ui.Colorize(strings.ToUpper(statusResp.Status), statusColor),
-				fmt.Sprintf("%s", time.Duration(statusResp.Uptime)*time.Second),
+				uptime,
 				time.Unix(statusResp.Timestamp, 0).Format("15:04:05"))
 		}
 	}

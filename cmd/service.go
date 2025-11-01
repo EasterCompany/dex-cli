@@ -3,7 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/EasterCompany/dex-cli/config"
-	"github.com/EasterCompany/dex-cli/ui"
 	"github.com/EasterCompany/dex-cli/health"
+	"github.com/EasterCompany/dex-cli/ui"
 )
 
 const ( // Constants for service management
@@ -88,7 +88,7 @@ func readPid(serviceID string) (int, error) {
 		return 0, err
 	}
 
-	data, err := ioutil.ReadFile(pidFilePath)
+	data, err := os.ReadFile(pidFilePath)
 	if err != nil {
 		return 0, fmt.Errorf("failed to read PID file %s: %w", pidFilePath, err)
 	}
@@ -106,7 +106,7 @@ func writePid(serviceID string, pid int) error {
 		return err
 	}
 
-	return ioutil.WriteFile(pidFilePath, []byte(strconv.Itoa(pid)), 0644)
+	return os.WriteFile(pidFilePath, []byte(strconv.Itoa(pid)), 0644)
 }
 
 func removePidFile(serviceID string) error {
@@ -142,7 +142,7 @@ func verifyServiceStatus(service *config.ServiceEntry) error {
 		return fmt.Errorf("service %s /status returned non-200 status: %d", service.ID, resp.StatusCode)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read response body from %s: %w", statusURL, err)
 	}
