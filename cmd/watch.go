@@ -5,61 +5,52 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"os/exec"
 	"strings"
-	"text/tabwriter"
 	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/health"
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
-// Watch provides a live dashboard of all service statuses
-func Watch() error {
-	ticker := time.NewTicker(2 * time.Second)
-	defer ticker.Stop()
+type tickMsg time.Time
 
-	for range ticker.C {
-		if err := refreshWatchDashboard(); err != nil {
-			ui.PrintError(fmt.Sprintf("Error refreshing dashboard: %v", err))
-		}
-	}
-
-	return nil
+type watchModel struct {
+	serviceMap *config.ServiceMapConfig
+	rows       []ui.TableRow
+	err        error
+	quitting   bool
 }
 
-func clearScreen() {
-	cmd := exec.Command("clear") // or "cls" on Windows
-	cmd.Stdout = os.Stdout
-	cmd.Run()
+func (m watchModel) Init() tea.Cmd {
+	return tea.Batch(
+		tickCmd(),
+		m.fetchStatuses,
+	)
 }
 
-func refreshWatchDashboard() error {
-	clearScreen()
-	ui.PrintTitle("DEXTER LIVE WATCH DASHBOARD")
-	fmt.Println("Press Ctrl+C to exit")
-	fmt.Println()
+func tickCmd() tea.Cmd {
+	return tea.Tick(2*time.Second, func(t time.Time) tea.Msg {
+		return tickMsg(t)
+	})
+}
 
-	serviceMap, err := config.LoadServiceMap()
-	if err != nil {
-		return fmt.Errorf("failed to load service map: %w", err)
-	}
+func (m watchModel) fetchStatuses() tea.Msg {
+	var rows []ui.TableRow
 
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "SERVICE\tVERSION\tSTATUS\tUPTIME\tLAST CHECK")
-	fmt.Fprintln(w, "-------\t-------\t------\t------\t----------")
-
-	for _, services := range serviceMap.Services {
+	for _, services := range m.serviceMap.Services {
 		for _, service := range services {
 			if service.Addr == "" {
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-					ui.Colorize(service.ID, ui.ColorYellow),
+				rows = append(rows, ui.FormatTableRow(
+					service.ID,
 					"N/A",
-					ui.Colorize("SKIPPED", ui.ColorYellow),
+					"SKIPPED",
 					"N/A",
-					"N/A")
+					"N/A",
+				))
 				continue
 			}
 
@@ -67,55 +58,123 @@ func refreshWatchDashboard() error {
 			client := http.Client{Timeout: 1 * time.Second}
 			resp, err := client.Get(statusURL)
 			if err != nil {
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-					ui.Colorize(service.ID, ui.ColorRed),
+				rows = append(rows, ui.FormatTableRow(
+					service.ID,
 					"N/A",
-					ui.Colorize("DOWN", ui.ColorRed),
+					"DOWN",
 					"N/A",
-					time.Now().Format("15:04:05"))
+					time.Now().Format("15:04:05"),
+				))
 				continue
 			}
-			defer resp.Body.Close()
 
 			body, err := io.ReadAll(resp.Body)
+			resp.Body.Close()
 			if err != nil {
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-					ui.Colorize(service.ID, ui.ColorRed),
+				rows = append(rows, ui.FormatTableRow(
+					service.ID,
 					"N/A",
-					ui.Colorize("ERROR", ui.ColorRed),
+					"ERROR",
 					"N/A",
-					time.Now().Format("15:04:05"))
+					time.Now().Format("15:04:05"),
+				))
 				continue
 			}
 
 			var statusResp health.StatusResponse
 			if err := json.Unmarshal(body, &statusResp); err != nil {
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-					ui.Colorize(service.ID, ui.ColorRed),
+				rows = append(rows, ui.FormatTableRow(
+					service.ID,
 					"N/A",
-					ui.Colorize("INVALID RESP", ui.ColorRed),
+					"INVALID RESP",
 					"N/A",
-					time.Now().Format("15:04:05"))
+					time.Now().Format("15:04:05"),
+				))
 				continue
 			}
 
-			statusColor := ui.ColorGreen
-			if statusResp.Status == "degraded" {
-				statusColor = ui.ColorYellow
-			} else if statusResp.Status == "unhealthy" {
-				statusColor = ui.ColorRed
-			}
-
 			uptime := formatUptime(time.Duration(statusResp.Uptime) * time.Second)
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
-				ui.Colorize(statusResp.Service, ui.ColorWhite),
+			rows = append(rows, ui.FormatTableRow(
+				statusResp.Service,
 				statusResp.Version,
-				ui.Colorize(strings.ToUpper(statusResp.Status), statusColor),
+				statusResp.Status,
 				uptime,
-				time.Unix(statusResp.Timestamp, 0).Format("15:04:05"))
+				time.Unix(statusResp.Timestamp, 0).Format("15:04:05"),
+			))
 		}
 	}
-	w.Flush()
+
+	return statusUpdateMsg{rows: rows}
+}
+
+type statusUpdateMsg struct {
+	rows []ui.TableRow
+}
+
+func (m watchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "q", "ctrl+c", "esc":
+			m.quitting = true
+			return m, tea.Quit
+		}
+
+	case tickMsg:
+		return m, tea.Batch(tickCmd(), m.fetchStatuses)
+
+	case statusUpdateMsg:
+		m.rows = msg.rows
+		return m, nil
+	}
+
+	return m, nil
+}
+
+func (m watchModel) View() string {
+	if m.quitting {
+		return lipgloss.NewStyle().
+			Foreground(lipgloss.Color("245")).
+			Render("Stopped watching services. Goodbye!\n")
+	}
+
+	var s strings.Builder
+
+	// Title
+	s.WriteString(ui.RenderTitle("DEXTER LIVE WATCH"))
+	s.WriteString("\n")
+	s.WriteString(ui.RenderSubtitle("Press 'q' or Ctrl+C to exit • Refreshing every 2 seconds"))
+	s.WriteString("\n\n")
+
+	// Table
+	if len(m.rows) == 0 {
+		s.WriteString(lipgloss.NewStyle().
+			Foreground(lipgloss.Color("245")).
+			Render("Loading service statuses..."))
+	} else {
+		table := ui.CreateServiceTable(m.rows)
+		s.WriteString(ui.RenderTable(table))
+	}
+
+	return s.String()
+}
+
+// Watch provides a live dashboard of all service statuses
+func Watch() error {
+	serviceMap, err := config.LoadServiceMap()
+	if err != nil {
+		return fmt.Errorf("failed to load service map: %w", err)
+	}
+
+	m := watchModel{
+		serviceMap: serviceMap,
+		rows:       []ui.TableRow{},
+	}
+
+	p := tea.NewProgram(m, tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		return fmt.Errorf("error running watch: %w", err)
+	}
 
 	return nil
 }
