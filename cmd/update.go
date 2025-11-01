@@ -341,15 +341,22 @@ func installDexCLI(dexCliPath string) error {
 
 	sourcePath := filepath.Join(dexCliPath, "dex-cli")
 	destPath := filepath.Join(dexterBinPath, "dex")
+	tempPath := filepath.Join(dexterBinPath, "dex.new")
 
-	// Copy the binary
+	// Copy to temporary location first
 	sourceFile, err := os.ReadFile(sourcePath)
 	if err != nil {
 		return fmt.Errorf("failed to read binary: %w", err)
 	}
 
-	if err := os.WriteFile(destPath, sourceFile, 0755); err != nil {
+	if err := os.WriteFile(tempPath, sourceFile, 0755); err != nil {
 		return fmt.Errorf("failed to write binary: %w", err)
+	}
+
+	// Rename (atomic operation that works even if dest is running)
+	if err := os.Rename(tempPath, destPath); err != nil {
+		os.Remove(tempPath) // Clean up temp file
+		return fmt.Errorf("failed to install binary: %w", err)
 	}
 
 	return nil
