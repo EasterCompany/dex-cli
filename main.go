@@ -118,6 +118,12 @@ func main() {
 			os.Exit(1)
 		}
 
+	case "model":
+		if err := cmd.Model(os.Args[2:]); err != nil {
+			ui.PrintError(fmt.Sprintf("Error: %v", err))
+			os.Exit(1)
+		}
+
 	case "help", "-h", "--help":
 		printUsage()
 
@@ -143,6 +149,7 @@ func printUsage() {
 	ui.PrintInfo("config     <validate> Manage and validate configuration files")
 	ui.PrintInfo("watch      Show a live dashboard of all service statuses")
 	ui.PrintInfo("logs       <service> [-f] View service logs")
+	ui.PrintInfo("model      <list|delete|edit> Manage Dexter models")
 	ui.PrintInfo("system     Show system info and manage packages")
 	ui.PrintInfo("version    Show version information")
 	ui.PrintInfo("help       Show this help message")
