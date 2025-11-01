@@ -184,6 +184,14 @@ func FormatTableRow(service, version, status, uptime, timestamp string) TableRow
 	}
 }
 
+// FormatFormatTableRow formats a row with proper styling for the format command
+func FormatFormatTableRow(service, status string) TableRow {
+	return TableRow{
+		StyleServiceName(service),
+		StyleStatus(status),
+	}
+}
+
 // PrintLogo prints the Dexter ASCII logo
 func PrintLogo() {
 	logo := lipgloss.NewStyle().
