@@ -224,6 +224,13 @@ EOF
     echo "  → Edit ~/Dexter/config/options.json with your credentials"
 fi
 
+# Generate system.json on first install
+if [ ! -f ~/Dexter/config/system.json ]; then
+    echo "→ Scanning system hardware..."
+    ~/Dexter/bin/dex system scan > /dev/null 2>&1
+    echo "✓ Created system.json"
+fi
+
 echo ""
 echo "✓ Installed!"
 echo ""

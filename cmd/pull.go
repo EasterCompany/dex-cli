@@ -20,6 +20,24 @@ func Pull() error {
 	fmt.Println("✓ Directory structure verified")
 	fmt.Println()
 
+	// Check system packages
+	fmt.Println("Validating system packages...")
+	if sys, err := config.LoadSystemConfig(); err == nil {
+		missing := []string{}
+		for _, pkg := range sys.Packages {
+			if pkg.Required && !pkg.Installed {
+				missing = append(missing, pkg.Name)
+			}
+		}
+		if len(missing) > 0 {
+			fmt.Printf("⚠ Missing packages: %v\n", missing)
+			fmt.Println("  Run: dex system validate")
+		} else {
+			fmt.Println("✓ All required packages present")
+		}
+	}
+	fmt.Println()
+
 	// Load service map
 	fmt.Println("Loading service map...")
 	serviceMap, err := config.LoadServiceMap()

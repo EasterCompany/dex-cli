@@ -26,6 +26,12 @@ func main() {
 			os.Exit(1)
 		}
 
+	case "system":
+		if err := cmd.System(os.Args[2:]); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+
 	case "version", "-v", "--version":
 		fmt.Printf("dex version %s\n", version)
 
@@ -47,6 +53,7 @@ func printUsage() {
 	fmt.Println()
 	fmt.Println("Commands:")
 	fmt.Println("  pull       Clone/pull all Dexter services from Git")
+	fmt.Println("  system     Show system info and manage packages")
 	fmt.Println("  version    Show version information")
 	fmt.Println("  help       Show this help message")
 	fmt.Println()
