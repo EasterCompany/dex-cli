@@ -43,6 +43,7 @@ func runOnAllServices(command string, args []string, title string, showOutputOnF
 			out, err := cmd.CombinedOutput()
 			if err != nil {
 				status = "FAILED"
+				fmt.Println(ui.RenderSubtitle(fmt.Sprintf("▼ %s", service.ID)))
 				fmt.Println(string(out))
 			}
 		}
