@@ -389,10 +389,12 @@ func installDexCLI(dexCliPath string) error {
 }
 
 func renderUpdateSteps(steps []updateStep) {
-	// Clear previous output (move cursor up)
-	fmt.Print("\033[s") // Save cursor position
+	// Move cursor up to the beginning of the steps
+	if len(steps) > 1 {
+		fmt.Printf("\033[%dA", len(steps)-1)
+	}
 
-	for i, step := range steps {
+	for _, step := range steps {
 		var style lipgloss.Style
 		var icon string
 
@@ -428,15 +430,10 @@ func renderUpdateSteps(steps []updateStep) {
 			message = "..."
 		}
 
-		fmt.Printf("%s %s %s\n",
+		fmt.Printf("\r\033[K%s %s %s\n",
 			iconStyle.Render(icon),
 			nameStyle.Render(step.name),
 			style.Render(message))
-
-		// If this is the last step being rendered, don't print extra newline
-		if i == len(steps)-1 {
-			fmt.Print("\033[u") // Restore cursor position for next update
-		}
 	}
 
 	// Add delay for visibility

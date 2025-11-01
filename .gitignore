@@ -1,5 +1,6 @@
 # Binaries
 dex
+dex-cli
 *.exe
 *.exe~
 *.dll
