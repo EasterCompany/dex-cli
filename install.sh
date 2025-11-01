@@ -214,7 +214,13 @@ EOF
 }
 EOF
 
+    # Copy to .default files for redundancy
+    cp ~/Dexter/config/service-map.json ~/Dexter/config/service-map.json.default
+    cp ~/Dexter/config/options.json ~/Dexter/config/options.json.default
+
     echo "✓ Created default configs"
+    echo "  → service-map.json & service-map.json.default"
+    echo "  → options.json & options.json.default"
     echo "  → Edit ~/Dexter/config/options.json with your credentials"
 fi
 
