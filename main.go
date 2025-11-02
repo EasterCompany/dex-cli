@@ -36,7 +36,7 @@ func main() {
 
 	switch command {
 	case "pull":
-		if err := cmd.Pull(); err != nil {
+		if err := cmd.Pull(os.Args[2:]); err != nil {
 			ui.PrintError(fmt.Sprintf("Error: %v", err))
 			os.Exit(1)
 		}
@@ -60,16 +60,11 @@ func main() {
 		}
 
 	case "version", "-v", "--version":
-		ui.PrintInfo(fmt.Sprintf("dex-cli v%s @ %s-%s", version, commit, date))
+		branch, commit := git.GetVersionInfo(".")
+		ui.PrintInfo(fmt.Sprintf("dex-cli %s %s@%s %s", version, branch, commit, date))
 
 	case "build":
-		if len(os.Args) < 3 {
-			ui.PrintError("Error: service name or 'all' required for 'build' command")
-			printUsage(isDevMode, hasSourceServices)
-			os.Exit(1)
-		}
-		service := os.Args[2]
-		if err := cmd.Build(service); err != nil {
+		if err := cmd.Build(os.Args[2:]); err != nil {
 			ui.PrintError(fmt.Sprintf("Error: %v", err))
 			os.Exit(1)
 		}
@@ -115,14 +110,16 @@ func main() {
 		}
 
 	case "logs":
-		if len(os.Args) < 3 {
-			ui.PrintError("Error: service name required for 'logs' command")
-			printUsage(isDevMode, hasSourceServices)
-			os.Exit(1)
+		follow := false
+		args := os.Args[2:]
+		for i, arg := range args {
+			if arg == "-f" {
+				follow = true
+				args = append(args[:i], args[i+1:]...)
+				break
+			}
 		}
-		service := os.Args[2]
-		follow := len(os.Args) > 3 && os.Args[3] == "-f"
-		if err := cmd.Logs(service, follow); err != nil {
+		if err := cmd.Logs(args, follow); err != nil {
 			ui.PrintError(fmt.Sprintf("Error: %v", err))
 			os.Exit(1)
 		}

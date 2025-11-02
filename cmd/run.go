@@ -17,11 +17,7 @@ func runOnAllServices(command string, args []string, showOutputOnFailure bool) e
 		return fmt.Errorf("failed to load service map: %w", err)
 	}
 
-	// Add dex-cli to the list of services
-	services := []config.ServiceEntry{{
-		ID:     "dex-cli",
-		Source: ".",
-	}}
+	var services []config.ServiceEntry
 	for _, s := range serviceMap.Services {
 		for _, service := range s {
 			if strings.HasPrefix(service.ID, "dex-") && service.Source != "" {

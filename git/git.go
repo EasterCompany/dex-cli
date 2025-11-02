@@ -7,6 +7,25 @@ import (
 	"strings"
 )
 
+// GetVersionInfo returns the git version information for a given path.
+func GetVersionInfo(path string) (string, string) {
+	branchCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	branchCmd.Dir = path
+	branch, err := branchCmd.Output()
+	if err != nil {
+		branch = []byte("unknown")
+	}
+
+	commitCmd := exec.Command("git", "rev-parse", "--short", "HEAD")
+	commitCmd.Dir = path
+	commit, err := commitCmd.Output()
+	if err != nil {
+		commit = []byte("unknown")
+	}
+
+	return strings.TrimSpace(string(branch)), strings.TrimSpace(string(commit))
+}
+
 // RepoStatus represents the state of a git repository
 type RepoStatus struct {
 	Exists         bool
@@ -107,6 +126,32 @@ func Pull(repoPath string) error {
 
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to pull repository: %w", err)
+	}
+
+	return nil
+}
+
+// SwitchBranch switches to a different branch
+func SwitchBranch(repoPath, branch string) error {
+	cmd := exec.Command("git", "-C", repoPath, "checkout", branch)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to switch to branch %s: %w", branch, err)
+	}
+
+	return nil
+}
+
+// CheckoutCommit checks out a specific commit
+func CheckoutCommit(repoPath, commit string) error {
+	cmd := exec.Command("git", "-C", repoPath, "checkout", commit)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to checkout commit %s: %w", commit, err)
 	}
 
 	return nil

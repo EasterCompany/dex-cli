@@ -5,49 +5,64 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
 // Build compiles one or all services
-func Build(serviceName string) error {
+func Build(args []string) error {
 	// Load the service map
 	serviceMap, err := config.LoadServiceMap()
 	if err != nil {
 		return fmt.Errorf("failed to load service map: %w", err)
 	}
-	ui.PrintSuccess("Service map loaded")
+
+	// Determine which services to build
+	servicesToBuild := []config.ServiceEntry{}
+	if len(args) == 0 || (len(args) > 0 && args[0] == "all") {
+		for _, services := range serviceMap.Services {
+			for _, service := range services {
+				if strings.HasPrefix(service.ID, "dex-") && service.ID != "dex-cli" {
+					servicesToBuild = append(servicesToBuild, service)
+				}
+			}
+		}
+	} else {
+		for _, arg := range args {
+			serviceName := arg
+			if !strings.HasPrefix(serviceName, "dex-") {
+				serviceName = "dex-" + serviceName + "-service"
+			}
+			found := false
+			for _, services := range serviceMap.Services {
+				for _, service := range services {
+					if service.ID == serviceName {
+						servicesToBuild = append(servicesToBuild, service)
+						found = true
+						break
+					}
+				}
+				if found {
+					break
+				}
+			}
+			if !found {
+				return fmt.Errorf("service '%s' not found", arg)
+			}
+		}
+	}
 
 	// Build logic
-	if serviceName == "all" {
-		return buildAll(serviceMap)
-	} else {
-		return buildOne(serviceMap, serviceName)
-	}
-}
-
-func buildAll(serviceMap *config.ServiceMapConfig) error {
-	for _, services := range serviceMap.Services {
-		for _, service := range services {
-			if err := buildService(service); err != nil {
-				ui.PrintError(fmt.Sprintf("Failed to build %s: %v", service.ID, err))
-			}
+	for _, service := range servicesToBuild {
+		if err := buildService(service); err != nil {
+			ui.PrintError(fmt.Sprintf("Failed to build %s: %v", service.ID, err))
 		}
 	}
+
 	ui.PrintSuccess("All services built")
 	return nil
-}
-
-func buildOne(serviceMap *config.ServiceMapConfig, serviceName string) error {
-	for _, services := range serviceMap.Services {
-		for _, service := range services {
-			if service.ID == serviceName {
-				return buildService(service)
-			}
-		}
-	}
-	return fmt.Errorf("service '%s' not found in service-map.json", serviceName)
 }
 
 func buildService(service config.ServiceEntry) error {

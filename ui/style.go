@@ -1,6 +1,10 @@
 package ui
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/charmbracelet/lipgloss"
+)
 
 const (
 	ColorRed    = "\033[31m"
@@ -40,4 +44,31 @@ func PrintInfo(message string) {
 // Colorize wraps a string with the given ANSI color codes
 func Colorize(text string, color string) string {
 	return fmt.Sprintf("%s%s%s", color, text, ColorReset)
+}
+
+func RenderTitle(title string) string {
+	style := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("63")).
+		Padding(1, 2)
+
+	return style.Render(title)
+}
+
+func RenderSubtitle(subtitle string) string {
+	style := lipgloss.NewStyle().
+		Italic(true).
+		Foreground(lipgloss.Color("245"))
+
+	return style.Render(subtitle)
+}
+
+func RenderSectionTitle(title string) string {
+	style := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("99")).
+		Padding(0, 1).
+		MarginTop(1)
+
+	return style.Render(title)
 }

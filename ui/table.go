@@ -147,26 +147,6 @@ func StyleAddress(address string) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color("147")).Render(address)
 }
 
-// RenderTitle renders a styled title
-func RenderTitle(title string) string {
-	style := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("99")).
-		Padding(1, 2).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("99"))
-	return style.Render(title)
-}
-
-// RenderSubtitle renders a styled subtitle
-func RenderSubtitle(subtitle string) string {
-	style := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("245")).
-		Italic(true).
-		Padding(0, 1)
-	return style.Render(subtitle)
-}
-
 // CreateServiceTable creates a properly formatted service status table
 func CreateServiceTable(rows []TableRow) Table {
 	return Table{
