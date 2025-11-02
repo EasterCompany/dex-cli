@@ -139,6 +139,14 @@ func StyleTimestamp(timestamp string) string {
 	return lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render(timestamp)
 }
 
+// StyleAddress returns address text
+func StyleAddress(address string) string {
+	if address == "N/A" || address == "" {
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("N/A")
+	}
+	return lipgloss.NewStyle().Foreground(lipgloss.Color("147")).Render(address)
+}
+
 // RenderTitle renders a styled title
 func RenderTitle(title string) string {
 	style := lipgloss.NewStyle().
@@ -164,6 +172,7 @@ func CreateServiceTable(rows []TableRow) Table {
 	return Table{
 		Columns: []TableColumn{
 			{Header: "SERVICE", Width: 25},
+			{Header: "ADDRESS", Width: 25},
 			{Header: "VERSION", Width: 12},
 			{Header: "STATUS", Width: 15},
 			{Header: "UPTIME", Width: 10},
@@ -174,9 +183,10 @@ func CreateServiceTable(rows []TableRow) Table {
 }
 
 // FormatTableRow formats a row with proper styling
-func FormatTableRow(service, version, status, uptime, timestamp string) TableRow {
+func FormatTableRow(service, address, version, status, uptime, timestamp string) TableRow {
 	return TableRow{
 		StyleServiceName(service),
+		StyleAddress(address),
 		StyleVersion(version),
 		StyleStatus(status),
 		StyleUptime(uptime),

@@ -47,6 +47,7 @@ func (m watchModel) fetchStatuses() tea.Msg {
 				rows = append(rows, ui.FormatTableRow(
 					service.ID,
 					"N/A",
+					"N/A",
 					"SKIPPED",
 					"N/A",
 					"N/A",
@@ -60,6 +61,7 @@ func (m watchModel) fetchStatuses() tea.Msg {
 			if err != nil {
 				rows = append(rows, ui.FormatTableRow(
 					service.ID,
+					service.Addr,
 					"N/A",
 					"DOWN",
 					"N/A",
@@ -73,6 +75,7 @@ func (m watchModel) fetchStatuses() tea.Msg {
 			if err != nil {
 				rows = append(rows, ui.FormatTableRow(
 					service.ID,
+					service.Addr,
 					"N/A",
 					"ERROR",
 					"N/A",
@@ -85,6 +88,7 @@ func (m watchModel) fetchStatuses() tea.Msg {
 			if err := json.Unmarshal(body, &statusResp); err != nil {
 				rows = append(rows, ui.FormatTableRow(
 					service.ID,
+					service.Addr,
 					"N/A",
 					"INVALID RESP",
 					"N/A",
@@ -96,6 +100,7 @@ func (m watchModel) fetchStatuses() tea.Msg {
 			uptime := formatUptime(time.Duration(statusResp.Uptime) * time.Second)
 			rows = append(rows, ui.FormatTableRow(
 				statusResp.Service,
+				service.Addr,
 				statusResp.Version,
 				statusResp.Status,
 				uptime,
