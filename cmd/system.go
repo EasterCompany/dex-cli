@@ -179,11 +179,15 @@ func renderSystemInfo(sys *config.SystemConfig) {
 
 	// CPU
 	for _, cpu := range sys.CPU {
-		fmt.Printf("%s  %s\n",
-			headerStyle.Render("CPU:"),
-			valueStyle.Render(cpu.Label))
-		fmt.Printf("  %s\n",
-			labelStyle.Render(fmt.Sprintf("Cores: %d  •  Threads: %d", cpu.Count, cpu.Threads)))
+		fmt.Printf("%s\n", headerStyle.Render(fmt.Sprintf("CPU (%s):", cpu.Label)))
+		fmt.Printf("  %s\n", labelStyle.Render(fmt.Sprintf("CORES: %d", cpu.Count)))
+		fmt.Printf("  %s\n", labelStyle.Render(fmt.Sprintf("THREADS: %d", cpu.Threads)))
+		if cpu.AvgGHz > 0 {
+			fmt.Printf("  %s\n", labelStyle.Render(fmt.Sprintf("AVG: %.2f GHz", cpu.AvgGHz)))
+		}
+		if cpu.MaxGHz > 0 {
+			fmt.Printf("  %s\n", labelStyle.Render(fmt.Sprintf("MAX: %.2f GHz", cpu.MaxGHz)))
+		}
 	}
 
 	// GPU

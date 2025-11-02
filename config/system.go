@@ -121,6 +121,7 @@ func detectCPU() []CPUInfo {
 		if data, err := os.ReadFile("/proc/cpuinfo"); err == nil {
 			lines := strings.Split(string(data), "\n")
 			coreIDs := make(map[string]bool)
+			var frequencies []float64
 
 			for _, line := range lines {
 				if strings.HasPrefix(line, "model name") {
@@ -136,11 +137,35 @@ func detectCPU() []CPUInfo {
 						coreIDs[strings.TrimSpace(parts[1])] = true
 					}
 				}
+				// Collect CPU frequencies
+				if strings.HasPrefix(line, "cpu MHz") {
+					parts := strings.Split(line, ":")
+					if len(parts) > 1 {
+						mhzStr := strings.TrimSpace(parts[1])
+						if mhz, err := strconv.ParseFloat(mhzStr, 64); err == nil {
+							frequencies = append(frequencies, mhz/1000.0) // Convert MHz to GHz
+						}
+					}
+				}
 			}
 
 			// If we found core IDs, use that count
 			if len(coreIDs) > 0 {
 				cpuInfo.Count = len(coreIDs)
+			}
+
+			// Calculate average and max frequencies
+			if len(frequencies) > 0 {
+				var sum float64
+				maxFreq := frequencies[0]
+				for _, freq := range frequencies {
+					sum += freq
+					if freq > maxFreq {
+						maxFreq = freq
+					}
+				}
+				cpuInfo.AvgGHz = sum / float64(len(frequencies))
+				cpuInfo.MaxGHz = maxFreq
 			}
 		}
 	}
