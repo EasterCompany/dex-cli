@@ -16,9 +16,6 @@ import (
 
 // Status checks the health of one or all services
 func Status(serviceName string) error {
-	fmt.Println(ui.RenderTitle("DEXTER STATUS"))
-	fmt.Println()
-
 	// Load the service map
 	serviceMap, err := config.LoadServiceMap()
 	if err != nil {

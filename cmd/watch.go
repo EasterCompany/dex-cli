@@ -145,9 +145,7 @@ func (m watchModel) View() string {
 
 	var s strings.Builder
 
-	// Title
-	s.WriteString(ui.RenderTitle("DEXTER LIVE WATCH"))
-	s.WriteString("\n")
+	// Info line
 	s.WriteString(ui.RenderSubtitle("Press 'q' or Ctrl+C to exit • Refreshing every 2 seconds"))
 	s.WriteString("\n\n")
 
