@@ -51,14 +51,24 @@ type Package struct {
 	MinVersion     string `json:"min_version,omitempty"`
 	Installed      bool   `json:"installed"`
 	InstallCommand string `json:"install_command,omitempty"`
+	UpgradeCommand string `json:"upgrade_command,omitempty"`
 }
 
 // RequiredPackages defines packages needed for Dexter
 var RequiredPackages = []Package{
-	{Name: "git", Required: true, MinVersion: "2.0", InstallCommand: "sudo pacman -S git || sudo apt install git"},
-	{Name: "go", Required: true, MinVersion: "1.20", InstallCommand: "sudo pacman -S go || sudo apt install golang-go"},
-	{Name: "python3", Required: true, MinVersion: "3.10", InstallCommand: "sudo pacman -S python || sudo apt install python3"},
-	{Name: "redis-server", Required: false, MinVersion: "6.0", InstallCommand: "sudo pacman -S redis || sudo apt install redis-server"},
+	{Name: "git", Required: true, MinVersion: "2.0", InstallCommand: "sudo pacman -S --noconfirm git || sudo apt install -y git", UpgradeCommand: "sudo pacman -Syu --noconfirm git || (sudo apt update && sudo apt upgrade -y git)"},
+	{Name: "go", Required: true, MinVersion: "1.20", InstallCommand: "sudo pacman -S --noconfirm go || sudo apt install -y golang-go", UpgradeCommand: "sudo pacman -Syu --noconfirm go || (sudo apt update && sudo apt upgrade -y golang-go)"},
+	{Name: "python3", Required: true, MinVersion: "3.13", InstallCommand: "sudo pacman -S --noconfirm python || sudo apt install -y python3", UpgradeCommand: "sudo pacman -Syu --noconfirm python || (sudo apt update && sudo apt upgrade -y python3)"},
+	{Name: "bun", Required: true, MinVersion: "1.0", InstallCommand: "curl -fsSL https://bun.sh/install | bash", UpgradeCommand: "bun upgrade"},
+	{Name: "golangci-lint", Required: true, MinVersion: "1.50", InstallCommand: "go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest", UpgradeCommand: "go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"},
+	{Name: "make", Required: true, MinVersion: "4.0", InstallCommand: "sudo pacman -S --noconfirm make || sudo apt install -y make", UpgradeCommand: "sudo pacman -Syu --noconfirm make || (sudo apt update && sudo apt upgrade -y make)"},
+	{Name: "pip3", Required: true, MinVersion: "20.0", InstallCommand: "sudo pacman -S --noconfirm python-pip || sudo apt install -y python3-pip", UpgradeCommand: "pip3 install --upgrade pip"},
+	{Name: "lsblk", Required: true, MinVersion: "", InstallCommand: "sudo pacman -S --noconfirm util-linux || sudo apt install -y util-linux", UpgradeCommand: "sudo pacman -Syu --noconfirm util-linux || (sudo apt update && sudo apt upgrade -y util-linux)"},
+	{Name: "findmnt", Required: true, MinVersion: "", InstallCommand: "sudo pacman -S --noconfirm util-linux || sudo apt install -y util-linux", UpgradeCommand: "sudo pacman -Syu --noconfirm util-linux || (sudo apt update && sudo apt upgrade -y util-linux)"},
+	{Name: "redis-server", Required: false, MinVersion: "6.0", InstallCommand: "sudo pacman -S --noconfirm redis || sudo apt install -y redis-server", UpgradeCommand: "sudo pacman -Syu --noconfirm redis || (sudo apt update && sudo apt upgrade -y redis-server)"},
+	{Name: "htop", Required: false, MinVersion: "3.0", InstallCommand: "sudo pacman -S --noconfirm htop || sudo apt install -y htop", UpgradeCommand: "sudo pacman -Syu --noconfirm htop || (sudo apt update && sudo apt upgrade -y htop)"},
+	{Name: "curl", Required: false, MinVersion: "7.0", InstallCommand: "sudo pacman -S --noconfirm curl || sudo apt install -y curl", UpgradeCommand: "sudo pacman -Syu --noconfirm curl || (sudo apt update && sudo apt upgrade -y curl)"},
+	{Name: "jq", Required: false, MinVersion: "1.6", InstallCommand: "sudo pacman -S --noconfirm jq || sudo apt install -y jq", UpgradeCommand: "sudo pacman -Syu --noconfirm jq || (sudo apt update && sudo apt upgrade -y jq)"},
 }
 
 // LoadSystemConfig loads or creates system.json
@@ -248,8 +258,8 @@ func detectStorage() []StorageInfo {
 
 	// Parse lsblk output to find disk devices
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	deviceMap := make(map[string]*StorageInfo)   // Map device name to storage info
-	partitionMap := make(map[string]string)      // Map partition to parent disk
+	deviceMap := make(map[string]*StorageInfo) // Map device name to storage info
+	partitionMap := make(map[string]string)    // Map partition to parent disk
 
 	for _, line := range lines {
 		fields := strings.Fields(line)
@@ -357,16 +367,86 @@ func detectPackages() []Package {
 		}
 	}
 
+	// Add conditional CUDA packages if dex-model-service exists
+	if modelServiceExists() {
+		cudaPackages := []Package{
+			{Name: "nvidia-smi", Required: true, MinVersion: "", InstallCommand: "Install NVIDIA drivers"},
+			{Name: "nvcc", Required: true, MinVersion: "11.0", InstallCommand: "sudo pacman -S cuda || sudo apt install nvidia-cuda-toolkit"},
+		}
+
+		for _, cudaPkg := range cudaPackages {
+			_, err := exec.LookPath(cudaPkg.Name)
+			cudaPkg.Installed = err == nil
+			if cudaPkg.Installed {
+				cudaPkg.Version = getPackageVersion(cudaPkg.Name)
+			}
+			packages = append(packages, cudaPkg)
+		}
+	}
+
+	// Add Python venv check
+	venvPath, err := ExpandPath(filepath.Join(DexterRoot, "python"))
+	if err == nil {
+		venvExists := false
+		if info, err := os.Stat(venvPath); err == nil && info.IsDir() {
+			// Check for activate script to confirm it's a venv
+			activatePath := filepath.Join(venvPath, "bin", "activate")
+			if _, err := os.Stat(activatePath); err == nil {
+				venvExists = true
+			}
+		}
+
+		packages = append(packages, Package{
+			Name:           "dexter-venv",
+			Version:        venvPath,
+			Required:       true,
+			Installed:      venvExists,
+			InstallCommand: "python3 -m venv ~/Dexter/python",
+		})
+	}
+
 	return packages
+}
+
+// modelServiceExists checks if dex-model-service is installed
+func modelServiceExists() bool {
+	// Check source directory
+	sourcePath, err := ExpandPath("~/EasterCompany/dex-model-service")
+	if err == nil {
+		if info, err := os.Stat(sourcePath); err == nil && info.IsDir() {
+			return true
+		}
+	}
+
+	// Check binary location
+	binaryPath, err := ExpandPath(filepath.Join(DexterRoot, "bin", "dex-model-service"))
+	if err == nil {
+		if _, err := os.Stat(binaryPath); err == nil {
+			return true
+		}
+	}
+
+	return false
 }
 
 // getPackageVersion tries to get package version
 func getPackageVersion(pkgName string) string {
 	versionArgs := map[string][]string{
-		"git":          {"--version"},
-		"go":           {"version"},
-		"python3":      {"--version"},
-		"redis-server": {"--version"},
+		"git":           {"--version"},
+		"go":            {"version"},
+		"python3":       {"--version"},
+		"bun":           {"--version"},
+		"golangci-lint": {"--version"},
+		"make":          {"--version"},
+		"pip3":          {"--version"},
+		"redis-server":  {"--version"},
+		"htop":          {"--version"},
+		"curl":          {"--version"},
+		"jq":            {"--version"},
+		"nvidia-smi":    {"--version"},
+		"nvcc":          {"--version"},
+		"lsblk":         {"--version"},
+		"findmnt":       {"--version"},
 	}
 
 	args, ok := versionArgs[pkgName]

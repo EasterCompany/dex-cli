@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/ui"
@@ -12,8 +11,6 @@ import (
 
 // Logs displays logs for a given service
 func Logs(service string, follow bool) error {
-	ui.PrintTitle(fmt.Sprintf("LOGS FOR %s", strings.ToUpper(service)))
-
 	serviceMap, err := config.LoadServiceMap()
 	if err != nil {
 		return fmt.Errorf("failed to load service map: %w", err)

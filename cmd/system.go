@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -21,6 +23,10 @@ func System(args []string) error {
 		return systemScan()
 	case "validate":
 		return systemValidate()
+	case "install":
+		return systemInstall(args[1:])
+	case "upgrade":
+		return systemUpgrade(args[1:])
 	default:
 		errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 		fmt.Println(errorStyle.Render(fmt.Sprintf("Unknown command: %s", args[0])))
@@ -33,6 +39,8 @@ func System(args []string) error {
 		fmt.Println(cmdStyle.Render("dex system         # Show system info"))
 		fmt.Println(cmdStyle.Render("dex system scan    # Re-scan hardware/software"))
 		fmt.Println(cmdStyle.Render("dex system validate # Check for missing packages"))
+		fmt.Println(cmdStyle.Render("dex system install [package] # Install missing package(s)"))
+		fmt.Println(cmdStyle.Render("dex system upgrade [package] # Upgrade installed package(s)"))
 
 		return fmt.Errorf("unknown command")
 	}
@@ -83,50 +91,29 @@ func systemValidate() error {
 	}
 
 	missing := []config.Package{}
-	installed := []config.Package{}
+	requiredCount := 0
 
 	for _, pkg := range sys.Packages {
 		if pkg.Required {
-			if pkg.Installed {
-				installed = append(installed, pkg)
-			} else {
+			requiredCount++
+			if !pkg.Installed {
 				missing = append(missing, pkg)
 			}
 		}
 	}
 
-	// Show installed packages
-	if len(installed) > 0 {
-		successStyle := lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("42")).
-			Padding(0, 1).
-			MarginBottom(1)
-		fmt.Println(successStyle.Render("INSTALLED"))
+	missingCount := len(missing)
 
-		for _, pkg := range installed {
-			pkgStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("252")).
-				Padding(0, 1)
-			versionStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("245"))
+	summaryStyle := lipgloss.NewStyle().Padding(0, 1)
+	checksStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	issuesStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
 
-			fmt.Printf("  %s %s %s\n",
-				lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Render("✓"),
-				pkgStyle.Render(pkg.Name),
-				versionStyle.Render(pkg.Version))
-		}
-		fmt.Println()
-	}
-
-	// Show missing packages
-	if len(missing) > 0 {
-		errorStyle := lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("196")).
-			Padding(0, 1).
-			MarginBottom(1)
-		fmt.Println(errorStyle.Render("MISSING"))
+	if missingCount > 0 {
+		summary := fmt.Sprintf("Found %s issues out of %s required package checks",
+			issuesStyle.Render(fmt.Sprintf("%d", missingCount)),
+			checksStyle.Render(fmt.Sprintf("%d", requiredCount)))
+		fmt.Println(summaryStyle.Render(summary))
 
 		for _, pkg := range missing {
 			pkgStyle := lipgloss.NewStyle().
@@ -153,16 +140,130 @@ func systemValidate() error {
 	}
 
 	// All good!
-	summaryBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("42")).
-		Padding(1, 2)
+	summary := fmt.Sprintf("✓ %s required package checks passed", okStyle.Render(fmt.Sprintf("%d", requiredCount)))
+	fmt.Println(summaryStyle.Render(summary))
+	return nil
+}
 
-	allGoodStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("42")).
-		Bold(true)
+// systemInstall installs missing packages
+func systemInstall(args []string) error {
+	sys, err := config.LoadSystemConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load system config: %w", err)
+	}
 
-	fmt.Println(summaryBox.Render(allGoodStyle.Render("✓ All required packages installed!")))
+	if len(args) == 0 {
+		// Install all missing packages
+		missing := []config.Package{}
+		for _, pkg := range sys.Packages {
+			if !pkg.Installed {
+				missing = append(missing, pkg)
+			}
+		}
+
+		if len(missing) == 0 {
+			fmt.Println("All packages are already installed.")
+			return nil
+		}
+
+		for _, pkg := range missing {
+			if err := installPackage(pkg); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	// Install specific package
+	pkgName := args[0]
+	for _, pkg := range sys.Packages {
+		if pkg.Name == pkgName {
+			if pkg.Installed {
+				fmt.Printf("Package '%s' is already installed.\n", pkgName)
+				return nil
+			}
+			return installPackage(pkg)
+		}
+	}
+
+	return fmt.Errorf("package '%s' not found", pkgName)
+}
+
+func installPackage(pkg config.Package) error {
+	if pkg.InstallCommand == "" {
+		return fmt.Errorf("no install command found for package '%s'", pkg.Name)
+	}
+
+	fmt.Printf("Installing '%s'...\n", pkg.Name)
+	fmt.Printf("Running command: %s\n", pkg.InstallCommand)
+
+	cmd := exec.Command("bash", "-c", pkg.InstallCommand)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to install package '%s': %w", pkg.Name, err)
+	}
+
+	fmt.Printf("✓ Successfully installed '%s'.\n", pkg.Name)
+	return nil
+}
+
+// systemUpgrade upgrades installed packages
+func systemUpgrade(args []string) error {
+	sys, err := config.LoadSystemConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load system config: %w", err)
+	}
+
+	if len(args) == 0 {
+		// Upgrade all installed packages
+		for _, pkg := range sys.Packages {
+			if pkg.Installed {
+				if err := upgradePackage(pkg); err != nil {
+					fmt.Printf("Failed to upgrade '%s': %v\n", pkg.Name, err)
+				}
+			}
+		}
+		return nil
+	}
+
+	// Upgrade specific package
+	pkgName := args[0]
+	for _, pkg := range sys.Packages {
+		if pkg.Name == pkgName {
+			if !pkg.Installed {
+				return fmt.Errorf("package '%s' is not installed", pkgName)
+			}
+			return upgradePackage(pkg)
+		}
+	}
+
+	return fmt.Errorf("package '%s' not found", pkgName)
+}
+
+func upgradePackage(pkg config.Package) error {
+	if pkg.UpgradeCommand == "" {
+		fmt.Printf("No upgrade command found for package '%s'. Skipping.\n", pkg.Name)
+		return nil
+	}
+
+	fmt.Printf("Upgrading '%s'...\n", pkg.Name)
+	fmt.Printf("Running command: %s\n", pkg.UpgradeCommand)
+
+	cmd := exec.Command("bash", "-c", pkg.UpgradeCommand)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to upgrade package '%s': %w", pkg.Name, err)
+	}
+
+	fmt.Printf("✓ Successfully upgraded '%s'.\n", pkg.Name)
 	return nil
 }
 
@@ -247,35 +348,48 @@ func renderSystemInfo(sys *config.SystemConfig) {
 	// Packages
 	fmt.Printf("%s\n", headerStyle.Render("PACKAGES:"))
 
+	missingPackages := []config.Package{}
 	for _, pkg := range sys.Packages {
-		var statusStyle lipgloss.Style
-		var icon string
-
-		if pkg.Installed {
-			statusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-			icon = "✓"
-		} else {
-			statusStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-			icon = "✗"
+		if !pkg.Installed {
+			missingPackages = append(missingPackages, pkg)
 		}
+	}
 
-		pkgNameStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("252")).
-			Width(18)
+	totalCount := len(sys.Packages)
+	missingCount := len(missingPackages)
 
-		versionStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	summaryStyle := lipgloss.NewStyle().Padding(0, 1)
+	checksStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	issuesStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
 
-		line := fmt.Sprintf(" %s %s %s",
-			statusStyle.Render(icon),
-			pkgNameStyle.Render(pkg.Name),
-			versionStyle.Render(pkg.Version))
+	if missingCount > 0 {
+		summary := fmt.Sprintf("Found %s issues out of %s checks",
+			issuesStyle.Render(fmt.Sprintf("%d", missingCount)),
+			checksStyle.Render(fmt.Sprintf("%d", totalCount)))
+		fmt.Println(summaryStyle.Render(summary))
 
-		if pkg.Required {
-			requiredStyle := lipgloss.NewStyle().
+		for _, pkg := range missingPackages {
+			pkgStyle := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("252")).
+				Padding(0, 1)
+			minVerStyle := lipgloss.NewStyle().
 				Foreground(lipgloss.Color("220"))
-			line += " " + requiredStyle.Render("(required)")
-		}
 
-		fmt.Println(line)
+			fmt.Printf("  %s %s %s\n",
+				lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render("✗"),
+				pkgStyle.Render(pkg.Name),
+				minVerStyle.Render(fmt.Sprintf(">= %s", pkg.MinVersion)))
+
+			if pkg.InstallCommand != "" {
+				installStyle := lipgloss.NewStyle().
+					Foreground(lipgloss.Color("111")).
+					Padding(0, 4)
+				fmt.Println(installStyle.Render(fmt.Sprintf("Install: %s", pkg.InstallCommand)))
+			}
+		}
+	} else {
+		summary := fmt.Sprintf("✓ %s checks passed", okStyle.Render(fmt.Sprintf("%d", totalCount)))
+		fmt.Println(summaryStyle.Render(summary))
 	}
 }

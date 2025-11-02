@@ -19,13 +19,15 @@ var (
 )
 
 func main() {
+	isDevMode := isDevMode()
+
 	if err := config.EnsureDirectoryStructure(); err != nil {
 		ui.PrintError(fmt.Sprintf("Error ensuring directory structure: %v", err))
 		os.Exit(1)
 	}
 
 	if len(os.Args) < 2 {
-		printUsage()
+		printUsage(isDevMode)
 		os.Exit(1)
 	}
 
@@ -39,8 +41,14 @@ func main() {
 		}
 
 	case "update":
-		if err := cmd.Update(os.Args[2:]); err != nil {
-			ui.PrintError(fmt.Sprintf("Error: %v", err))
+		if isDevMode {
+			if err := cmd.Update(os.Args[2:]); err != nil {
+				ui.PrintError(fmt.Sprintf("Error: %v", err))
+				os.Exit(1)
+			}
+		} else {
+			ui.PrintError(fmt.Sprintf("Unknown command: %s", command))
+			printUsage(isDevMode)
 			os.Exit(1)
 		}
 
@@ -56,7 +64,7 @@ func main() {
 	case "build":
 		if len(os.Args) < 3 {
 			ui.PrintError("Error: service name or 'all' required for 'build' command")
-			printUsage()
+			printUsage(isDevMode)
 			os.Exit(1)
 		}
 		service := os.Args[2]
@@ -74,7 +82,7 @@ func main() {
 	case "config":
 		if len(os.Args) < 3 {
 			ui.PrintError("Error: subcommand required for 'config' command")
-			printUsage()
+			printUsage(isDevMode)
 			os.Exit(1)
 		}
 		subcommand := os.Args[2]
@@ -86,7 +94,7 @@ func main() {
 	case "start", "stop", "restart":
 		if len(os.Args) < 3 {
 			ui.PrintError(fmt.Sprintf("Error: service name required for '%s' command", command))
-			printUsage()
+			printUsage(isDevMode)
 			os.Exit(1)
 		}
 		service := os.Args[2]
@@ -108,7 +116,7 @@ func main() {
 	case "logs":
 		if len(os.Args) < 3 {
 			ui.PrintError("Error: service name required for 'logs' command")
-			printUsage()
+			printUsage(isDevMode)
 			os.Exit(1)
 		}
 		service := os.Args[2]
@@ -147,22 +155,36 @@ func main() {
 		}
 
 	case "help", "-h", "--help":
-		printUsage()
+		printUsage(isDevMode)
 
 	default:
 		ui.PrintError(fmt.Sprintf("Unknown command: %s", command))
-		printUsage()
+		printUsage(isDevMode)
 		os.Exit(1)
 	}
 }
 
-func printUsage() {
+func isDevMode() bool {
+	// Check if the source code directory exists
+	path, err := config.ExpandPath("~/EasterCompany/dex-cli")
+	if err != nil {
+		return false
+	}
+	if _, err := os.Stat(path); err == nil {
+		return true
+	}
+	return false
+}
+
+func printUsage(isDevMode bool) {
 	ui.PrintTitle("DEXTER CLI - MANAGE DEXTER SERVICES")
 	ui.PrintSectionTitle("USAGE")
 	ui.PrintInfo("dex <command> [options]")
 	ui.PrintSectionTitle("COMMANDS")
 	ui.PrintInfo("pull       Clone/pull all Dexter services from Git")
-	ui.PrintInfo("update     Update dex-cli to latest version")
+	if isDevMode {
+		ui.PrintInfo("update     Update dex-cli to latest version")
+	}
 	ui.PrintInfo("build      <service|all> Build one or all Dexter services")
 	ui.PrintInfo("status     [service] Check the health of one or all services")
 	ui.PrintInfo("start      <service> Start a Dexter service")
