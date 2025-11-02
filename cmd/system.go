@@ -2,12 +2,10 @@ package cmd
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/EasterCompany/dex-cli/config"
-	"github.com/EasterCompany/dex-cli/ui"
 )
 
 // System displays and manages system configuration
@@ -24,9 +22,6 @@ func System(args []string) error {
 	case "validate":
 		return systemValidate()
 	default:
-		fmt.Println(ui.RenderTitle("DEXTER SYSTEM"))
-		fmt.Println()
-
 		errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 		fmt.Println(errorStyle.Render(fmt.Sprintf("Unknown command: %s", args[0])))
 		fmt.Println()
@@ -56,14 +51,10 @@ func systemInfo() error {
 
 // systemScan re-scans hardware and updates system.json
 func systemScan() error {
-	fmt.Println(ui.RenderTitle("SYSTEM SCAN"))
-	fmt.Println()
-
 	scanStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("111")).
 		Italic(true)
 	fmt.Println(scanStyle.Render("Scanning hardware and software..."))
-	fmt.Println()
 
 	sys, err := config.IntrospectSystem()
 	if err != nil {
@@ -75,8 +66,7 @@ func systemScan() error {
 	}
 
 	successStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("42")).
-		Bold(true)
+		Foreground(lipgloss.Color("42"))
 	fmt.Println(successStyle.Render("✓ System scan complete"))
 	fmt.Println()
 
@@ -86,8 +76,6 @@ func systemScan() error {
 
 // systemValidate checks for missing required packages
 func systemValidate() error {
-	fmt.Println(ui.RenderTitle("PACKAGE VALIDATION"))
-	fmt.Println()
 
 	sys, err := config.LoadSystemConfig()
 	if err != nil {
@@ -179,92 +167,55 @@ func systemValidate() error {
 }
 
 func renderSystemInfo(sys *config.SystemConfig) {
-	fmt.Println(ui.RenderTitle("SYSTEM INFORMATION"))
-	fmt.Println()
-
-	// Create main info box
-	infoBox := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("99")).
-		Padding(1, 2).
-		Width(70)
-
-	var content strings.Builder
-
-	// RAM
-	ramGB := float64(sys.MemoryBytes) / (1024 * 1024 * 1024)
-
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("99"))
 
 	labelStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("252")).
-		Width(12)
+		Foreground(lipgloss.Color("245"))
 
 	valueStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("111"))
 
-	content.WriteString(headerStyle.Render("MEMORY"))
-	content.WriteString("\n")
-	content.WriteString(labelStyle.Render("Total RAM:"))
-	content.WriteString(valueStyle.Render(fmt.Sprintf("  %.1f GB", ramGB)))
-	content.WriteString("\n\n")
+	// Memory
+	ramGB := float64(sys.MemoryBytes) / (1024 * 1024 * 1024)
+	fmt.Printf("%s  %s\n",
+		headerStyle.Render("MEMORY"),
+		valueStyle.Render(fmt.Sprintf("%.1f GB", ramGB)))
 
 	// CPU
-	content.WriteString(headerStyle.Render("PROCESSOR"))
-	content.WriteString("\n")
 	for _, cpu := range sys.CPU {
-		cpuStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("86"))
-		content.WriteString(cpuStyle.Render(cpu.Label))
-		content.WriteString("\n")
-
-		detailStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("245")).
-			Padding(0, 2)
-		content.WriteString(detailStyle.Render(fmt.Sprintf("Cores: %d  •  Threads: %d", cpu.Count, cpu.Threads)))
-		content.WriteString("\n")
+		fmt.Printf("%s  %s\n",
+			headerStyle.Render("CPU"),
+			valueStyle.Render(cpu.Label))
+		fmt.Printf("  %s\n",
+			labelStyle.Render(fmt.Sprintf("Cores: %d  •  Threads: %d", cpu.Count, cpu.Threads)))
 	}
-	content.WriteString("\n")
 
 	// GPU
 	if len(sys.GPU) > 0 {
-		content.WriteString(headerStyle.Render("GRAPHICS"))
-		content.WriteString("\n")
 		for i, gpu := range sys.GPU {
-			gpuStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-			content.WriteString(gpuStyle.Render(fmt.Sprintf("[%d] %s", i, gpu.Label)))
-			content.WriteString("\n")
-
+			fmt.Printf("%s  %s\n",
+				headerStyle.Render(fmt.Sprintf("GPU %d", i)),
+				valueStyle.Render(gpu.Label))
 			if gpu.VRAM > 0 {
 				vramGB := float64(gpu.VRAM) / (1024 * 1024 * 1024)
-				detailStyle := lipgloss.NewStyle().
-					Foreground(lipgloss.Color("245")).
-					Padding(0, 4)
-				content.WriteString(detailStyle.Render(fmt.Sprintf("VRAM: %.1f GB  •  CUDA: %d", vramGB, gpu.CUDA)))
-				content.WriteString("\n")
+				fmt.Printf("  %s\n",
+					labelStyle.Render(fmt.Sprintf("VRAM: %.1f GB  •  CUDA: %d", vramGB, gpu.CUDA)))
 			}
 		}
-		content.WriteString("\n")
 	}
 
 	// Storage
 	if len(sys.Storage) > 0 {
-		content.WriteString(headerStyle.Render("STORAGE"))
-		content.WriteString("\n")
+		fmt.Printf("\n%s\n", headerStyle.Render("STORAGE"))
 		for _, disk := range sys.Storage {
-			diskStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("111")).
-				Padding(0, 2)
-			content.WriteString(diskStyle.Render(disk))
-			content.WriteString("\n")
+			fmt.Printf("  %s\n", labelStyle.Render(disk))
 		}
-		content.WriteString("\n")
 	}
 
 	// Packages
-	content.WriteString(headerStyle.Render("PACKAGES"))
-	content.WriteString("\n")
+	fmt.Printf("\n%s\n", headerStyle.Render("PACKAGES"))
 
 	for _, pkg := range sys.Packages {
 		var statusStyle lipgloss.Style
@@ -280,26 +231,21 @@ func renderSystemInfo(sys *config.SystemConfig) {
 
 		pkgNameStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("252")).
-			Width(15).
-			Padding(0, 1)
+			Width(18)
 
 		versionStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 
-		line := fmt.Sprintf("%s %s %s",
+		line := fmt.Sprintf(" %s %s %s",
 			statusStyle.Render(icon),
 			pkgNameStyle.Render(pkg.Name),
 			versionStyle.Render(pkg.Version))
 
 		if pkg.Required {
 			requiredStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("220")).
-				Italic(true)
+				Foreground(lipgloss.Color("220"))
 			line += " " + requiredStyle.Render("(required)")
 		}
 
-		content.WriteString(line)
-		content.WriteString("\n")
+		fmt.Println(line)
 	}
-
-	fmt.Println(infoBox.Render(content.String()))
 }
