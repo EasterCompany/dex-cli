@@ -89,7 +89,7 @@ func checkServiceStatus(service config.ServiceEntry) ui.TableRow {
 			service.ID,
 			"N/A",
 			"N/A",
-			"SKIPPED",
+			"N/A",
 			"N/A",
 			"N/A",
 		)
@@ -109,7 +109,7 @@ func checkCLIStatus(service config.ServiceEntry) ui.TableRow {
 			service.ID,
 			"local",
 			"N/A",
-			"NOT INSTALLED",
+			"BAD",
 			"N/A",
 			time.Now().Format("15:04:05"),
 		)
@@ -126,7 +126,7 @@ func checkCLIStatus(service config.ServiceEntry) ui.TableRow {
 		service.ID,
 		"local",
 		version,
-		"INSTALLED",
+		"OK",
 		"N/A",
 		time.Now().Format("15:04:05"),
 	)
@@ -141,7 +141,7 @@ func checkHTTPStatus(service config.ServiceEntry) ui.TableRow {
 			service.ID,
 			service.Addr,
 			"N/A",
-			"DOWN",
+			"BAD",
 			"N/A",
 			time.Now().Format("15:04:05"),
 		)
@@ -153,7 +153,7 @@ func checkHTTPStatus(service config.ServiceEntry) ui.TableRow {
 			service.ID,
 			service.Addr,
 			"N/A",
-			"ERROR",
+			"BAD",
 			"N/A",
 			time.Now().Format("15:04:05"),
 		)
@@ -165,7 +165,7 @@ func checkHTTPStatus(service config.ServiceEntry) ui.TableRow {
 			service.ID,
 			service.Addr,
 			"N/A",
-			"INVALID",
+			"BAD",
 			"N/A",
 			time.Now().Format("15:04:05"),
 		)
