@@ -57,7 +57,7 @@ func CheckRepoStatus(repoPath string) (*RepoStatus, error) {
 
 	// Fetch remote to get latest info (silently)
 	fetchCmd := exec.Command("git", "-C", repoPath, "fetch", "--quiet")
-	fetchCmd.Run() // Ignore errors, we'll handle it in the next steps
+	_ = fetchCmd.Run() // Ignore errors, we'll handle it in the next steps
 
 	// Check if behind remote
 	behindCmd := exec.Command("git", "-C", repoPath, "rev-list", "--count", "HEAD..@{u}")

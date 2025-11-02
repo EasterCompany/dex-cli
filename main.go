@@ -20,6 +20,7 @@ var (
 
 func main() {
 	isDevMode := isDevMode()
+	hasSourceServices := config.HasSourceServices()
 
 	if err := config.EnsureDirectoryStructure(); err != nil {
 		ui.PrintError(fmt.Sprintf("Error ensuring directory structure: %v", err))
@@ -27,7 +28,7 @@ func main() {
 	}
 
 	if len(os.Args) < 2 {
-		printUsage(isDevMode)
+		printUsage(isDevMode, hasSourceServices)
 		os.Exit(1)
 	}
 
@@ -48,7 +49,7 @@ func main() {
 			}
 		} else {
 			ui.PrintError(fmt.Sprintf("Unknown command: %s", command))
-			printUsage(isDevMode)
+			printUsage(isDevMode, hasSourceServices)
 			os.Exit(1)
 		}
 
@@ -64,7 +65,7 @@ func main() {
 	case "build":
 		if len(os.Args) < 3 {
 			ui.PrintError("Error: service name or 'all' required for 'build' command")
-			printUsage(isDevMode)
+			printUsage(isDevMode, hasSourceServices)
 			os.Exit(1)
 		}
 		service := os.Args[2]
@@ -82,7 +83,7 @@ func main() {
 	case "config":
 		if len(os.Args) < 3 {
 			ui.PrintError("Error: subcommand required for 'config' command")
-			printUsage(isDevMode)
+			printUsage(isDevMode, hasSourceServices)
 			os.Exit(1)
 		}
 		subcommand := os.Args[2]
@@ -94,7 +95,7 @@ func main() {
 	case "start", "stop", "restart":
 		if len(os.Args) < 3 {
 			ui.PrintError(fmt.Sprintf("Error: service name required for '%s' command", command))
-			printUsage(isDevMode)
+			printUsage(isDevMode, hasSourceServices)
 			os.Exit(1)
 		}
 		service := os.Args[2]
@@ -116,7 +117,7 @@ func main() {
 	case "logs":
 		if len(os.Args) < 3 {
 			ui.PrintError("Error: service name required for 'logs' command")
-			printUsage(isDevMode)
+			printUsage(isDevMode, hasSourceServices)
 			os.Exit(1)
 		}
 		service := os.Args[2]
@@ -134,32 +135,50 @@ func main() {
 		}
 
 	case "format":
-		if err := cmd.Format(os.Args[2:]); err != nil {
-			if ui.PrintError(fmt.Sprintf("Error: %v", err)); err != nil {
-				os.Exit(1)
+		if hasSourceServices {
+			if err := cmd.Format(os.Args[2:]); err != nil {
+				if ui.PrintError(fmt.Sprintf("Error: %v", err)); err != nil {
+					os.Exit(1)
+				}
 			}
+		} else {
+			ui.PrintError(fmt.Sprintf("Unknown command: %s", command))
+			printUsage(isDevMode, hasSourceServices)
+			os.Exit(1)
 		}
 
 	case "test":
-		if err := cmd.Test(os.Args[2:]); err != nil {
-			if ui.PrintError(fmt.Sprintf("Error: %v", err)); err != nil {
-				os.Exit(1)
+		if hasSourceServices {
+			if err := cmd.Test(os.Args[2:]); err != nil {
+				if ui.PrintError(fmt.Sprintf("Error: %v", err)); err != nil {
+					os.Exit(1)
+				}
 			}
+		} else {
+			ui.PrintError(fmt.Sprintf("Unknown command: %s", command))
+			printUsage(isDevMode, hasSourceServices)
+			os.Exit(1)
 		}
 
 	case "lint":
-		if err := cmd.Lint(os.Args[2:]); err != nil {
-			if ui.PrintError(fmt.Sprintf("Error: %v", err)); err != nil {
-				os.Exit(1)
+		if hasSourceServices {
+			if err := cmd.Lint(os.Args[2:]); err != nil {
+				if ui.PrintError(fmt.Sprintf("Error: %v", err)); err != nil {
+					os.Exit(1)
+				}
 			}
+		} else {
+			ui.PrintError(fmt.Sprintf("Unknown command: %s", command))
+			printUsage(isDevMode, hasSourceServices)
+			os.Exit(1)
 		}
 
 	case "help", "-h", "--help":
-		printUsage(isDevMode)
+		printUsage(isDevMode, hasSourceServices)
 
 	default:
 		ui.PrintError(fmt.Sprintf("Unknown command: %s", command))
-		printUsage(isDevMode)
+		printUsage(isDevMode, hasSourceServices)
 		os.Exit(1)
 	}
 }
@@ -176,7 +195,7 @@ func isDevMode() bool {
 	return false
 }
 
-func printUsage(isDevMode bool) {
+func printUsage(isDevMode bool, hasSourceServices bool) {
 	ui.PrintInfo("dex <command> [options]")
 	ui.PrintInfo("pull       Clone/pull all Dexter services from Git")
 	if isDevMode {
@@ -191,9 +210,11 @@ func printUsage(isDevMode bool) {
 	ui.PrintInfo("watch      Show a live dashboard of all service statuses")
 	ui.PrintInfo("logs       <service> [-f] View service logs")
 	ui.PrintInfo("model      <list|delete> Manage Dexter models")
-	ui.PrintInfo("format     Format and lint all code")
-	ui.PrintInfo("lint       Lint all code")
-	ui.PrintInfo("test       Run all tests")
+	if hasSourceServices {
+		ui.PrintInfo("format     Format and lint all code")
+		ui.PrintInfo("lint       Lint all code")
+		ui.PrintInfo("test       Run all tests")
+	}
 	ui.PrintInfo("system     Show system info and manage packages")
 	ui.PrintInfo("version    Show version information")
 	ui.PrintInfo("help       Show this help message")

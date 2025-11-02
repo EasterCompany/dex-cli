@@ -275,14 +275,15 @@ func detectStorage() []StorageInfo {
 		size, _ := strconv.ParseInt(sizeStr, 10, 64)
 
 		// For disk devices (not partitions), initialize entry
-		if devType == "disk" {
+		switch devType {
+		case "disk":
 			deviceMap[name] = &StorageInfo{
 				Device:     name,
 				Size:       size,
 				Used:       0,
 				MountPoint: "",
 			}
-		} else if devType == "part" {
+		case "part":
 			// Map partition to parent disk
 			parentDisk := strings.TrimRight(name, "0123456789")
 			partitionMap[name] = parentDisk
@@ -523,7 +524,9 @@ func PrintSystemInfo(sys *SystemConfig) {
 	if len(sys.Storage) > 0 {
 		fmt.Println("Storage:")
 		for _, disk := range sys.Storage {
-			fmt.Printf("  %s\n", disk)
+			sizeGB := float64(disk.Size) / (1024 * 1024 * 1024)
+			usedGB := float64(disk.Used) / (1024 * 1024 * 1024)
+			fmt.Printf("  %s: %.1fGB / %.1fGB (%s)\n", disk.Device, usedGB, sizeGB, disk.MountPoint)
 		}
 		fmt.Println()
 	}

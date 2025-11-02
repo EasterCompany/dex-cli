@@ -9,11 +9,6 @@ import (
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
-type commandResult struct {
-	service string
-	status  string
-}
-
 func runOnAllServices(command string, args []string, showOutputOnFailure bool) error {
 
 	// Load the service map
@@ -28,14 +23,15 @@ func runOnAllServices(command string, args []string, showOutputOnFailure bool) e
 		Source: ".",
 	}}
 	for _, s := range serviceMap.Services {
-		services = append(services, s...)
+		for _, service := range s {
+			if strings.HasPrefix(service.ID, "dex-") && service.Source != "" {
+				services = append(services, service)
+			}
+		}
 	}
 
 	var rows []ui.TableRow
 	for _, service := range services {
-		if service.ID != "dex-cli" && !strings.HasPrefix(service.ID, "dex-") {
-			continue
-		}
 		status := "PASSED"
 		path, err := config.ExpandPath(service.Source)
 		if err != nil {

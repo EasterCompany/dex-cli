@@ -9,7 +9,6 @@ import (
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/git"
-	"github.com/EasterCompany/dex-cli/ui"
 )
 
 type pullResult struct {
@@ -113,11 +112,12 @@ func Pull() error {
 			for _, service := range services {
 				if service.ID == "cache" {
 					result := handleCacheService()
-					results = append(results, result)
-					renderServiceResult(result)
-					if result.status == "success" {
+															_ = append(results, result)
+															renderServiceResult(result)
+					switch result.status {
+					case "success":
 						successCount++
-					} else if result.status == "error" {
+					case "error":
 						errorCount++
 					}
 					continue
@@ -127,10 +127,10 @@ func Pull() error {
 			for _, service := range services {
 				// Skip services without a repo URL
 				if service.Repo == "" {
-					result := pullResult{service.ID, "skipped", "no repository configured", "○"}
-					results = append(results, result)
-					renderServiceResult(result)
-					skipCount++
+					                    															result := pullResult{service.ID, "skipped", "no repository configured", "○"}
+					                    															_ = append(results, result)
+					                    															renderServiceResult(result)
+					                    															skipCount++
 					continue
 				}
 
@@ -138,7 +138,7 @@ func Pull() error {
 				sourcePath, err := config.ExpandPath(service.Source)
 				if err != nil {
 					result := pullResult{service.ID, "error", "path expansion failed", "✗"}
-					results = append(results, result)
+					_ = append(results, result)
 					renderServiceResult(result)
 					errorCount++
 					continue

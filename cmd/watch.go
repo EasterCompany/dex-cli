@@ -21,7 +21,6 @@ type tickMsg time.Time
 type watchModel struct {
 	serviceMap *config.ServiceMapConfig
 	rows       []ui.TableRow
-	err        error
 	quitting   bool
 }
 
@@ -71,7 +70,7 @@ func (m watchModel) fetchStatuses() tea.Msg {
 			}
 
 			body, err := io.ReadAll(resp.Body)
-			resp.Body.Close()
+			_ = resp.Body.Close()
 			if err != nil {
 				rows = append(rows, ui.FormatTableRow(
 					service.ID,

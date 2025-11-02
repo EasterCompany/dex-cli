@@ -11,7 +11,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/EasterCompany/dex-cli/config"
-	"github.com/EasterCompany/dex-cli/ui"
 )
 
 type validationIssue struct {
@@ -363,7 +362,9 @@ func extractPort(addr string) int {
 	matches := re.FindStringSubmatch(addr)
 	if len(matches) > 1 {
 		var port int
-		fmt.Sscanf(matches[1], "%d", &port)
+		if _, err := fmt.Sscanf(matches[1], "%d", &port); err != nil {
+			return 0
+		}
 		return port
 	}
 	return 0

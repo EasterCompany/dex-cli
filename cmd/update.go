@@ -12,7 +12,6 @@ import (
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/git"
-	"github.com/EasterCompany/dex-cli/ui"
 )
 
 type updateStep struct {
@@ -363,9 +362,8 @@ func installDexCLI(dexCliPath string) error {
 	}
 
 	// Rename (atomic operation that works even if dest is running)
-	if err := os.Rename(tempPath, destPath); err != nil {
-		os.Remove(tempPath) // Clean up temp file
-		return fmt.Errorf("failed to install binary: %w", err)
+			if err := os.Rename(tempPath, destPath); err != nil {
+				_ = os.Remove(tempPath) // Clean up temp file		return fmt.Errorf("failed to install binary: %w", err)
 	}
 
 	return nil

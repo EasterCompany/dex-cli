@@ -42,6 +42,21 @@ func showModelUsage() error {
 
 func listModels() error {
 	modelsPath, err := config.ExpandPath(filepath.Join(config.DexterRoot, "models"))
+	if err != nil {
+		return fmt.Errorf("failed to expand models path: %w", err)
+	}
+
+	files, err := os.ReadDir(modelsPath)
+	if err != nil {
+		return fmt.Errorf("failed to read models directory: %w", err)
+	}
+
+	for _, file := range files {
+		fmt.Println(file.Name())
+	}
+
+	return nil
+}
 
 func deleteModel(modelName string) error {
 	modelsPath, err := config.ExpandPath(filepath.Join(config.DexterRoot, "models"))
