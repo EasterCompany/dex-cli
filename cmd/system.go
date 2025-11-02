@@ -5,60 +5,145 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/charmbracelet/lipgloss"
-
 	"github.com/EasterCompany/dex-cli/config"
+	"github.com/EasterCompany/dex-cli/ui"
 )
 
 // System displays and manages system configuration
 func System(args []string) error {
+	logFile, err := config.LogFile()
+	if err != nil {
+		return fmt.Errorf("failed to get log file: %w", err)
+	}
+	defer func() { _ = logFile.Close() }()
+
+	log := func(message string) {
+		_, _ = fmt.Fprintln(logFile, message)
+	}
+
+	log(fmt.Sprintf("System command called with args: %v", args))
+
 	if len(args) == 0 {
-		return systemInfo()
+		return systemInfo(log)
 	}
 
 	switch args[0] {
 	case "info":
-		return systemInfo()
+		return systemInfo(log)
 	case "scan":
-		return systemScan()
+		return systemScan(log)
 	case "validate":
-		return systemValidate()
+		return systemValidate(log)
 	case "install":
-		return systemInstall(args[1:])
+		return systemInstall(args[1:], log)
 	case "upgrade":
-		return systemUpgrade(args[1:])
+		return systemUpgrade(args[1:], log)
 	default:
-		errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-		fmt.Println(errorStyle.Render(fmt.Sprintf("Unknown command: %s", args[0])))
-		fmt.Println()
-
-		helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-		fmt.Println(helpStyle.Render("Available commands:"))
-
-		cmdStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("111")).Padding(0, 2)
-		fmt.Println(cmdStyle.Render("dex system         # Show system info"))
-		fmt.Println(cmdStyle.Render("dex system scan    # Re-scan hardware/software"))
-		fmt.Println(cmdStyle.Render("dex system validate # Check for missing packages"))
-		fmt.Println(cmdStyle.Render("dex system install [package] # Install missing package(s)"))
-		fmt.Println(cmdStyle.Render("dex system upgrade [package] # Upgrade installed package(s)"))
-
+		log(fmt.Sprintf("Unknown system subcommand: %s", args[0]))
+		fmt.Printf("Unknown command: %s\n", args[0])
+		fmt.Println("Available commands:")
+		fmt.Println("  dex system         # Show system info")
+		fmt.Println("  dex system scan    # Re-scan hardware/software")
+		fmt.Println("  dex system validate # Check for missing packages")
+		fmt.Println("  dex system install [package] # Install missing package(s)")
+		fmt.Println("  dex system upgrade [package] # Upgrade installed package(s)")
 		return fmt.Errorf("unknown command")
 	}
 }
 
 // systemInfo shows current system configuration
-func systemInfo() error {
+func systemInfo(log func(string)) error {
+	log("Displaying system information.")
 	sys, err := config.LoadSystemConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load system config: %w", err)
 	}
 
-	renderSystemInfo(sys)
+	table := ui.NewTable([]string{"Category", "Value"})
+
+	// CPU
+	for _, cpu := range sys.CPU {
+		table.AddRow([]string{fmt.Sprintf("CPU (%s)", cpu.Label), fmt.Sprintf("Cores: %d, Threads: %d", cpu.Count, cpu.Threads)})
+		if cpu.AvgGHz > 0 {
+			table.AddRow([]string{"", fmt.Sprintf("Avg Clock: %.2f GHz", cpu.AvgGHz)})
+		}
+		if cpu.MaxGHz > 0 {
+			table.AddRow([]string{"", fmt.Sprintf("Max Clock: %.2f GHz", cpu.MaxGHz)})
+		}
+	}
+
+	// GPU
+	if len(sys.GPU) > 0 {
+		for i, gpu := range sys.GPU {
+			gpuInfo := gpu.Label
+			if gpu.VRAM > 0 {
+				vramGB := float64(gpu.VRAM) / (1024 * 1024 * 1024)
+				gpuInfo += fmt.Sprintf(", VRAM: %.1f GB", vramGB)
+			}
+			if gpu.CUDA > 0 {
+				gpuInfo += fmt.Sprintf(", CUDA: %d", gpu.CUDA)
+			}
+			table.AddRow([]string{fmt.Sprintf("GPU %d", i), gpuInfo})
+		}
+	}
+
+	// Memory
+	ramGB := float64(sys.MemoryBytes) / (1024 * 1024 * 1024)
+	table.AddRow([]string{"Memory", fmt.Sprintf("%.1f GB", ramGB)})
+
+	// Storage
+	if len(sys.Storage) > 0 {
+		var totalSizeBytes int64
+		for _, disk := range sys.Storage {
+			totalSizeBytes += disk.Size
+		}
+		totalSizeGB := float64(totalSizeBytes) / (1024 * 1024 * 1024)
+		table.AddRow([]string{"Storage", fmt.Sprintf("%.1f GB (%d devices)", totalSizeGB, len(sys.Storage))})
+
+		for _, disk := range sys.Storage {
+			sizeGB := float64(disk.Size) / (1024 * 1024 * 1024)
+			var deviceInfo string
+			if disk.MountPoint == "unmounted" || disk.MountPoint == "" {
+				deviceInfo = fmt.Sprintf("%s: %.1f GB (unmounted)", disk.Device, sizeGB)
+			} else {
+				usedGB := float64(disk.Used) / (1024 * 1024 * 1024)
+				deviceInfo = fmt.Sprintf("%s: %.1f GB / %.1f GB (%s)", disk.Device, usedGB, sizeGB, disk.MountPoint)
+			}
+			table.AddRow([]string{"", deviceInfo})
+		}
+	}
+
+	// Packages
+	table.AddRow([]string{"Packages", ""})
+	missingPackages := []config.Package{}
+	for _, pkg := range sys.Packages {
+		if !pkg.Installed {
+			missingPackages = append(missingPackages, pkg)
+		}
+	}
+
+	totalCount := len(sys.Packages)
+	missingCount := len(missingPackages)
+
+	if missingCount > 0 {
+		table.AddRow([]string{"", fmt.Sprintf("Found %d issues out of %d checks", missingCount, totalCount)})
+		for _, pkg := range missingPackages {
+			table.AddRow([]string{"  ✗ Missing", fmt.Sprintf("%s (>= %s)", pkg.Name, pkg.MinVersion)})
+			if pkg.InstallCommand != "" {
+				table.AddRow([]string{"", fmt.Sprintf("    Install: %s", pkg.InstallCommand)})
+			}
+		}
+	} else {
+		table.AddRow([]string{"", fmt.Sprintf("✓ %d checks passed", totalCount)})
+	}
+
+	table.Render()
 	return nil
 }
 
 // systemScan re-scans hardware and updates system.json
-func systemScan() error {
+func systemScan(log func(string)) error {
+	log("Scanning system hardware and software.")
 	sys, err := config.IntrospectSystem()
 	if err != nil {
 		return fmt.Errorf("failed to scan system: %w", err)
@@ -68,18 +153,14 @@ func systemScan() error {
 		return fmt.Errorf("failed to save system config: %w", err)
 	}
 
-	successStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("42"))
-	fmt.Println(successStyle.Render("✓ System scan complete"))
-	fmt.Println()
-
-	renderSystemInfo(sys)
-	return nil
+	fmt.Println("✓ System scan complete")
+	log("System scan complete.")
+	return systemInfo(log)
 }
 
 // systemValidate checks for missing required packages
-func systemValidate() error {
-
+func systemValidate(log func(string)) error {
+	log("Validating system packages.")
 	sys, err := config.LoadSystemConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load system config: %w", err)
@@ -99,49 +180,25 @@ func systemValidate() error {
 
 	missingCount := len(missing)
 
-	summaryStyle := lipgloss.NewStyle().Padding(0, 1)
-	checksStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	issuesStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-	okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-
 	if missingCount > 0 {
-		summary := fmt.Sprintf("Found %s issues out of %s required package checks",
-			issuesStyle.Render(fmt.Sprintf("%d", missingCount)),
-			checksStyle.Render(fmt.Sprintf("%d", requiredCount)))
-		fmt.Println(summaryStyle.Render(summary))
-
+		fmt.Printf("Found %d issues out of %d required package checks\n", missingCount, requiredCount)
+		table := ui.NewTable([]string{"Status", "Package", "Min Version", "Install Command"})
 		for _, pkg := range missing {
-			pkgStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("252")).
-				Padding(0, 1)
-			minVerStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("220"))
-
-			fmt.Printf("  %s %s %s\n",
-				lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render("✗"),
-				pkgStyle.Render(pkg.Name),
-				minVerStyle.Render(fmt.Sprintf(">= %s", pkg.MinVersion)))
-
-			if pkg.InstallCommand != "" {
-				installStyle := lipgloss.NewStyle().
-					Foreground(lipgloss.Color("111")).
-					Padding(0, 4)
-				fmt.Println(installStyle.Render(fmt.Sprintf("Install: %s", pkg.InstallCommand)))
-			}
+			table.AddRow([]string{"✗ Missing", pkg.Name, pkg.MinVersion, pkg.InstallCommand})
 		}
-		fmt.Println()
-
+		table.Render()
+		log(fmt.Sprintf("Missing %d required package(s).", missingCount))
 		return fmt.Errorf("missing %d required package(s)", len(missing))
 	}
 
-	// All good!
-	summary := fmt.Sprintf("✓ %s required package checks passed", okStyle.Render(fmt.Sprintf("%d", requiredCount)))
-	fmt.Println(summaryStyle.Render(summary))
+	fmt.Printf("✓ %d required package checks passed\n", requiredCount)
+	log("All required package checks passed.")
 	return nil
 }
 
 // systemInstall installs missing packages
-func systemInstall(args []string) error {
+func systemInstall(args []string, log func(string)) error {
+	log(fmt.Sprintf("Attempting to install packages: %v", args))
 	sys, err := config.LoadSystemConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load system config: %w", err)
@@ -158,11 +215,12 @@ func systemInstall(args []string) error {
 
 		if len(missing) == 0 {
 			fmt.Println("All packages are already installed.")
+			log("All packages are already installed.")
 			return nil
 		}
 
 		for _, pkg := range missing {
-			if err := installPackage(pkg); err != nil {
+			if err := installPackage(pkg, log); err != nil {
 				return err
 			}
 		}
@@ -175,22 +233,25 @@ func systemInstall(args []string) error {
 		if pkg.Name == pkgName {
 			if pkg.Installed {
 				fmt.Printf("Package '%s' is already installed.\n", pkgName)
+				log(fmt.Sprintf("Package '%s' is already installed.", pkgName))
 				return nil
 			}
-			return installPackage(pkg)
+			return installPackage(pkg, log)
 		}
 	}
 
+	log(fmt.Sprintf("Package '%s' not found.", pkgName))
 	return fmt.Errorf("package '%s' not found", pkgName)
 }
 
-func installPackage(pkg config.Package) error {
+func installPackage(pkg config.Package, log func(string)) error {
 	if pkg.InstallCommand == "" {
+		log(fmt.Sprintf("No install command found for package '%s'.", pkg.Name))
 		return fmt.Errorf("no install command found for package '%s'", pkg.Name)
 	}
 
 	fmt.Printf("Installing '%s'...\n", pkg.Name)
-	fmt.Printf("Running command: %s\n", pkg.InstallCommand)
+	log(fmt.Sprintf("Installing '%s' by running: %s", pkg.Name, pkg.InstallCommand))
 
 	cmd := exec.Command("bash", "-c", pkg.InstallCommand)
 	cmd.Stdout = os.Stdout
@@ -199,15 +260,18 @@ func installPackage(pkg config.Package) error {
 
 	err := cmd.Run()
 	if err != nil {
+		log(fmt.Sprintf("Failed to install package '%s': %v", pkg.Name, err))
 		return fmt.Errorf("failed to install package '%s': %w", pkg.Name, err)
 	}
 
 	fmt.Printf("✓ Successfully installed '%s'.\n", pkg.Name)
+	log(fmt.Sprintf("Successfully installed '%s'.", pkg.Name))
 	return nil
 }
 
 // systemUpgrade upgrades installed packages
-func systemUpgrade(args []string) error {
+func systemUpgrade(args []string, log func(string)) error {
+	log(fmt.Sprintf("Attempting to upgrade packages: %v", args))
 	sys, err := config.LoadSystemConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load system config: %w", err)
@@ -217,8 +281,9 @@ func systemUpgrade(args []string) error {
 		// Upgrade all installed packages
 		for _, pkg := range sys.Packages {
 			if pkg.Installed {
-				if err := upgradePackage(pkg); err != nil {
+				if err := upgradePackage(pkg, log); err != nil {
 					fmt.Printf("Failed to upgrade '%s': %v\n", pkg.Name, err)
+					log(fmt.Sprintf("Failed to upgrade '%s': %v", pkg.Name, err))
 				}
 			}
 		}
@@ -230,23 +295,26 @@ func systemUpgrade(args []string) error {
 	for _, pkg := range sys.Packages {
 		if pkg.Name == pkgName {
 			if !pkg.Installed {
+				log(fmt.Sprintf("Package '%s' is not installed.", pkgName))
 				return fmt.Errorf("package '%s' is not installed", pkgName)
 			}
-			return upgradePackage(pkg)
+			return upgradePackage(pkg, log)
 		}
 	}
 
+	log(fmt.Sprintf("Package '%s' not found.", pkgName))
 	return fmt.Errorf("package '%s' not found", pkgName)
 }
 
-func upgradePackage(pkg config.Package) error {
+func upgradePackage(pkg config.Package, log func(string)) error {
 	if pkg.UpgradeCommand == "" {
 		fmt.Printf("No upgrade command found for package '%s'. Skipping.\n", pkg.Name)
+		log(fmt.Sprintf("No upgrade command found for package '%s'. Skipping.", pkg.Name))
 		return nil
 	}
 
 	fmt.Printf("Upgrading '%s'...\n", pkg.Name)
-	fmt.Printf("Running command: %s\n", pkg.UpgradeCommand)
+	log(fmt.Sprintf("Upgrading '%s' by running: %s", pkg.Name, pkg.UpgradeCommand))
 
 	cmd := exec.Command("bash", "-c", pkg.UpgradeCommand)
 	cmd.Stdout = os.Stdout
@@ -255,136 +323,11 @@ func upgradePackage(pkg config.Package) error {
 
 	err := cmd.Run()
 	if err != nil {
+		log(fmt.Sprintf("Failed to upgrade package '%s': %v", pkg.Name, err))
 		return fmt.Errorf("failed to upgrade package '%s': %w", pkg.Name, err)
 	}
 
 	fmt.Printf("✓ Successfully upgraded '%s'.\n", pkg.Name)
+	log(fmt.Sprintf("Successfully upgraded '%s'.", pkg.Name))
 	return nil
-}
-
-func renderSystemInfo(sys *config.SystemConfig) {
-	headerStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("99"))
-
-	labelStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("245"))
-
-	valueStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("111"))
-
-	// CPU
-	for _, cpu := range sys.CPU {
-		fmt.Printf("%s\n", headerStyle.Render(fmt.Sprintf("CPU (%s):", cpu.Label)))
-		fmt.Printf("  %s\n", labelStyle.Render(fmt.Sprintf("CORES: %d", cpu.Count)))
-		fmt.Printf("  %s\n", labelStyle.Render(fmt.Sprintf("THREADS: %d", cpu.Threads)))
-		if cpu.AvgGHz > 0 {
-			fmt.Printf("  %s\n", labelStyle.Render(fmt.Sprintf("AVG: %.2f GHz", cpu.AvgGHz)))
-		}
-		if cpu.MaxGHz > 0 {
-			fmt.Printf("  %s\n", labelStyle.Render(fmt.Sprintf("MAX: %.2f GHz", cpu.MaxGHz)))
-		}
-	}
-
-	// GPU
-	if len(sys.GPU) > 0 {
-		for i, gpu := range sys.GPU {
-			fmt.Printf("%s  %s\n",
-				headerStyle.Render(fmt.Sprintf("GPU %d:", i)),
-				valueStyle.Render(gpu.Label))
-			if gpu.VRAM > 0 {
-				vramGB := float64(gpu.VRAM) / (1024 * 1024 * 1024)
-				fmt.Printf("  %s\n",
-					labelStyle.Render(fmt.Sprintf("VRAM: %.1f GB  •  CUDA: %d", vramGB, gpu.CUDA)))
-			}
-		}
-	}
-
-	// Blank line before MEMORY/STORAGE group
-	fmt.Println()
-
-	// Memory
-	ramGB := float64(sys.MemoryBytes) / (1024 * 1024 * 1024)
-	fmt.Printf("%s  %s\n",
-		headerStyle.Render("MEMORY:"),
-		valueStyle.Render(fmt.Sprintf("%.1f GB", ramGB)))
-
-	// Storage (no blank line between MEMORY and STORAGE)
-	if len(sys.Storage) > 0 {
-		// Calculate total storage
-		var totalSizeBytes int64
-		for _, disk := range sys.Storage {
-			totalSizeBytes += disk.Size
-		}
-		totalSizeGB := float64(totalSizeBytes) / (1024 * 1024 * 1024)
-
-		fmt.Printf("%s  %s\n",
-			headerStyle.Render("STORAGE:"),
-			valueStyle.Render(fmt.Sprintf("%.1f GB (%d devices)", totalSizeGB, len(sys.Storage))))
-
-		for _, disk := range sys.Storage {
-			sizeGB := float64(disk.Size) / (1024 * 1024 * 1024)
-
-			var deviceInfo string
-			if disk.MountPoint == "unmounted" || disk.MountPoint == "" {
-				deviceInfo = fmt.Sprintf("%s: %.1f GB (unmounted)", disk.Device, sizeGB)
-			} else {
-				usedGB := float64(disk.Used) / (1024 * 1024 * 1024)
-				deviceInfo = fmt.Sprintf("%s: %.1f GB / %.1f GB (%s)", disk.Device, usedGB, sizeGB, disk.MountPoint)
-			}
-
-			fmt.Printf("  %s\n", labelStyle.Render(deviceInfo))
-		}
-	}
-
-	// Blank line before PACKAGES
-	fmt.Println()
-
-	// Packages
-	fmt.Printf("%s\n", headerStyle.Render("PACKAGES:"))
-
-	missingPackages := []config.Package{}
-	for _, pkg := range sys.Packages {
-		if !pkg.Installed {
-			missingPackages = append(missingPackages, pkg)
-		}
-	}
-
-	totalCount := len(sys.Packages)
-	missingCount := len(missingPackages)
-
-	summaryStyle := lipgloss.NewStyle().Padding(0, 1)
-	checksStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	issuesStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-	okStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-
-	if missingCount > 0 {
-		summary := fmt.Sprintf("Found %s issues out of %s checks",
-			issuesStyle.Render(fmt.Sprintf("%d", missingCount)),
-			checksStyle.Render(fmt.Sprintf("%d", totalCount)))
-		fmt.Println(summaryStyle.Render(summary))
-
-		for _, pkg := range missingPackages {
-			pkgStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("252")).
-				Padding(0, 1)
-			minVerStyle := lipgloss.NewStyle().
-				Foreground(lipgloss.Color("220"))
-
-			fmt.Printf("  %s %s %s\n",
-				lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render("✗"),
-				pkgStyle.Render(pkg.Name),
-				minVerStyle.Render(fmt.Sprintf(">= %s", pkg.MinVersion)))
-
-			if pkg.InstallCommand != "" {
-				installStyle := lipgloss.NewStyle().
-					Foreground(lipgloss.Color("111")).
-					Padding(0, 4)
-				fmt.Println(installStyle.Render(fmt.Sprintf("Install: %s", pkg.InstallCommand)))
-			}
-		}
-	} else {
-		summary := fmt.Sprintf("✓ %s checks passed", okStyle.Render(fmt.Sprintf("%d", totalCount)))
-		fmt.Println(summaryStyle.Render(summary))
-	}
 }

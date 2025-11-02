@@ -8,11 +8,22 @@ import (
 	"strings"
 
 	"github.com/EasterCompany/dex-cli/config"
-	"github.com/EasterCompany/dex-cli/ui"
 )
 
 // Build compiles one or all services
 func Build(args []string) error {
+	logFile, err := config.LogFile()
+	if err != nil {
+		return fmt.Errorf("failed to get log file: %w", err)
+	}
+	defer func() { _ = logFile.Close() }()
+
+	log := func(message string) {
+		_, _ = fmt.Fprintln(logFile, message)
+	}
+
+	log(fmt.Sprintf("Build command called with args: %v", args))
+
 	// Load the service map
 	serviceMap, err := config.LoadServiceMap()
 	if err != nil {
@@ -56,18 +67,21 @@ func Build(args []string) error {
 
 	// Build logic
 	for _, service := range servicesToBuild {
-		if err := buildService(service); err != nil {
-			ui.PrintError(fmt.Sprintf("Failed to build %s: %v", service.ID, err))
+		if err := buildService(service, log); err != nil {
+			fmt.Printf("Failed to build %s: %v\n", service.ID, err)
+			log(fmt.Sprintf("Failed to build %s: %v", service.ID, err))
 		}
 	}
 
-	ui.PrintSuccess("All services built")
+	fmt.Println("All services built")
+	log("All services built.")
 	return nil
 }
 
-func buildService(service config.ServiceEntry) error {
+func buildService(service config.ServiceEntry, log func(string)) error {
 	if service.Source == "" || service.Source == "system" {
-		ui.PrintWarning(fmt.Sprintf("Skipping %s: no source path defined", service.ID))
+		fmt.Printf("Skipping %s: no source path defined\n", service.ID)
+		log(fmt.Sprintf("Skipping %s: no source path defined", service.ID))
 		return nil
 	}
 
@@ -77,11 +91,13 @@ func buildService(service config.ServiceEntry) error {
 	}
 
 	if _, err := os.Stat(filepath.Join(sourcePath, "go.mod")); os.IsNotExist(err) {
-		ui.PrintWarning(fmt.Sprintf("Skipping %s: not a Go project (no go.mod)", service.ID))
+		fmt.Printf("Skipping %s: not a Go project (no go.mod)\n", service.ID)
+		log(fmt.Sprintf("Skipping %s: not a Go project (no go.mod)", service.ID))
 		return nil
 	}
 
-	ui.PrintInfo(fmt.Sprintf("Building %s...", service.ID))
+	fmt.Printf("Building %s...\n", service.ID)
+	log(fmt.Sprintf("Building %s...", service.ID))
 
 	dexterBinPath, err := config.ExpandPath("~/Dexter/bin")
 	if err != nil {
@@ -97,6 +113,7 @@ func buildService(service config.ServiceEntry) error {
 		return fmt.Errorf("failed to build %s: %w", service.ID, err)
 	}
 
-	ui.PrintSuccess(fmt.Sprintf("%s built successfully", service.ID))
+	fmt.Printf("%s built successfully\n", service.ID)
+	log(fmt.Sprintf("%s built successfully", service.ID))
 	return nil
 }

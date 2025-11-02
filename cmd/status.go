@@ -16,6 +16,18 @@ import (
 
 // Status checks the health of one or all services
 func Status(serviceName string) error {
+	logFile, err := config.LogFile()
+	if err != nil {
+		return fmt.Errorf("failed to get log file: %w", err)
+	}
+	defer func() { _ = logFile.Close() }()
+
+	log := func(message string) {
+		_, _ = fmt.Fprintln(logFile, message)
+	}
+
+	log(fmt.Sprintf("Checking status for service: %s", serviceName))
+
 	// Load the service map
 	serviceMap, err := config.LoadServiceMap()
 	if err != nil {
@@ -54,6 +66,7 @@ func Status(serviceName string) error {
 	for _, service := range servicesToCheck {
 		row := checkServiceStatus(service)
 		rows = append(rows, row)
+		log(fmt.Sprintf("Service: %s, Status: %s, Version: %s, Uptime: %s, Last Check: %s", row[0], row[3], row[2], row[4], row[5]))
 	}
 
 	// Render table

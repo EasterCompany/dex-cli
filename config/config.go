@@ -127,3 +127,37 @@ func EnsureDirectoryStructure() error {
 
 	return nil
 }
+
+// LogFile returns a file handle to the dex-cli log file.
+func LogFile() (*os.File, error) {
+	logPath, err := ExpandPath(filepath.Join(DexterRoot, "logs", "dex-cli.log"))
+	if err != nil {
+		return nil, fmt.Errorf("failed to expand log file path: %w", err)
+	}
+
+	// Ensure the directory exists.
+	if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
+		return nil, fmt.Errorf("failed to create log directory: %w", err)
+	}
+
+	// Open the file in append mode, create it if it doesn't exist.
+	file, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open log file: %w", err)
+	}
+
+	return file, nil
+}
+
+// HasSourceServices checks if the EasterCompany source directory exists.
+func IsDevMode() bool {
+	// Check if the source code directory exists
+	path, err := ExpandPath("~/EasterCompany/dex-cli")
+	if err != nil {
+		return false
+	}
+	if _, err := os.Stat(path); err == nil {
+		return true
+	}
+	return false
+}

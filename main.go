@@ -14,12 +14,11 @@ const (
 )
 
 var (
-	commit = "unknown"
-	date   = "unknown"
+	date = "unknown"
 )
 
 func main() {
-	isDevMode := isDevMode()
+	isDevMode := config.IsDevMode()
 	hasSourceServices := config.HasSourceServices()
 
 	if err := config.EnsureDirectoryStructure(); err != nil {
@@ -35,12 +34,6 @@ func main() {
 	command := os.Args[1]
 
 	switch command {
-	case "pull":
-		if err := cmd.Pull(os.Args[2:]); err != nil {
-			ui.PrintError(fmt.Sprintf("Error: %v", err))
-			os.Exit(1)
-		}
-
 	case "update":
 		if isDevMode {
 			if err := cmd.Update(os.Args[2:]); err != nil {
@@ -60,29 +53,10 @@ func main() {
 		}
 
 	case "version", "-v", "--version":
-		branch, commit := git.GetVersionInfo(".")
-		ui.PrintInfo(fmt.Sprintf("dex-cli %s %s@%s %s", version, branch, commit, date))
+		cmd.Version(version, date)
 
 	case "build":
 		if err := cmd.Build(os.Args[2:]); err != nil {
-			ui.PrintError(fmt.Sprintf("Error: %v", err))
-			os.Exit(1)
-		}
-
-	case "watch":
-		if err := cmd.Watch(); err != nil {
-			ui.PrintError(fmt.Sprintf("Error: %v", err))
-			os.Exit(1)
-		}
-
-	case "config":
-		if len(os.Args) < 3 {
-			ui.PrintError("Error: subcommand required for 'config' command")
-			printUsage(isDevMode, hasSourceServices)
-			os.Exit(1)
-		}
-		subcommand := os.Args[2]
-		if err := cmd.Config(subcommand); err != nil {
 			ui.PrintError(fmt.Sprintf("Error: %v", err))
 			os.Exit(1)
 		}
@@ -180,21 +154,8 @@ func main() {
 	}
 }
 
-func isDevMode() bool {
-	// Check if the source code directory exists
-	path, err := config.ExpandPath("~/EasterCompany/dex-cli")
-	if err != nil {
-		return false
-	}
-	if _, err := os.Stat(path); err == nil {
-		return true
-	}
-	return false
-}
-
 func printUsage(isDevMode bool, hasSourceServices bool) {
 	ui.PrintInfo("dex <command> [options]")
-	ui.PrintInfo("pull       Clone/pull all Dexter services from Git")
 	if isDevMode {
 		ui.PrintInfo("update     Update dex-cli to latest version")
 	}
@@ -203,8 +164,6 @@ func printUsage(isDevMode bool, hasSourceServices bool) {
 	ui.PrintInfo("start      <service> Start a Dexter service")
 	ui.PrintInfo("stop       <service> Stop a Dexter service")
 	ui.PrintInfo("restart    <service> Restart a Dexter service")
-	ui.PrintInfo("config     <validate> Manage and validate configuration files")
-	ui.PrintInfo("watch      Show a live dashboard of all service statuses")
 	ui.PrintInfo("logs       <service> [-f] View service logs")
 	ui.PrintInfo("model      <list|delete> Manage Dexter models")
 	if hasSourceServices {

@@ -10,6 +10,17 @@ import (
 )
 
 func runOnAllServices(command string, args []string, showOutputOnFailure bool) error {
+	logFile, err := config.LogFile()
+	if err != nil {
+		return fmt.Errorf("failed to get log file: %w", err)
+	}
+	defer func() { _ = logFile.Close() }()
+
+	log := func(message string) {
+		_, _ = fmt.Fprintln(logFile, message)
+	}
+
+	log(fmt.Sprintf("Running command '%s' on all services.", command))
 
 	// Load the service map
 	serviceMap, err := config.LoadServiceMap()
@@ -32,14 +43,18 @@ func runOnAllServices(command string, args []string, showOutputOnFailure bool) e
 		path, err := config.ExpandPath(service.Source)
 		if err != nil {
 			status = "ERROR"
+			log(fmt.Sprintf("Error expanding path for service %s: %v", service.ID, err))
 		} else {
 			cmd := exec.Command(command, args...)
 			cmd.Dir = path
 			out, err := cmd.CombinedOutput()
 			if err != nil {
 				status = "FAILED"
-				fmt.Println(ui.RenderSubtitle(fmt.Sprintf("▼ %s", service.ID)))
-				fmt.Println(string(out))
+				if showOutputOnFailure {
+					fmt.Printf("▼ %s\n", service.ID)
+					fmt.Println(string(out))
+				}
+				log(fmt.Sprintf("Command '%s' failed for service %s. Output:\n%s", command, service.ID, string(out)))
 			}
 		}
 		rows = append(rows, ui.FormatFormatTableRow(service.ID, status))
