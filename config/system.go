@@ -13,12 +13,19 @@ import (
 
 // SystemConfig represents the hardware and software state of the system
 type SystemConfig struct {
-	MemoryBytes int64     `json:"MEMORY_BYTES"`
-	CPU         []CPUInfo `json:"CPU"`
-	GPU         []GPUInfo `json:"GPU"`
-	Storage     []string  `json:"STORAGE"`
-	Packages    []Package `json:"PACKAGES"`
-	LastUpdated int64     `json:"LAST_UPDATED,omitempty"`
+	MemoryBytes int64         `json:"MEMORY_BYTES"`
+	CPU         []CPUInfo     `json:"CPU"`
+	GPU         []GPUInfo     `json:"GPU"`
+	Storage     []StorageInfo `json:"STORAGE"`
+	Packages    []Package     `json:"PACKAGES"`
+	LastUpdated int64         `json:"LAST_UPDATED,omitempty"`
+}
+
+type StorageInfo struct {
+	Device     string `json:"DEVICE"`
+	Size       int64  `json:"SIZE"`
+	Used       int64  `json:"USED"`
+	MountPoint string `json:"MOUNT_POINT"`
 }
 
 type CPUInfo struct {
@@ -223,21 +230,101 @@ func detectRAM() int64 {
 	return 0
 }
 
-// detectStorage lists storage devices
-func detectStorage() []string {
-	var storage []string
+// detectStorage lists storage devices with usage information
+func detectStorage() []StorageInfo {
+	var storage []StorageInfo
 
 	// Try lsblk on Linux
-	if runtime.GOOS == "linux" {
-		cmd := exec.Command("lsblk", "-d", "-n", "-o", "NAME,SIZE,TYPE")
-		if output, err := cmd.Output(); err == nil {
-			lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-			for _, line := range lines {
-				if strings.Contains(line, "disk") {
-					storage = append(storage, strings.TrimSpace(line))
+	if runtime.GOOS != "linux" {
+		return storage
+	}
+
+	// Get all block devices with their partitions
+	cmd := exec.Command("lsblk", "-b", "-n", "-o", "NAME,SIZE,FSUSED,MOUNTPOINT,TYPE")
+	output, err := cmd.Output()
+	if err != nil {
+		return storage
+	}
+
+	// Parse lsblk output to find disk devices and their mount points
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	deviceMap := make(map[string]*StorageInfo) // Map device name to storage info
+
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+
+		name := strings.TrimLeft(fields[0], "├─└│")
+		sizeStr := fields[1]
+
+		// Parse device type - it's always the last field
+		devType := fields[len(fields)-1]
+
+		// Parse size
+		size, _ := strconv.ParseInt(sizeStr, 10, 64)
+
+		// For disk devices (not partitions), initialize entry
+		if devType == "disk" {
+			deviceMap[name] = &StorageInfo{
+				Device:     name,
+				Size:       size,
+				Used:       0,
+				MountPoint: "",
+			}
+			continue
+		}
+
+		// For partitions, extract used and mount point
+		if devType == "part" {
+			// Find parent disk (e.g., sda1 -> sda)
+			parentDisk := strings.TrimRight(name, "0123456789")
+			info, exists := deviceMap[parentDisk]
+			if !exists {
+				continue
+			}
+
+			// Fields can be: NAME SIZE FSUSED MOUNTPOINT TYPE or NAME SIZE MOUNTPOINT TYPE or NAME SIZE TYPE
+			var used int64
+			var mountPoint string
+
+			if len(fields) == 5 {
+				// NAME SIZE FSUSED MOUNTPOINT TYPE
+				used, _ = strconv.ParseInt(fields[2], 10, 64)
+				mountPoint = fields[3]
+			} else if len(fields) == 4 {
+				// NAME SIZE MOUNTPOINT TYPE or NAME SIZE FSUSED TYPE
+				// Check if field 2 looks like a mount point (starts with /)
+				if strings.HasPrefix(fields[2], "/") {
+					mountPoint = fields[2]
+				} else {
+					// It's FSUSED but no mount point
+					used, _ = strconv.ParseInt(fields[2], 10, 64)
+				}
+			}
+
+			// Update parent disk info if we have a mount point
+			if mountPoint != "" {
+				// Keep the shortest (closest to root) mount point
+				if info.MountPoint == "" || len(mountPoint) < len(info.MountPoint) {
+					info.MountPoint = mountPoint
+					info.Used = used
+				} else if mountPoint == "/" {
+					// Always prefer root mount
+					info.MountPoint = mountPoint
+					info.Used = used
 				}
 			}
 		}
+	}
+
+	// Convert map to slice
+	for _, info := range deviceMap {
+		if info.MountPoint == "" {
+			info.MountPoint = "unmounted"
+		}
+		storage = append(storage, *info)
 	}
 
 	return storage

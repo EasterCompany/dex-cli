@@ -216,22 +216,28 @@ func renderSystemInfo(sys *config.SystemConfig) {
 	// Storage (no blank line between MEMORY and STORAGE)
 	if len(sys.Storage) > 0 {
 		// Calculate total storage
-		totalSize := "Unknown"
-		if len(sys.Storage) > 0 {
-			// Try to parse the total from the storage list
-			// For now, just use the first entry's size indication or "Multiple devices"
-			if len(sys.Storage) == 1 {
-				totalSize = "1 device"
-			} else {
-				totalSize = fmt.Sprintf("%d devices", len(sys.Storage))
-			}
+		var totalSizeBytes int64
+		for _, disk := range sys.Storage {
+			totalSizeBytes += disk.Size
 		}
+		totalSizeGB := float64(totalSizeBytes) / (1024 * 1024 * 1024)
 
 		fmt.Printf("%s  %s\n",
 			headerStyle.Render("STORAGE:"),
-			valueStyle.Render(totalSize))
+			valueStyle.Render(fmt.Sprintf("%.1f GB (%d devices)", totalSizeGB, len(sys.Storage))))
+
 		for _, disk := range sys.Storage {
-			fmt.Printf("  %s\n", labelStyle.Render(disk))
+			sizeGB := float64(disk.Size) / (1024 * 1024 * 1024)
+
+			var deviceInfo string
+			if disk.MountPoint == "unmounted" || disk.MountPoint == "" {
+				deviceInfo = fmt.Sprintf("%s: %.1f GB (unmounted)", disk.Device, sizeGB)
+			} else {
+				usedGB := float64(disk.Used) / (1024 * 1024 * 1024)
+				deviceInfo = fmt.Sprintf("%s: %.1f GB / %.1f GB (%s)", disk.Device, usedGB, sizeGB, disk.MountPoint)
+			}
+
+			fmt.Printf("  %s\n", labelStyle.Render(deviceInfo))
 		}
 	}
 
