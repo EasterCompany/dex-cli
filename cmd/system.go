@@ -177,16 +177,10 @@ func renderSystemInfo(sys *config.SystemConfig) {
 	valueStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("111"))
 
-	// Memory
-	ramGB := float64(sys.MemoryBytes) / (1024 * 1024 * 1024)
-	fmt.Printf("%s  %s\n",
-		headerStyle.Render("MEMORY"),
-		valueStyle.Render(fmt.Sprintf("%.1f GB", ramGB)))
-
 	// CPU
 	for _, cpu := range sys.CPU {
 		fmt.Printf("%s  %s\n",
-			headerStyle.Render("CPU"),
+			headerStyle.Render("CPU:"),
 			valueStyle.Render(cpu.Label))
 		fmt.Printf("  %s\n",
 			labelStyle.Render(fmt.Sprintf("Cores: %d  •  Threads: %d", cpu.Count, cpu.Threads)))
@@ -196,7 +190,7 @@ func renderSystemInfo(sys *config.SystemConfig) {
 	if len(sys.GPU) > 0 {
 		for i, gpu := range sys.GPU {
 			fmt.Printf("%s  %s\n",
-				headerStyle.Render(fmt.Sprintf("GPU %d", i)),
+				headerStyle.Render(fmt.Sprintf("GPU %d:", i)),
 				valueStyle.Render(gpu.Label))
 			if gpu.VRAM > 0 {
 				vramGB := float64(gpu.VRAM) / (1024 * 1024 * 1024)
@@ -206,16 +200,42 @@ func renderSystemInfo(sys *config.SystemConfig) {
 		}
 	}
 
-	// Storage
+	// Blank line before MEMORY/STORAGE group
+	fmt.Println()
+
+	// Memory
+	ramGB := float64(sys.MemoryBytes) / (1024 * 1024 * 1024)
+	fmt.Printf("%s  %s\n",
+		headerStyle.Render("MEMORY:"),
+		valueStyle.Render(fmt.Sprintf("%.1f GB", ramGB)))
+
+	// Storage (no blank line between MEMORY and STORAGE)
 	if len(sys.Storage) > 0 {
-		fmt.Printf("\n%s\n", headerStyle.Render("STORAGE"))
+		// Calculate total storage
+		totalSize := "Unknown"
+		if len(sys.Storage) > 0 {
+			// Try to parse the total from the storage list
+			// For now, just use the first entry's size indication or "Multiple devices"
+			if len(sys.Storage) == 1 {
+				totalSize = "1 device"
+			} else {
+				totalSize = fmt.Sprintf("%d devices", len(sys.Storage))
+			}
+		}
+
+		fmt.Printf("%s  %s\n",
+			headerStyle.Render("STORAGE:"),
+			valueStyle.Render(totalSize))
 		for _, disk := range sys.Storage {
 			fmt.Printf("  %s\n", labelStyle.Render(disk))
 		}
 	}
 
+	// Blank line before PACKAGES
+	fmt.Println()
+
 	// Packages
-	fmt.Printf("\n%s\n", headerStyle.Render("PACKAGES"))
+	fmt.Printf("%s\n", headerStyle.Render("PACKAGES:"))
 
 	for _, pkg := range sys.Packages {
 		var statusStyle lipgloss.Style
