@@ -59,11 +59,6 @@ func systemInfo() error {
 
 // systemScan re-scans hardware and updates system.json
 func systemScan() error {
-	scanStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("111")).
-		Italic(true)
-	fmt.Println(scanStyle.Render("Scanning hardware and software..."))
-
 	sys, err := config.IntrospectSystem()
 	if err != nil {
 		return fmt.Errorf("failed to scan system: %w", err)

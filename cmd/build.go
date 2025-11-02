@@ -12,10 +12,7 @@ import (
 
 // Build compiles one or all services
 func Build(serviceName string) error {
-	ui.PrintTitle("DEXTER BUILD COMMAND")
-
 	// Load the service map
-	ui.PrintSectionTitle("LOADING SERVICE MAP")
 	serviceMap, err := config.LoadServiceMap()
 	if err != nil {
 		return fmt.Errorf("failed to load service map: %w", err)
@@ -31,7 +28,6 @@ func Build(serviceName string) error {
 }
 
 func buildAll(serviceMap *config.ServiceMapConfig) error {
-	ui.PrintSectionTitle("BUILDING ALL SERVICES")
 	for _, services := range serviceMap.Services {
 		for _, service := range services {
 			if err := buildService(service); err != nil {
@@ -44,7 +40,6 @@ func buildAll(serviceMap *config.ServiceMapConfig) error {
 }
 
 func buildOne(serviceMap *config.ServiceMapConfig, serviceName string) error {
-	ui.PrintSectionTitle(fmt.Sprintf("BUILDING SERVICE: %s", serviceName))
 	for _, services := range serviceMap.Services {
 		for _, service := range services {
 			if service.ID == serviceName {

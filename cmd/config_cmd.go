@@ -33,15 +33,6 @@ func Config(subcommand string) error {
 
 // ValidateConfig checks all configuration files for correctness
 func ValidateConfig() error {
-	fmt.Println(ui.RenderTitle("DEXTER CONFIG VALIDATOR"))
-	fmt.Println()
-
-	infoStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("245")).
-		Italic(true)
-	fmt.Println(infoStyle.Render("Performing comprehensive configuration validation..."))
-	fmt.Println()
-
 	var allIssues []validationIssue
 
 	// Validate directory structure

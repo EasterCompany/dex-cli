@@ -14,8 +14,7 @@ type commandResult struct {
 	status  string
 }
 
-func runOnAllServices(command string, args []string, title string, showOutputOnFailure bool) error {
-	fmt.Println(ui.RenderTitle(title))
+func runOnAllServices(command string, args []string, showOutputOnFailure bool) error {
 
 	// Load the service map
 	serviceMap, err := config.LoadServiceMap()

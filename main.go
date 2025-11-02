@@ -177,10 +177,7 @@ func isDevMode() bool {
 }
 
 func printUsage(isDevMode bool) {
-	ui.PrintTitle("DEXTER CLI - MANAGE DEXTER SERVICES")
-	ui.PrintSectionTitle("USAGE")
 	ui.PrintInfo("dex <command> [options]")
-	ui.PrintSectionTitle("COMMANDS")
 	ui.PrintInfo("pull       Clone/pull all Dexter services from Git")
 	if isDevMode {
 		ui.PrintInfo("update     Update dex-cli to latest version")
@@ -200,7 +197,6 @@ func printUsage(isDevMode bool) {
 	ui.PrintInfo("system     Show system info and manage packages")
 	ui.PrintInfo("version    Show version information")
 	ui.PrintInfo("help       Show this help message")
-	ui.PrintSectionTitle("ENVIRONMENT")
 	ui.PrintInfo("Dexter root:        ~/Dexter")
 	ui.PrintInfo("EasterCompany root: ~/EasterCompany")
 	fmt.Println()

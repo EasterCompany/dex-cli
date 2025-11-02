@@ -43,11 +43,7 @@ func Update(args []string) error {
 }
 
 func showUpdateUsage() error {
-	fmt.Println(ui.RenderTitle("DEXTER UPDATE"))
-	fmt.Println()
-
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	fmt.Println(helpStyle.Render("Update dex-cli to the latest version"))
+	fmt.Println("Update dex-cli to the latest version")
 	fmt.Println()
 
 	cmdStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("111")).Padding(0, 2)
@@ -62,13 +58,7 @@ func showUpdateUsage() error {
 
 // updateFull performs complete update: pull, build, install
 func updateFull() error {
-	fmt.Println(ui.RenderTitle("DEXTER UPDATE"))
-	fmt.Println()
-
-	infoStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("245")).
-		Italic(true)
-	fmt.Println(infoStyle.Render("Updating dex-cli to latest version..."))
+	fmt.Println("Updating dex-cli to latest version...")
 	fmt.Println()
 
 	steps := []updateStep{
@@ -226,9 +216,6 @@ func updateFull() error {
 }
 
 func updateCheck() error {
-	fmt.Println(ui.RenderTitle("CHECK FOR UPDATES"))
-	fmt.Println()
-
 	dexCliPath, err := config.ExpandPath("~/EasterCompany/dex-cli")
 	if err != nil {
 		return err
@@ -265,9 +252,6 @@ func updateCheck() error {
 }
 
 func updatePull() error {
-	fmt.Println(ui.RenderTitle("PULL LATEST CHANGES"))
-	fmt.Println()
-
 	dexCliPath, err := config.ExpandPath("~/EasterCompany/dex-cli")
 	if err != nil {
 		return err
@@ -302,9 +286,6 @@ func updatePull() error {
 }
 
 func updateBuild() error {
-	fmt.Println(ui.RenderTitle("BUILD DEX-CLI"))
-	fmt.Println()
-
 	dexCliPath, err := config.ExpandPath("~/EasterCompany/dex-cli")
 	if err != nil {
 		return err
@@ -320,9 +301,6 @@ func updateBuild() error {
 }
 
 func updateInstall() error {
-	fmt.Println(ui.RenderTitle("INSTALL DEX-CLI"))
-	fmt.Println()
-
 	dexCliPath, err := config.ExpandPath("~/EasterCompany/dex-cli")
 	if err != nil {
 		return err

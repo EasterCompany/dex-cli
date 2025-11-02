@@ -30,11 +30,7 @@ func Model(args []string) error {
 }
 
 func showModelUsage() error {
-	fmt.Println(ui.RenderTitle("DEXTER MODEL"))
-	fmt.Println()
-
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	fmt.Println(helpStyle.Render("Manage models in ~/Dexter/models"))
+	fmt.Println("Manage models in ~/Dexter/models")
 	fmt.Println()
 
 	cmdStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("111")).Padding(0, 2)
@@ -46,24 +42,6 @@ func showModelUsage() error {
 
 func listModels() error {
 	modelsPath, err := config.ExpandPath(filepath.Join(config.DexterRoot, "models"))
-	if err != nil {
-		return fmt.Errorf("failed to expand models path: %w", err)
-	}
-
-	files, err := os.ReadDir(modelsPath)
-	if err != nil {
-		return fmt.Errorf("failed to read models directory: %w", err)
-	}
-
-	fmt.Println(ui.RenderTitle("DEXTER MODELS"))
-	fmt.Println()
-
-	for _, file := range files {
-		fmt.Println(file.Name())
-	}
-
-	return nil
-}
 
 func deleteModel(modelName string) error {
 	modelsPath, err := config.ExpandPath(filepath.Join(config.DexterRoot, "models"))

@@ -52,10 +52,6 @@ func handleCacheService() pullResult {
 
 // Pull synchronizes all Dexter services from their Git repositories
 func Pull() error {
-	// Title
-	fmt.Println(ui.RenderTitle("DEXTER PULL"))
-	fmt.Println()
-
 	// Ensure directory structure
 	if err := config.EnsureDirectoryStructure(); err != nil {
 		return fmt.Errorf("failed to ensure directory structure: %w", err)
@@ -90,12 +86,6 @@ func Pull() error {
 		totalServices += len(services)
 	}
 
-	infoStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("245")).
-		Italic(true)
-	fmt.Println(infoStyle.Render(fmt.Sprintf("Syncing %d services...", totalServices)))
-	fmt.Println()
-
 	// Process each service and collect results
 	var results []pullResult
 	successCount := 0
@@ -118,14 +108,6 @@ func Pull() error {
 		if serviceTypeLabel == "" {
 			serviceTypeLabel = serviceType
 		}
-
-		// Section header
-		sectionStyle := lipgloss.NewStyle().
-			Bold(true).
-			Foreground(lipgloss.Color("99")).
-			Padding(0, 1).
-			MarginTop(1)
-		fmt.Println(sectionStyle.Render(strings.ToUpper(serviceTypeLabel)))
 
 		if serviceType == "os" {
 			for _, service := range services {
@@ -283,12 +265,6 @@ func renderSummary(total, success, skipped, errors int) {
 		Width(50)
 
 	var summaryText strings.Builder
-
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("99"))
-	summaryText.WriteString(titleStyle.Render("SYNC SUMMARY"))
-	summaryText.WriteString("\n\n")
 
 	totalStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	summaryText.WriteString(totalStyle.Render(fmt.Sprintf("Total services:  %d", total)))
