@@ -98,13 +98,6 @@ func main() {
 			os.Exit(1)
 		}
 
-	case "model":
-		if err := cmd.Model(os.Args[2:]); err != nil {
-			if ui.PrintError(fmt.Sprintf("Error: %v", err)); err != nil {
-				os.Exit(1)
-			}
-		}
-
 	case "format":
 		if hasSourceServices {
 			if err := cmd.Format(os.Args[2:]); err != nil {
@@ -165,7 +158,6 @@ func printUsage(isDevMode bool, hasSourceServices bool) {
 	ui.PrintInfo("stop       <service> Stop a Dexter service")
 	ui.PrintInfo("restart    <service> Restart a Dexter service")
 	ui.PrintInfo("logs       <service> [-f] View service logs")
-	ui.PrintInfo("model      <list|delete> Manage Dexter models")
 	if hasSourceServices {
 		ui.PrintInfo("format     Format and lint all code")
 		ui.PrintInfo("lint       Lint all code")

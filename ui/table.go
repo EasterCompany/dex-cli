@@ -66,24 +66,6 @@ func padRight(s string, width int) string {
 	return s + strings.Repeat(" ", width-len(s))
 }
 
-func CreateServiceTable(rows []TableRow) Table {
-	return Table{
-		Columns: []TableColumn{
-			{Header: "SERVICE", Width: 25},
-			{Header: "ADDRESS", Width: 25},
-			{Header: "VERSION", Width: 12},
-			{Header: "STATUS", Width: 15},
-			{Header: "UPTIME", Width: 10},
-			{Header: "LAST CHECK", Width: 10},
-		},
-		Rows: rows,
-	}
-}
-
-func FormatTableRow(service, address, version, status, uptime, timestamp string) TableRow {
-	return TableRow{service, address, version, status, uptime, timestamp}
-}
-
 func FormatFormatTableRow(service, status string) TableRow {
 	return TableRow{service, status}
 }
@@ -122,3 +104,14 @@ func RenderTable(table Table) string {
 	return output.String()
 }
 
+func CreateServiceTable(rows []TableRow) Table {
+	table := NewTable([]string{"SERVICE", "ADDRESS", "VERSION", "STATUS", "UPTIME", "LAST CHECK"})
+	for _, row := range rows {
+		table.AddRow(row)
+	}
+	return table
+}
+
+func FormatTableRow(service, address, version, status, uptime, timestamp string) TableRow {
+	return TableRow{service, address, version, status, uptime, timestamp}
+}

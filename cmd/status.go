@@ -71,7 +71,7 @@ func Status(serviceName string) error {
 
 	// Render table
 	table := ui.CreateServiceTable(rows)
-	fmt.Print(ui.RenderTable(table))
+	table.Render()
 
 	return nil
 }

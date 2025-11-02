@@ -62,17 +62,15 @@ func runOnAllServices(command string, args []string, showOutputOnFailure bool) e
 
 	// Render table
 	table := createTable(rows)
-	fmt.Print(ui.RenderTable(table))
+	table.Render()
 
 	return nil
 }
 
 func createTable(rows []ui.TableRow) ui.Table {
-	return ui.Table{
-		Columns: []ui.TableColumn{
-			{Header: "SERVICE", Width: 30},
-			{Header: "STATUS", Width: 10},
-		},
-		Rows: rows,
+	table := ui.NewTable([]string{"SERVICE", "STATUS"})
+	for _, row := range rows {
+		table.AddRow(row)
 	}
+	return table
 }
