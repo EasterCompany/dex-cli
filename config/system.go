@@ -240,15 +240,16 @@ func detectStorage() []StorageInfo {
 	}
 
 	// Get all block devices with their partitions
-	cmd := exec.Command("lsblk", "-b", "-n", "-o", "NAME,SIZE,FSUSED,MOUNTPOINT,TYPE")
+	cmd := exec.Command("lsblk", "-b", "-n", "-o", "NAME,SIZE,FSUSED,TYPE")
 	output, err := cmd.Output()
 	if err != nil {
 		return storage
 	}
 
-	// Parse lsblk output to find disk devices and their mount points
+	// Parse lsblk output to find disk devices
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	deviceMap := make(map[string]*StorageInfo) // Map device name to storage info
+	deviceMap := make(map[string]*StorageInfo)   // Map device name to storage info
+	partitionMap := make(map[string]string)      // Map partition to parent disk
 
 	for _, line := range lines {
 		fields := strings.Fields(line)
@@ -258,8 +259,6 @@ func detectStorage() []StorageInfo {
 
 		name := strings.TrimLeft(fields[0], "├─└│")
 		sizeStr := fields[1]
-
-		// Parse device type - it's always the last field
 		devType := fields[len(fields)-1]
 
 		// Parse size
@@ -273,45 +272,55 @@ func detectStorage() []StorageInfo {
 				Used:       0,
 				MountPoint: "",
 			}
-			continue
-		}
-
-		// For partitions, extract used and mount point
-		if devType == "part" {
-			// Find parent disk (e.g., sda1 -> sda)
+		} else if devType == "part" {
+			// Map partition to parent disk
 			parentDisk := strings.TrimRight(name, "0123456789")
+			partitionMap[name] = parentDisk
+		}
+	}
+
+	// Use findmnt to get mount points and usage for each partition
+	findmntCmd := exec.Command("findmnt", "-b", "-n", "-o", "TARGET,SOURCE,USED")
+	findmntOutput, err := findmntCmd.Output()
+	if err == nil {
+		findmntLines := strings.Split(strings.TrimSpace(string(findmntOutput)), "\n")
+
+		for _, line := range findmntLines {
+			fields := strings.Fields(line)
+			if len(fields) < 2 {
+				continue
+			}
+
+			mountPoint := fields[0]
+			source := fields[1]
+			var used int64
+			if len(fields) >= 3 {
+				used, _ = strconv.ParseInt(fields[2], 10, 64)
+			}
+
+			// Extract device name from source (e.g., /dev/sda2[/@] -> sda2)
+			deviceName := strings.TrimPrefix(source, "/dev/")
+			if idx := strings.Index(deviceName, "["); idx != -1 {
+				deviceName = deviceName[:idx]
+			}
+
+			// Find parent disk for this partition
+			parentDisk, exists := partitionMap[deviceName]
+			if !exists {
+				continue
+			}
+
 			info, exists := deviceMap[parentDisk]
 			if !exists {
 				continue
 			}
 
-			// Fields can be: NAME SIZE FSUSED MOUNTPOINT TYPE or NAME SIZE MOUNTPOINT TYPE or NAME SIZE TYPE
-			var used int64
-			var mountPoint string
-
-			if len(fields) == 5 {
-				// NAME SIZE FSUSED MOUNTPOINT TYPE
-				used, _ = strconv.ParseInt(fields[2], 10, 64)
-				mountPoint = fields[3]
-			} else if len(fields) == 4 {
-				// NAME SIZE MOUNTPOINT TYPE or NAME SIZE FSUSED TYPE
-				// Check if field 2 looks like a mount point (starts with /)
-				if strings.HasPrefix(fields[2], "/") {
-					mountPoint = fields[2]
-				} else {
-					// It's FSUSED but no mount point
-					used, _ = strconv.ParseInt(fields[2], 10, 64)
-				}
-			}
-
-			// Update parent disk info if we have a mount point
-			if mountPoint != "" {
-				// Keep the shortest (closest to root) mount point
+			// Prioritize root mount point, otherwise shortest path
+			if mountPoint == "/" {
+				info.MountPoint = mountPoint
+				info.Used = used
+			} else if info.MountPoint != "/" {
 				if info.MountPoint == "" || len(mountPoint) < len(info.MountPoint) {
-					info.MountPoint = mountPoint
-					info.Used = used
-				} else if mountPoint == "/" {
-					// Always prefer root mount
 					info.MountPoint = mountPoint
 					info.Used = used
 				}
