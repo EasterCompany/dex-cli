@@ -105,26 +105,42 @@ func SaveSystemConfig(sys *SystemConfig) error {
 
 // detectCPU introspects CPU information
 func detectCPU() []CPUInfo {
+	threads := runtime.NumCPU()
+	cores := threads / 2 // Assume hyperthreading
+
 	cpuInfo := CPUInfo{
 		Label:   "Unknown CPU",
-		Count:   runtime.NumCPU(),
-		Threads: runtime.NumCPU(),
+		Count:   cores,
+		Threads: threads,
 		AvgGHz:  0,
 		MaxGHz:  0,
 	}
 
-	// Try to get CPU model from /proc/cpuinfo on Linux
+	// Try to get CPU model and core count from /proc/cpuinfo on Linux
 	if runtime.GOOS == "linux" {
 		if data, err := os.ReadFile("/proc/cpuinfo"); err == nil {
 			lines := strings.Split(string(data), "\n")
+			coreIDs := make(map[string]bool)
+
 			for _, line := range lines {
 				if strings.HasPrefix(line, "model name") {
 					parts := strings.Split(line, ":")
 					if len(parts) > 1 {
 						cpuInfo.Label = strings.TrimSpace(parts[1])
-						break
 					}
 				}
+				// Count unique physical cores
+				if strings.HasPrefix(line, "core id") {
+					parts := strings.Split(line, ":")
+					if len(parts) > 1 {
+						coreIDs[strings.TrimSpace(parts[1])] = true
+					}
+				}
+			}
+
+			// If we found core IDs, use that count
+			if len(coreIDs) > 0 {
+				cpuInfo.Count = len(coreIDs)
 			}
 		}
 	}
