@@ -41,7 +41,8 @@ func Service(action, serviceShortName string) error {
 		return fmt.Errorf("failed to check systemd status for '%s': %w", def.ShortName, err)
 	}
 	if !exists {
-		return fmt.Errorf("systemd service '%s' not found.\nRun 'dex build %s' to install it.", systemdServiceName, def.ShortName)
+		// Corrected error string: removed newline and punctuation
+		return fmt.Errorf("systemd service '%s' not found, run 'dex build %s' to install it", systemdServiceName, def.ShortName)
 	}
 
 	// Perform the action using systemctl --user
