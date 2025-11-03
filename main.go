@@ -9,12 +9,12 @@ import (
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
-const (
-	version = "1.0.0"
-)
-
 var (
-	date = "unknown"
+	version   string
+	branch    string
+	commit    string
+	buildDate string
+	buildYear string
 )
 
 func main() {
@@ -53,7 +53,7 @@ func main() {
 		}
 
 	case "version", "-v", "--version":
-		cmd.Version(version, date)
+		cmd.Version(version, branch, commit, buildDate, buildYear)
 
 	case "build":
 		if err := cmd.Build(os.Args[2:]); err != nil {
@@ -98,35 +98,9 @@ func main() {
 			os.Exit(1)
 		}
 
-	case "format":
-		if hasSourceServices {
-			if err := cmd.Format(os.Args[2:]); err != nil {
-				if ui.PrintError(fmt.Sprintf("Error: %v", err)); err != nil {
-					os.Exit(1)
-				}
-			}
-		} else {
-			ui.PrintError(fmt.Sprintf("Unknown command: %s", command))
-			printUsage(isDevMode, hasSourceServices)
-			os.Exit(1)
-		}
-
 	case "test":
 		if hasSourceServices {
 			if err := cmd.Test(os.Args[2:]); err != nil {
-				if ui.PrintError(fmt.Sprintf("Error: %v", err)); err != nil {
-					os.Exit(1)
-				}
-			}
-		} else {
-			ui.PrintError(fmt.Sprintf("Unknown command: %s", command))
-			printUsage(isDevMode, hasSourceServices)
-			os.Exit(1)
-		}
-
-	case "lint":
-		if hasSourceServices {
-			if err := cmd.Lint(os.Args[2:]); err != nil {
 				if ui.PrintError(fmt.Sprintf("Error: %v", err)); err != nil {
 					os.Exit(1)
 				}
@@ -159,8 +133,6 @@ func printUsage(isDevMode bool, hasSourceServices bool) {
 	ui.PrintInfo("restart    <service> Restart a Dexter service")
 	ui.PrintInfo("logs       <service> [-f] View service logs")
 	if hasSourceServices {
-		ui.PrintInfo("format     Format and lint all code")
-		ui.PrintInfo("lint       Lint all code")
 		ui.PrintInfo("test       Run all tests")
 	}
 	ui.PrintInfo("system     Show system info and manage packages")

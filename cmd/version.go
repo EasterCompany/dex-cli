@@ -2,16 +2,38 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"runtime"
+	"strings"
 
-	"github.com/EasterCompany/dex-cli/git"
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
-func Version(version, date string) {
-	branch, commit := git.GetVersionInfo(".")
+func Version(version, branch, commit, buildDate, buildYear string) {
+	exePath, err := os.Executable()
+	if err != nil {
+		exePath = "unknown"
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		homeDir = ""
+	}
+
+	displayPath := "/"
+	if homeDir != "" && strings.HasPrefix(exePath, homeDir) {
+		displayPath = "~" + strings.TrimPrefix(exePath, homeDir)
+	}
+
+	buildID := fmt.Sprintf("%s-%s-%s-%s", version, branch, commit, buildDate)
+	arch := fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
+
 	versionString := fmt.Sprintf(
-		"dex (build name) | dex-cli (build project name) | ~/Dexter/bin/dex (original build target location) | Easter Company (company author) | version %s (version label) | release 1 (release label) | commit: %s@%s (branch and commit info of source from build) | build: %s (any other build info??)",
-		version, branch, commit, date,
+		"dex-cli @ %s | %s | %s | Easter Company™ © %s",
+		displayPath,
+		buildID,
+		arch,
+		buildYear,
 	)
 	ui.PrintInfo(versionString)
 }
