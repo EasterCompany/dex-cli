@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/EasterCompany/dex-cli/config"
@@ -70,23 +69,13 @@ func Update(args []string) error {
 		log(fmt.Sprintf("Checked out commit '%s'", commit))
 	}
 
-	// Build & Install
-	log("Building `dex-cli` from source...")
-	buildCmd := exec.Command("go", "build", "-o", "dex-cli", ".")
-	buildCmd.Dir = sourcePath
-	if output, err := buildCmd.CombinedOutput(); err != nil {
+	// Build & Install using Makefile
+	log("Building and installing `dex-cli` from source using Makefile...")
+	installCmd := exec.Command("make", "install")
+	installCmd.Dir = sourcePath
+	if output, err := installCmd.CombinedOutput(); err != nil {
 		log(string(output))
-		return fmt.Errorf("build failed: %w", err)
-	}
-
-	log("Installing `dex-cli` to `~/Dexter/bin`...")
-	sourcePathBin := filepath.Join(sourcePath, "dex-cli")
-	destPath, err := config.ExpandPath("~/Dexter/bin/dex")
-	if err != nil {
-		return err
-	}
-	if err := os.Rename(sourcePathBin, destPath); err != nil {
-		return fmt.Errorf("install failed: %w", err)
+		return fmt.Errorf("make install failed: %w", err)
 	}
 
 	newVersion, _ := exec.Command("dex", "version").Output()
