@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"time"
+	"strings"
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/git"
@@ -34,24 +34,52 @@ func Update(args []string) error {
 		return nil
 	}
 
+	// Get current version and binary size before update
+	currentVersion, _ := exec.Command("dex", "version").Output()
+	currentVersionStr := strings.TrimSpace(string(currentVersion))
+
+	currentBinaryPath, _ := exec.LookPath("dex")
+	var currentSize int64
+	if currentBinaryPath != "" {
+		if stat, err := os.Stat(currentBinaryPath); err == nil {
+			currentSize = stat.Size()
+		}
+	}
+
 	log("Updating to latest version...")
-	ui.PrintInfo("Switching to main branch and pulling latest changes...")
+	ui.PrintSection("Downloading")
 
 	if err := git.SwitchBranch(sourcePath, "main"); err != nil {
 		return err
 	}
 	log("Switched to branch 'main'")
 
+	// Get commit hash before pull
+	beforeCommit, _ := exec.Command("git", "-C", sourcePath, "rev-parse", "HEAD").Output()
+	beforeCommitStr := strings.TrimSpace(string(beforeCommit))
+
 	if err := git.Pull(sourcePath); err != nil {
 		return err
 	}
 	log("Pulled latest changes")
 
-	ui.PrintInfo("Waiting for 2 seconds to show pull logs...")
-	time.Sleep(2 * time.Second)
+	// Get commit hash after pull
+	afterCommit, _ := exec.Command("git", "-C", sourcePath, "rev-parse", "HEAD").Output()
+	afterCommitStr := strings.TrimSpace(string(afterCommit))
+
+	// Get diff stats if commits changed
+	var additions, deletions int
+	if beforeCommitStr != afterCommitStr {
+		diffOut, _ := exec.Command("git", "-C", sourcePath, "diff", "--shortstat", beforeCommitStr, afterCommitStr).Output()
+		diffStr := string(diffOut)
+		_, err = fmt.Sscanf(diffStr, "%*d files changed, %d insertions(+), %d deletions(-)", &additions, &deletions)
+		if err != nil {
+			log(fmt.Sprintf("Failed to parse diff string: %v", err))
+		}
+	}
 
 	log("Building and installing `dex-cli` from source using Makefile...")
-	ui.PrintInfo("Building and installing new version...")
+	ui.PrintSection("Building & Installing")
 	installCmd := exec.Command("make", "install")
 	installCmd.Dir = sourcePath
 	installCmd.Stdout = os.Stdout
@@ -61,9 +89,21 @@ func Update(args []string) error {
 		return fmt.Errorf("make install failed: %w", err)
 	}
 
+	// Get new version and binary size after update
 	newVersion, _ := exec.Command("dex", "version").Output()
-	log(fmt.Sprintf("Update complete. New version: %s", newVersion))
-	ui.PrintInfo(fmt.Sprintf("Update complete. New version: %s", newVersion))
+	newVersionStr := strings.TrimSpace(string(newVersion))
+
+	newBinaryPath, _ := exec.LookPath("dex")
+	var newSize int64
+	if newBinaryPath != "" {
+		if stat, err := os.Stat(newBinaryPath); err == nil {
+			newSize = stat.Size()
+		}
+	}
+
+	log(fmt.Sprintf("Update complete. New version: %s", newVersionStr))
+	ui.PrintSection("Complete")
+	ui.PrintVersionComparison(currentVersionStr, newVersionStr, currentSize, newSize, additions, deletions)
 
 	return nil
 }

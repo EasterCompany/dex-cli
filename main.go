@@ -23,31 +23,30 @@ func main() {
 		os.Exit(1)
 	}
 
-	isDevMode := config.IsDevMode()
-	hasSourceServices := config.HasSourceServices()
-
 	if err := config.EnsureDirectoryStructure(); err != nil {
 		ui.PrintError(fmt.Sprintf("Error ensuring directory structure: %v", err))
 		os.Exit(1)
 	}
 
 	if len(os.Args) < 2 {
-		printUsage(isDevMode, hasSourceServices)
+		printUsage()
 		os.Exit(1)
 	}
 
 	command := os.Args[1]
 
+	// Check if command is available based on requirements
+	if !config.IsCommandAvailable(command) {
+		ui.PrintError(fmt.Sprintf("Command '%s' is not available", command))
+		ui.PrintInfo("This command requires certain conditions to be met.")
+		printUsage()
+		os.Exit(1)
+	}
+
 	switch command {
 	case "update":
-		if isDevMode {
-			if err := cmd.Update(os.Args[2:]); err != nil {
-				ui.PrintError(fmt.Sprintf("Error: %v", err))
-				os.Exit(1)
-			}
-		} else {
-			ui.PrintError(fmt.Sprintf("Unknown command: %s", command))
-			printUsage(isDevMode, hasSourceServices)
+		if err := cmd.Update(os.Args[2:]); err != nil {
+			ui.PrintError(fmt.Sprintf("Error: %v", err))
 			os.Exit(1)
 		}
 
@@ -103,16 +102,10 @@ func main() {
 		}
 
 	case "test":
-		if hasSourceServices {
-			if err := cmd.Test(os.Args[2:]); err != nil {
-				if ui.PrintError(fmt.Sprintf("Error: %v", err)); err != nil {
-					os.Exit(1)
-				}
+		if err := cmd.Test(os.Args[2:]); err != nil {
+			if ui.PrintError(fmt.Sprintf("Error: %v", err)); err != nil {
+				os.Exit(1)
 			}
-		} else {
-			ui.PrintError(fmt.Sprintf("Unknown command: %s", command))
-			printUsage(isDevMode, hasSourceServices)
-			os.Exit(1)
 		}
 
 	case "python":
@@ -133,34 +126,64 @@ func main() {
 			os.Exit(1)
 		}
 
+	case "pull":
+		if err := cmd.Pull(os.Args[2:]); err != nil {
+			ui.PrintError(fmt.Sprintf("Error: %v", err))
+			os.Exit(1)
+		}
+
 	case "help", "-h", "--help":
-		printUsage(isDevMode, hasSourceServices)
+		printUsage()
 
 	default:
 		ui.PrintError(fmt.Sprintf("Unknown command: %s", command))
-		printUsage(isDevMode, hasSourceServices)
+		printUsage()
 		os.Exit(1)
 	}
 }
 
-func printUsage(isDevMode bool, hasSourceServices bool) {
+func printUsage() {
 	ui.PrintInfo("dex <command> [options]")
-	if isDevMode {
+
+	if config.IsCommandAvailable("update") {
 		ui.PrintInfo("update     Update dex-cli to latest version")
 	}
-	ui.PrintInfo("build      <service|all> Build one or all Dexter services")
-	ui.PrintInfo("status     [service] Check the health of one or all services")
-	ui.PrintInfo("start      <service> Start a Dexter service")
-	ui.PrintInfo("stop       <service> Stop a Dexter service")
-	ui.PrintInfo("restart    <service> Restart a Dexter service")
-	ui.PrintInfo("logs       <service> [-f] View service logs")
-	if hasSourceServices {
+	if config.IsCommandAvailable("build") {
+		ui.PrintInfo("build      <service|all> Build one or all Dexter services")
+	}
+	if config.IsCommandAvailable("status") {
+		ui.PrintInfo("status     [service] Check the health of one or all services")
+	}
+	if config.IsCommandAvailable("start") {
+		ui.PrintInfo("start      <service> Start a Dexter service")
+	}
+	if config.IsCommandAvailable("stop") {
+		ui.PrintInfo("stop       <service> Stop a Dexter service")
+	}
+	if config.IsCommandAvailable("restart") {
+		ui.PrintInfo("restart    <service> Restart a Dexter service")
+	}
+	if config.IsCommandAvailable("logs") {
+		ui.PrintInfo("logs       <service> [-f] View service logs")
+	}
+	if config.IsCommandAvailable("test") {
 		ui.PrintInfo("test       Run all tests")
 	}
-	ui.PrintInfo("system     Show system info and manage packages")
-	ui.PrintInfo("python     [<subcommand>] [args...] Manage Dexter's Python environment or run Python commands")
-	ui.PrintInfo("bun        [args...] Proxy for the system's bun executable")
-	ui.PrintInfo("bunx       [args...] Proxy for the system's bunx executable")
+	if config.IsCommandAvailable("system") {
+		ui.PrintInfo("system     Show system info and manage packages")
+	}
+	if config.IsCommandAvailable("python") {
+		ui.PrintInfo("python     [<subcommand>] [args...] Manage Dexter's Python environment or run Python commands")
+	}
+	if config.IsCommandAvailable("bun") {
+		ui.PrintInfo("bun        [args...] Proxy for the system's bun executable")
+	}
+	if config.IsCommandAvailable("bunx") {
+		ui.PrintInfo("bunx       [args...] Proxy for the system's bunx executable")
+	}
+	if config.IsCommandAvailable("pull") {
+		ui.PrintInfo("pull       Pull latest changes for all Dexter services")
+	}
 	ui.PrintInfo("version    Show version information")
 	ui.PrintInfo("help       Show this help message")
 	ui.PrintInfo("Dexter root:        ~/Dexter")
