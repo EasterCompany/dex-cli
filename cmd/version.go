@@ -1,12 +1,23 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"runtime"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 )
+
+// TagInfo represents the structure of a single tag entry in the JSON
+type TagInfo struct {
+	Latest string `json:"latest"`
+}
+
+// TagsMap represents the overall JSON structure
+type TagsMap map[string]TagInfo
 
 func Version(version, branch, commit, buildDate, buildYear string) {
 	// Style for the trademark part
@@ -29,9 +40,46 @@ func Version(version, branch, commit, buildDate, buildYear string) {
 		arch,
 	)
 
-	// Style the trademark part
-	trademarkPart := darkStyle.Render(fmt.Sprintf("| Easter Company™ © %s", buildYear))
+	// Conditionally add the trademark part
+	trademarkPart := ""
+	if isOfficialRelease(version) {
+		trademarkPart = darkStyle.Render(fmt.Sprintf("| Easter Company™ © %s", buildYear))
+	}
 
 	// Assemble and print the final output
-	fmt.Printf("%s %s\n", fullVersion, trademarkPart)
+	if trademarkPart != "" {
+		fmt.Printf("%s %s\n", fullVersion, trademarkPart)
+	} else {
+		fmt.Printf("%s\n", fullVersion)
+	}
+}
+
+func isOfficialRelease(currentVersion string) bool {
+	resp, err := http.Get("https://easter.company/tags/dex-cli.json")
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return false
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return false
+	}
+
+	var tagsMap TagsMap
+	if err := json.Unmarshal(body, &tagsMap); err != nil {
+		return false
+	}
+
+	for _, tagInfo := range tagsMap {
+		if strings.TrimSpace(tagInfo.Latest) == currentVersion {
+			return true
+		}
+	}
+
+	return false
 }
