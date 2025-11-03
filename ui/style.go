@@ -77,9 +77,12 @@ func PrintSection(title string) {
 	fmt.Printf("\n%s=== %s ===%s\n", ColorCyan, title, ColorReset)
 }
 
-func PrintVersionComparison(oldVersion, newVersion string, oldSize, newSize int64, additions, deletions int) {
+func PrintVersionComparison(oldVersion, newVersion, latestVersion string, oldSize, newSize int64, additions, deletions int) {
 	fmt.Printf("%s  Previous version: %s%s\n", ColorBlue, ColorReset, oldVersion)
 	fmt.Printf("%s  Current version:  %s%s\n", ColorBlue, ColorReset, newVersion)
+	if latestVersion != "" {
+		fmt.Printf("%s  Latest version:   %s%s\n", ColorBlue, ColorReset, latestVersion)
+	}
 
 	// Calculate size difference
 	sizeDiff := newSize - oldSize

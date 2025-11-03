@@ -103,7 +103,15 @@ func Update(args []string) error {
 
 	log(fmt.Sprintf("Update complete. New version: %s", newVersionStr))
 	ui.PrintSection("Complete")
-	ui.PrintVersionComparison(currentVersionStr, newVersionStr, currentSize, newSize, additions, deletions)
+
+	// Fetch latest version from easter.company
+	latestVersion, err := fetchLatestVersion()
+	if err != nil {
+		log(fmt.Sprintf("Failed to fetch latest version: %v", err))
+		latestVersion = "" // Continue without showing latest version
+	}
+
+	ui.PrintVersionComparison(currentVersionStr, newVersionStr, latestVersion, currentSize, newSize, additions, deletions)
 
 	return nil
 }
