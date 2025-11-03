@@ -37,6 +37,7 @@ if [ -n "$SHELL_RC" ]; then
         echo '# dex-cli' >> "$SHELL_RC"
         echo 'export PATH="$HOME/Dexter/bin:$PATH"' >> "$SHELL_RC"
         echo "→ Added $HOME/Dexter/bin to PATH. Please run 'source $SHELL_RC' or restart your terminal."
+        source "$SHELL_RC"
     else
         echo "→ $HOME/Dexter/bin already in PATH."
     fi
