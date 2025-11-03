@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/EasterCompany/dex-cli/config"
 )
@@ -16,19 +17,45 @@ var pythonRequirements = []string{
 
 // Python manages the Python virtual environment for Dexter.
 func Python(args []string) error {
+	venvPath, err := config.ExpandPath("~/Dexter/python")
+	if err != nil {
+		return err
+	}
+	pythonPath := filepath.Join(venvPath, "bin", "python")
+
+	// If no arguments, launch interactive python console
 	if len(args) == 0 {
-		return fmt.Errorf("subcommand required: init, remove, upgrade")
+		fmt.Println("Launching Python interactive console...")
+		cmd := exec.Command(pythonPath)
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
 	}
 
-	switch args[0] {
+	subcommand := args[0]
+
+	switch subcommand {
 	case "init":
 		return pythonInit()
 	case "remove":
 		return pythonRemove()
 	case "upgrade":
 		return pythonUpgrade()
+	case "version", "help":
+		// Pass version/help directly to python executable
+		cmd := exec.Command(pythonPath, args...)
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
 	default:
-		return fmt.Errorf("unknown subcommand: %s", args[0])
+		// Pass all arguments directly to python executable
+		cmd := exec.Command(pythonPath, args...)
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
 	}
 }
 
@@ -50,9 +77,11 @@ func pythonInit() error {
 	}
 
 	fmt.Println("Installing Python requirements...")
-	pipPath := venvPath + "/bin/pip"
+	pipPath := filepath.Join(venvPath, "bin", "pip")
 	for _, req := range pythonRequirements {
 		cmd := exec.Command(pipPath, "install", req)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("failed to install %s: %w", req, err)
 		}
@@ -93,9 +122,11 @@ func pythonUpgrade() error {
 	}
 
 	fmt.Println("Upgrading Python requirements...")
-	pipPath := venvPath + "/bin/pip"
+	pipPath := filepath.Join(venvPath, "bin", "pip")
 	args := append([]string{"install", "--upgrade"}, pythonRequirements...)
 	cmd := exec.Command(pipPath, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to upgrade requirements: %w", err)
 	}

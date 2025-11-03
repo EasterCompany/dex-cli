@@ -122,6 +122,18 @@ func main() {
 			os.Exit(1)
 		}
 
+	case "bun":
+		if err := cmd.Bun(os.Args[2:]); err != nil {
+			ui.PrintError(fmt.Sprintf("Error: %v", err))
+			os.Exit(1)
+		}
+
+	case "bunx":
+		if err := cmd.Bunx(os.Args[2:]); err != nil {
+			ui.PrintError(fmt.Sprintf("Error: %v", err))
+			os.Exit(1)
+		}
+
 	case "help", "-h", "--help":
 		printUsage(isDevMode, hasSourceServices)
 
@@ -147,7 +159,9 @@ func printUsage(isDevMode bool, hasSourceServices bool) {
 		ui.PrintInfo("test       Run all tests")
 	}
 	ui.PrintInfo("system     Show system info and manage packages")
-	ui.PrintInfo("python     <init|remove|upgrade> Manage Dexter's Python environment")
+	ui.PrintInfo("python     [<subcommand>] [args...] Manage Dexter's Python environment or run Python commands")
+	ui.PrintInfo("bun        [args...] Proxy for the system's bun executable")
+	ui.PrintInfo("bunx       [args...] Proxy for the system's bunx executable")
 	ui.PrintInfo("version    Show version information")
 	ui.PrintInfo("help       Show this help message")
 	ui.PrintInfo("Dexter root:        ~/Dexter")
