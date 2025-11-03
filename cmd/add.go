@@ -14,10 +14,15 @@ import (
 
 // Add prompts the user to create a new service in the new service map.
 func Add(args []string) error {
+	if len(args) > 0 {
+		return fmt.Errorf("add command takes no arguments")
+	}
+
+	reader := bufio.NewReader(os.Stdin)
+
 	// Load existing service map
 	serviceMap, err := config.LoadServiceMapConfig()
 	if err != nil {
-		// If the file doesn't exist, create a new map
 		if os.IsNotExist(err) {
 			serviceMap = config.DefaultServiceMapConfig()
 		} else {
@@ -25,129 +30,97 @@ func Add(args []string) error {
 		}
 	}
 
-	// Figure out which services are already in the map
-	existingServices := make(map[string]bool)
-	for _, serviceList := range serviceMap.Services {
-		for _, service := range serviceList {
-			existingServices[service.ID] = true
+	// Create a map of already-added services for quick lookup
+	addedServices := make(map[string]bool)
+	for _, services := range serviceMap.Services {
+		for _, service := range services {
+			addedServices[service.ID] = true
 		}
 	}
 
-	// Find available services (defined in ServiceDefinitions but not in service-map.json)
-	available := []config.ServiceDefinition{}
+	// Find services that are defined but not yet added
+	var availableServices []config.ServiceDefinition
 	for _, def := range config.ServiceDefinitions {
-		// Only "manageable" services can be added
-		if !config.IsManageable(def.ShortName) {
+		// Only show services that are manageable (not 'cli' or 'os')
+		if !def.IsManageable() {
 			continue
 		}
-		if _, exists := existingServices[def.ID]; !exists {
-			available = append(available, def)
+		if _, ok := addedServices[def.ID]; !ok {
+			availableServices = append(availableServices, def)
 		}
 	}
 
-	if len(available) == 0 {
-		ui.PrintInfo("All available services are already added to service-map.json.")
+	if len(availableServices) == 0 {
+		ui.PrintInfo("All manageable services are already added.")
 		return nil
 	}
 
-	// Sort for consistent order
-	sort.Slice(available, func(i, j int) bool {
-		return available[i].ShortName < available[j].ShortName
+	// Sort for consistent display
+	sort.Slice(availableServices, func(i, j int) bool {
+		return availableServices[i].ShortName < availableServices[j].ShortName
 	})
 
 	fmt.Println("Available services to add:")
-	for i, def := range available {
+	for i, def := range availableServices {
 		fmt.Printf("  %d: %s (Port: %s, Type: %s)\n", i+1, def.ShortName, def.Port, def.Type)
 	}
 
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Enter number(s) to add (e.g., 1 or 1,2): ")
+	fmt.Print("Enter number(s) to add (e.g., '1' or '1, 2'): ")
 	input, _ := reader.ReadString('\n')
-
-	// --- New Parsing Logic ---
-	servicesToAdd := []config.ServiceDefinition{}
-	invalidInputs := []string{}
-	seenIndices := make(map[int]bool) // To prevent adding the same service twice from "1,1"
-
-	// 1. Clean and split the input
 	input = strings.TrimSpace(input)
-	input = strings.TrimSuffix(input, ",")
-	numberStrings := strings.Split(input, ",")
 
-	if len(numberStrings) == 0 {
-		fmt.Println("No input provided.")
+	if input == "" {
+		fmt.Println("No selection made.")
 		return nil
 	}
 
-	// 2. Parse each number string
-	for _, numStr := range numberStrings {
-		numStr = strings.TrimSpace(numStr)
-		if numStr == "" {
-			continue // Skip empty entries (e.g., "1,,2")
-		}
+	selections := strings.Split(input, ",")
+	servicesAdded := 0
 
-		num, err := strconv.Atoi(numStr)
-		if err != nil {
-			invalidInputs = append(invalidInputs, fmt.Sprintf("'%s' (not a number)", numStr))
+	for _, s := range selections {
+		s = strings.TrimSpace(s)
+		if s == "" {
 			continue
 		}
 
-		// 3. Validate the number
-		if num <= 0 || num > len(available) {
-			invalidInputs = append(invalidInputs, fmt.Sprintf("'%d' (out of range)", num))
+		idx, err := strconv.Atoi(s)
+		if err != nil || idx < 1 || idx > len(availableServices) {
+			ui.PrintError(fmt.Sprintf("Invalid selection: '%s'. Skipping.", s))
 			continue
 		}
 
-		// 4. Get the 0-based index
-		index := num - 1
+		def := availableServices[idx-1]
 
-		// 5. Check if already added
-		if seenIndices[index] {
-			continue
-		}
-
-		// 6. Add to list
-		servicesToAdd = append(servicesToAdd, available[index])
-		seenIndices[index] = true
-	}
-
-	// 7. Report errors
-	if len(invalidInputs) > 0 {
-		return fmt.Errorf("invalid inputs: %s", strings.Join(invalidInputs, ", "))
-	}
-
-	// 8. Check if any valid services were selected
-	if len(servicesToAdd) == 0 {
-		fmt.Println("No valid services selected.")
-		return nil
-	}
-
-	// 9. Add all selected services to the map
-	servicesAddedNames := []string{}
-	for _, serviceDef := range servicesToAdd {
-		address := "0.0.0.0"
+		// Create the new ServiceEntry
 		service := config.ServiceEntry{
-			ID:     serviceDef.ID,
-			Repo:   serviceDef.Repo,
-			Source: serviceDef.Source,
-			HTTP:   fmt.Sprintf("%s:%s", address, serviceDef.Port),
-			Socket: fmt.Sprintf("ws://%s:%s", address, serviceDef.Port),
+			ID:     def.ID,
+			Repo:   def.Repo,
+			Source: def.Source,
 		}
 
-		serviceMap.Services[serviceDef.Type] = append(serviceMap.Services[serviceDef.Type], service)
-		servicesAddedNames = append(servicesAddedNames, serviceDef.ShortName)
+		// Add HTTP/Socket info if it's not a CLI/OS service
+		if def.Type != "cli" && def.Type != "os" {
+			address := "0.0.0.0" // Default address
+			service.HTTP = fmt.Sprintf("%s:%s", address, def.Port)
+			service.Socket = fmt.Sprintf("ws://%s:%s", address, def.Port)
+		}
+
+		// Add the new service
+		serviceMap.Services[def.Type] = append(serviceMap.Services[def.Type], service)
+		ui.PrintInfo(fmt.Sprintf("Adding '%s' to service map...", def.ShortName))
+		servicesAdded++
 	}
 
-	// 10. Save the map
+	if servicesAdded == 0 {
+		return nil
+	}
+
+	// Save the updated service map
 	if err := config.SaveServiceMapConfig(serviceMap); err != nil {
 		return fmt.Errorf("failed to save service map: %w", err)
 	}
 
-	// 11. Final report
-	if len(servicesAddedNames) > 0 {
-		ui.PrintSuccess(fmt.Sprintf("Successfully added: %s", strings.Join(servicesAddedNames, ", ")))
-		ui.PrintInfo("Run 'dex build all' or 'dex build <alias>' to install them.")
-	}
-
+	ui.PrintSuccess(fmt.Sprintf("Successfully added %d service(s).", servicesAdded))
+	ui.PrintInfo("Run 'dex build all' or 'dex build <service>' to build and install.")
 	return nil
 }
