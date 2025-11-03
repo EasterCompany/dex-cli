@@ -247,7 +247,7 @@ func checkHTTPStatus(service config.ServiceEntry, serviceName, address string) u
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return ui.FormatTableRow(serviceName, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/Player/N/A"), time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(serviceName, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 	}
 
 	var statusResp health.StatusResponse
