@@ -77,15 +77,26 @@ func Test(args []string) error {
 	return nil
 }
 
-func commandExists(cmd string) bool {
-	_, err := exec.LookPath(cmd)
-	return err == nil
+func getExecutablePath(name string) (string, bool) {
+	virtualEnvPath, err := config.ExpandPath("~/Dexter/python/bin/" + name)
+	if err == nil {
+		if _, err := os.Stat(virtualEnvPath); err == nil {
+			return virtualEnvPath, true
+		}
+	}
+
+	// Fallback to system path
+	path, err := exec.LookPath(name)
+	if err != nil {
+		return "", false
+	}
+	return path, true
 }
 
 func formatProject(projectPath string, log func(string)) string {
 	// Go
-	if commandExists("gofmt") {
-		cmd := exec.Command("gofmt", "-w", ".")
+	if gofmtPath, ok := getExecutablePath("gofmt"); ok {
+		cmd := exec.Command(gofmtPath, "-w", ".")
 		cmd.Dir = projectPath
 		if err := cmd.Run(); err != nil {
 			return "Go: FAILED"
@@ -93,15 +104,15 @@ func formatProject(projectPath string, log func(string)) string {
 	}
 
 	// Prettier for HTML, CSS, JS, TS, JSON, Markdown
-	if commandExists("prettier") {
-		cmd := exec.Command("prettier", "--write", "--prose-wrap", "always", ".")
+	if prettierPath, ok := getExecutablePath("prettier"); ok {
+		cmd := exec.Command(prettierPath, "--write", "--prose-wrap", "always", ".")
 		cmd.Dir = projectPath
 		_ = cmd.Run() // Prettier returns error if no files found, so we ignore it
 	}
 
 	// Shell
-	if commandExists("shfmt") {
-		cmd := exec.Command("shfmt", "-w", ".")
+	if shfmtPath, ok := getExecutablePath("shfmt"); ok {
+		cmd := exec.Command(shfmtPath, "-w", ".")
 		cmd.Dir = projectPath
 		if err := cmd.Run(); err != nil {
 			return "Shell: FAILED"
@@ -109,8 +120,8 @@ func formatProject(projectPath string, log func(string)) string {
 	}
 
 	// Python
-	if commandExists("black") {
-		cmd := exec.Command("black", ".")
+	if blackPath, ok := getExecutablePath("black"); ok {
+		cmd := exec.Command(blackPath, ".")
 		cmd.Dir = projectPath
 		if err := cmd.Run(); err != nil {
 			return "Python: FAILED"
@@ -122,8 +133,8 @@ func formatProject(projectPath string, log func(string)) string {
 
 func lintProject(projectPath string, log func(string)) string {
 	// Go
-	if commandExists("golangci-lint") {
-		cmd := exec.Command("golangci-lint", "run")
+	if golintPath, ok := getExecutablePath("golangci-lint"); ok {
+		cmd := exec.Command(golintPath, "run")
 		cmd.Dir = projectPath
 		if err := cmd.Run(); err != nil {
 			return "Go: FAILED"
@@ -131,8 +142,8 @@ func lintProject(projectPath string, log func(string)) string {
 	}
 
 	// ESLint for JS/TS
-	if commandExists("eslint") {
-		cmd := exec.Command("eslint", ".")
+	if eslintPath, ok := getExecutablePath("eslint"); ok {
+		cmd := exec.Command(eslintPath, ".")
 		cmd.Dir = projectPath
 		if err := cmd.Run(); err != nil {
 			return "JS/TS: FAILED"
@@ -140,8 +151,8 @@ func lintProject(projectPath string, log func(string)) string {
 	}
 
 	// Stylelint for CSS
-	if commandExists("stylelint") {
-		cmd := exec.Command("stylelint", "**/*.css")
+	if stylelintPath, ok := getExecutablePath("stylelint"); ok {
+		cmd := exec.Command(stylelintPath, "**/*.css")
 		cmd.Dir = projectPath
 		if err := cmd.Run(); err != nil {
 			return "CSS: FAILED"
@@ -149,8 +160,8 @@ func lintProject(projectPath string, log func(string)) string {
 	}
 
 	// HTMLHint for HTML
-	if commandExists("htmlhint") {
-		cmd := exec.Command("htmlhint", "**/*.html")
+	if htmlhintPath, ok := getExecutablePath("htmlhint"); ok {
+		cmd := exec.Command(htmlhintPath, "**/*.html")
 		cmd.Dir = projectPath
 		if err := cmd.Run(); err != nil {
 			return "HTML: FAILED"
@@ -158,8 +169,8 @@ func lintProject(projectPath string, log func(string)) string {
 	}
 
 	// JSONLint for JSON
-	if commandExists("jsonlint") {
-		cmd := exec.Command("jsonlint", "-q", ".")
+	if jsonlintPath, ok := getExecutablePath("jsonlint"); ok {
+		cmd := exec.Command(jsonlintPath, "-q", ".")
 		cmd.Dir = projectPath
 		if err := cmd.Run(); err != nil {
 			return "JSON: FAILED"
@@ -167,8 +178,8 @@ func lintProject(projectPath string, log func(string)) string {
 	}
 
 	// Markdown
-	if commandExists("markdownlint") {
-		cmd := exec.Command("markdownlint", ".")
+	if markdownlintPath, ok := getExecutablePath("markdownlint"); ok {
+		cmd := exec.Command(markdownlintPath, ".")
 		cmd.Dir = projectPath
 		if err := cmd.Run(); err != nil {
 			return "Markdown: FAILED"
@@ -176,8 +187,8 @@ func lintProject(projectPath string, log func(string)) string {
 	}
 
 	// Shell
-	if commandExists("shellcheck") {
-		cmd := exec.Command("shellcheck", ".")
+	if shellcheckPath, ok := getExecutablePath("shellcheck"); ok {
+		cmd := exec.Command(shellcheckPath, ".")
 		cmd.Dir = projectPath
 		if err := cmd.Run(); err != nil {
 			return "Shell: FAILED"
@@ -185,8 +196,8 @@ func lintProject(projectPath string, log func(string)) string {
 	}
 
 	// Python
-	if commandExists("flake8") {
-		cmd := exec.Command("flake8", ".")
+	if flake8Path, ok := getExecutablePath("flake8"); ok {
+		cmd := exec.Command(flake8Path, ".")
 		cmd.Dir = projectPath
 		if err := cmd.Run(); err != nil {
 			return "Python: FAILED"
@@ -199,17 +210,19 @@ func lintProject(projectPath string, log func(string)) string {
 func testProject(projectPath string, log func(string)) string {
 	// Go
 	if _, err := os.Stat(filepath.Join(projectPath, "go.mod")); err == nil {
-		cmd := exec.Command("go", "test", "./...")
-		cmd.Dir = projectPath
-		if err := cmd.Run(); err != nil {
-			return "Go: FAILED"
+		if goPath, ok := getExecutablePath("go"); ok {
+			cmd := exec.Command(goPath, "test", "./...")
+			cmd.Dir = projectPath
+			if err := cmd.Run(); err != nil {
+				return "Go: FAILED"
+			}
 		}
 	}
 
 	// Python
 	if _, err := os.Stat(filepath.Join(projectPath, "requirements.txt")); err == nil {
-		if commandExists("pytest") {
-			cmd := exec.Command("pytest")
+		if pytestPath, ok := getExecutablePath("pytest"); ok {
+			cmd := exec.Command(pytestPath)
 			cmd.Dir = projectPath
 			if err := cmd.Run(); err != nil {
 				return "Python: FAILED"

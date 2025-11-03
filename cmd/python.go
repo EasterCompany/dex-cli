@@ -103,3 +103,54 @@ func pythonUpgrade() error {
 	fmt.Println("Python requirements upgraded successfully.")
 	return nil
 }
+
+func EnsurePythonVenv(currentVersion string) error {
+	versionFilePath, err := config.ExpandPath("~/Dexter/.dex-cli-version")
+	if err != nil {
+		return err
+	}
+
+	venvPath, err := config.ExpandPath("~/Dexter/python")
+	if err != nil {
+		return err
+	}
+
+	backupVenvPath, err := config.ExpandPath("~/Dexter/.python.backup")
+	if err != nil {
+		return err
+	}
+
+	data, err := os.ReadFile(versionFilePath)
+	if err != nil || string(data) != currentVersion {
+		fmt.Println("Python environment is outdated or missing. Re-initializing...")
+
+		// Backup existing venv
+		if _, err := os.Stat(venvPath); err == nil {
+			fmt.Println("Backing up existing Python environment...")
+			if err := os.RemoveAll(backupVenvPath); err != nil {
+				return fmt.Errorf("failed to remove old backup: %w", err)
+			}
+			if err := os.Rename(venvPath, backupVenvPath); err != nil {
+				return fmt.Errorf("failed to backup python environment: %w", err)
+			}
+		}
+
+		// Initialize new venv
+		if err := pythonInit(); err != nil {
+			return err
+		}
+
+		// Upgrade packages
+		if err := pythonUpgrade(); err != nil {
+			return err
+		}
+
+		// Write new version
+		if err := os.WriteFile(versionFilePath, []byte(currentVersion), 0644); err != nil {
+			return fmt.Errorf("failed to write version file: %w", err)
+		}
+		fmt.Println("Python environment is up to date.")
+	}
+
+	return nil
+}

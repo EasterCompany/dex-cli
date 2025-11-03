@@ -18,6 +18,11 @@ var (
 )
 
 func main() {
+	if err := cmd.EnsurePythonVenv(version); err != nil {
+		ui.PrintError(fmt.Sprintf("Error ensuring Python environment: %v", err))
+		os.Exit(1)
+	}
+
 	isDevMode := config.IsDevMode()
 	hasSourceServices := config.HasSourceServices()
 
