@@ -146,7 +146,7 @@ func checkCLIStatus(service config.ServiceEntry) ui.TableRow {
 		service.ID,
 		"local",
 		version,
-		"OK",
+		colorizeStatus("OK"),
 		"N/A",
 		"N/A",
 		"N/A",
@@ -158,7 +158,7 @@ func checkCLIStatus(service config.ServiceEntry) ui.TableRow {
 func checkCacheStatus(service config.ServiceEntry, address string) ui.TableRow {
 	conn, err := net.DialTimeout("tcp", service.HTTP, 2*time.Second)
 	if err != nil {
-		return ui.FormatTableRow(service.ID, address, "N/A", "BAD", "N/A", "N/A", "N/A", time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(service.ID, address, "N/A", colorizeStatus("BAD"), "N/A", "N/A", "N/A", time.Now().Format("15:04:05"))
 	}
 	defer func() { _ = conn.Close() }()
 
@@ -168,27 +168,27 @@ func checkCacheStatus(service config.ServiceEntry, address string) ui.TableRow {
 	if service.Credentials != nil && service.Credentials.Password != "" {
 		authCmd := fmt.Sprintf("AUTH %s\r\n", service.Credentials.Password)
 		if _, err = conn.Write([]byte(authCmd)); err != nil {
-			return ui.FormatTableRow(service.ID, address, "N/A", "BAD", "Auth failed", "N/A", "N/A", time.Now().Format("15:04:05"))
+			return ui.FormatTableRow(service.ID, address, "N/A", colorizeStatus("BAD"), "Auth failed", "N/A", "N/A", time.Now().Format("15:04:05"))
 		}
 		response, err := reader.ReadString('\n')
 		if err != nil || !strings.HasPrefix(response, "+OK") {
-			return ui.FormatTableRow(service.ID, address, "N/A", "BAD", "Auth failed", "N/A", "N/A", time.Now().Format("15:04:05"))
+			return ui.FormatTableRow(service.ID, address, "N/A", colorizeStatus("BAD"), "Auth failed", "N/A", "N/A", time.Now().Format("15:04:05"))
 		}
 	}
 
 	// --- Send PING ---
 	if _, err = conn.Write([]byte("PING\r\n")); err != nil {
-		return ui.FormatTableRow(service.ID, address, "N/A", "BAD", "Ping failed", "N/A", "N/A", time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(service.ID, address, "N/A", colorizeStatus("BAD"), "Ping failed", "N/A", "N/A", time.Now().Format("15:04:05"))
 	}
 
 	// --- Read PONG response ---
 	response, err := reader.ReadString('\n')
 	if err != nil || !strings.HasPrefix(response, "+PONG") {
-		return ui.FormatTableRow(service.ID, address, "N/A", "BAD", "Ping failed", "N/A", "N/A", time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(service.ID, address, "N/A", colorizeStatus("BAD"), "Ping failed", "N/A", "N/A", time.Now().Format("15:04:05"))
 	}
 
 	// PING successful
-	return ui.FormatTableRow(service.ID, address, "N/A", "OK", "N/A", "N/A", "N/A", time.Now().Format("15:04:05"))
+	return ui.FormatTableRow(service.ID, address, "N/A", colorizeStatus("OK"), "N/A", "N/A", "N/A", time.Now().Format("15:04:05"))
 }
 
 // checkHTTPStatus checks a service via its HTTP /status endpoint
@@ -200,7 +200,7 @@ func checkHTTPStatus(service config.ServiceEntry, address string) ui.TableRow {
 			service.ID,
 			address,
 			"N/A",
-			"BAD",
+			colorizeStatus("BAD"),
 			"N/A",
 			"N/A",
 			"N/A",
@@ -214,7 +214,7 @@ func checkHTTPStatus(service config.ServiceEntry, address string) ui.TableRow {
 			service.ID,
 			address,
 			"N/A",
-			"BAD",
+			colorizeStatus("BAD"),
 			"N/A",
 			"N/A",
 			"N/A",
@@ -228,7 +228,7 @@ func checkHTTPStatus(service config.ServiceEntry, address string) ui.TableRow {
 			service.ID,
 			address,
 			"N/A",
-			"BAD",
+			colorizeStatus("BAD"),
 			"N/A",
 			"N/A",
 			"N/A",
@@ -244,10 +244,24 @@ func checkHTTPStatus(service config.ServiceEntry, address string) ui.TableRow {
 		statusResp.Service,
 		address,
 		statusResp.Version,
-		statusResp.Status,
+		colorizeStatus(statusResp.Status),
 		uptime,
 		goroutines,
 		mem,
 		time.Unix(statusResp.Timestamp, 0).Format("15:04:05"),
 	)
+}
+
+// colorizeStatus applies color coding to the status string.
+func colorizeStatus(status string) string {
+	switch status {
+	case "OK":
+		return ui.Colorize(status, ui.ColorGreen)
+	case "BAD":
+		return ui.Colorize(status, ui.ColorBrightRed)
+	case "N/A":
+		return ui.Colorize(status, ui.ColorDarkGray)
+	default:
+		return status
+	}
 }
