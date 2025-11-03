@@ -32,11 +32,6 @@ git fetch origin main
 git checkout -f main
 git reset --hard origin/main
 
-echo "Running checks and building the project..."
-make all
-
-echo "Build successful!"
-
 echo "[EXISTING TAGS]:"
 git tag --sort=-v:refname | head -n 5 # Show 5 most recent tags
 
@@ -51,6 +46,11 @@ echo "Proposed new version tag: ${NEW_VERSION}"
 
 echo "Tagging the repository with ${NEW_VERSION}..."
 git tag -a "${NEW_VERSION}" -m "Release ${NEW_VERSION}"
+
+echo "Running checks and building the project..."
+make build-for-release VERSION=${NEW_VERSION}
+
+echo "Build successful!"
 
 echo "Successfully tagged ${NEW_VERSION}."
 echo "Please visit https://github.com/EasterCompany/dex-cli/releases/new to publish this release."

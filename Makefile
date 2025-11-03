@@ -41,6 +41,14 @@ build: check
 	@echo "Building..."
 	@$(GOBUILD) $(LDFLAGS) -o $(EXECUTABLE_PATH) .
 
+build-for-release: check
+	@if [ -z "$(VERSION)" ]; then \
+		echo "VERSION argument is required for build-for-release"; \
+		exit 1; \
+	fi
+	@echo "Building for release with version $(VERSION)..."
+	@$(GOBUILD) -ldflags "-X main.version=$(VERSION) -X main.branch=$(BRANCH) -X main.commit=$(COMMIT) -X main.buildDate=$(BUILD_DATE) -X main.buildYear=$(BUILD_YEAR)" -o $(EXECUTABLE_PATH) .
+
 install: build
 
 clean:
