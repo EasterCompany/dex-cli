@@ -19,6 +19,11 @@ type ServiceDefinition struct {
 	Source      string // "~/EasterCompany/dex-event-service"
 }
 
+// GetLogPath returns the expected log file path for the service.
+func (def *ServiceDefinition) GetLogPath() (string, error) {
+	return ExpandPath(filepath.Join(DexterLogs, fmt.Sprintf("%s.log", def.ID)))
+}
+
 // ServiceDefinitions is the new hardcoded map that drives all service commands.
 // All services MUST be defined here by their shortName.
 var ServiceDefinitions = map[string]ServiceDefinition{
@@ -108,6 +113,28 @@ var ServiceDefinitions = map[string]ServiceDefinition{
 		Repo:        "N/A",
 		Source:      "N/A",
 	},
+}
+
+// GetManageableServices returns a list of all service definitions that are not 'cli' or 'os'.
+func GetManageableServices() []ServiceDefinition {
+	var services []ServiceDefinition
+	for _, def := range ServiceDefinitions {
+		if def.IsManageable() {
+			services = append(services, def)
+		}
+	}
+	return services
+}
+
+// GetBuildableServices returns a list of all service definitions that are buildable.
+func GetBuildableServices() []ServiceDefinition {
+	var services []ServiceDefinition
+	for _, def := range ServiceDefinitions {
+		if def.IsBuildable() {
+			services = append(services, def)
+		}
+	}
+	return services
 }
 
 // --- service-map.json struct definitions ---

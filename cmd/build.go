@@ -25,54 +25,80 @@ func Build(args []string) error {
 
 	log(fmt.Sprintf("Build command called with args: %v", args))
 
+	// Load the service map
+	serviceMap, err := config.LoadServiceMapConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load service map: %w", err)
+	}
+
 	// Determine which services to build
 	servicesToBuild := []config.ServiceDefinition{}
 	if len(args) == 0 || (len(args) > 0 && args[0] == "all") {
-		aliases := config.GetBuildableServices()
-		for _, alias := range aliases {
-			def, _ := config.Resolve(alias)
-			servicesToBuild = append(servicesToBuild, def)
-		}
+		servicesToBuild = config.GetBuildableServices()
 	} else {
-		for _, alias := range args {
-			def, err := config.Resolve(alias)
+		for _, arg := range args {
+			serviceDef, err := config.Resolve(arg)
 			if err != nil {
-				return err
+				return fmt.Errorf("service '%s' not found: %w", arg, err)
 			}
-			if def.Source == "" || def.Type == "cli" {
-				return fmt.Errorf("service '%s' is not buildable", alias)
+			if !serviceDef.IsBuildable() {
+				return fmt.Errorf("service '%s' is not buildable (type: %s)", arg, serviceDef.Type)
 			}
-			servicesToBuild = append(servicesToBuild, def)
+			servicesToBuild = append(servicesToBuild, *serviceDef)
 		}
 	}
 
-	if len(servicesToBuild) == 0 {
-		ui.PrintInfo("No services to build.")
-		return nil
+	// Check if these services are in the user's service-map.json
+	var buildableInMap []config.ServiceDefinition
+	for _, serviceDef := range servicesToBuild {
+		foundInMap := false
+		for _, services := range serviceMap.Services {
+			for _, serviceEntry := range services {
+				if serviceEntry.ID == serviceDef.ID {
+					foundInMap = true
+					break
+				}
+			}
+			if foundInMap {
+				break
+			}
+		}
+
+		if !foundInMap {
+			ui.PrintWarning(fmt.Sprintf("Service '%s' is defined but not in your service-map.json. Run 'dex add' to add it.", serviceDef.ShortName))
+			continue
+		}
+		buildableInMap = append(buildableInMap, serviceDef)
 	}
 
 	// Build logic
-	for _, serviceDef := range servicesToBuild {
+	for _, serviceDef := range buildableInMap {
 		if err := buildService(serviceDef, log); err != nil {
-			ui.PrintError(fmt.Sprintf("Failed to build %s: %v", serviceDef.ShortName, err))
-			log(fmt.Sprintf("Failed to build %s: %v", serviceDef.ShortName, err))
+			ui.PrintError(fmt.Sprintf("Failed to build %s: %v", serviceDef.ID, err))
+			log(fmt.Sprintf("Failed to build %s: %v", serviceDef.ID, err))
 		}
 	}
 
-	ui.PrintSuccess("Build process complete.")
-	log("All services built.")
+	ui.PrintSuccess("All requested services built.")
+	log("Build command complete.")
 	return nil
 }
 
 func buildService(serviceDef config.ServiceDefinition, log func(string)) error {
+	if serviceDef.Source == "" || serviceDef.Source == "N/A" {
+		ui.PrintInfo(fmt.Sprintf("Skipping %s: no source path defined", serviceDef.ID))
+		log(fmt.Sprintf("Skipping %s: no source path defined", serviceDef.ID))
+		return nil
+	}
+
 	sourcePath, err := config.ExpandPath(serviceDef.Source)
 	if err != nil {
-		return fmt.Errorf("failed to expand source path for %s: %w", serviceDef.ShortName, err)
+		return fmt.Errorf("failed to expand source path for %s: %w", serviceDef.ID, err)
 	}
 
 	if _, err := os.Stat(filepath.Join(sourcePath, "go.mod")); os.IsNotExist(err) {
-		ui.PrintWarning(fmt.Sprintf("Skipping %s: not a Go project (no go.mod)", serviceDef.ShortName))
-		log(fmt.Sprintf("Skipping %s: not a Go project (no go.mod)", serviceDef.ShortName))
+		ui.PrintInfo(fmt.Sprintf("Skipping %s: not a Go project (no go.mod)", serviceDef.ID))
+		log(fmt.Sprintf("Skipping %s: not a Go project (no go.mod)", serviceDef.ID))
 		return nil
 	}
 
@@ -94,43 +120,46 @@ func buildService(serviceDef config.ServiceDefinition, log func(string)) error {
 	}
 
 	for _, step := range steps {
-		ui.PrintInfo(fmt.Sprintf("[%s] Running %s...", serviceDef.ShortName, step.name))
-		log(fmt.Sprintf("[%s] Running %s...", serviceDef.ShortName, step.name))
+		ui.PrintInfo(fmt.Sprintf("[%s] Running %s...", serviceDef.ID, step.name))
+		log(fmt.Sprintf("[%s] Running %s...", serviceDef.ID, step.name))
 
 		step.cmd.Dir = sourcePath
 		output, err := step.cmd.CombinedOutput()
 		if err != nil {
-			log(fmt.Sprintf("[%s] Failed %s:\n%s", serviceDef.ShortName, step.name, string(output)))
-			// Don't fail the whole build for lint/test
-			if step.name == "Linting" || step.name == "Testing" {
-				ui.PrintWarning(fmt.Sprintf("[%s] %s failed, continuing build...", serviceDef.ShortName, step.name))
-			} else {
-				return fmt.Errorf("failed %s for %s:\n%s", step.name, serviceDef.ShortName, string(output))
-			}
+			log(fmt.Sprintf("[%s] Failed %s:\n%s", serviceDef.ID, step.name, string(output)))
+			return fmt.Errorf("failed %s for %s:\n%s", step.name, serviceDef.ID, string(output))
 		}
 	}
 
 	// --- Installation Step ---
-	ui.PrintInfo(fmt.Sprintf("[%s] Installing systemd service...", serviceDef.ShortName))
-	log(fmt.Sprintf("[%s] Installing systemd service...", serviceDef.ShortName))
+	ui.PrintInfo(fmt.Sprintf("[%s] Installing systemd service...", serviceDef.ID))
+	log(fmt.Sprintf("[%s] Installing systemd service...", serviceDef.ID))
 	if err := installService(serviceDef, log); err != nil {
-		log(fmt.Sprintf("[%s] Failed installation: %v", serviceDef.ShortName, err))
-		return fmt.Errorf("failed to install service %s: %w", serviceDef.ShortName, err)
+		log(fmt.Sprintf("[%s] Failed installation: %v", serviceDef.ID, err))
+		return fmt.Errorf("failed to install service %s: %w", serviceDef.ID, err)
 	}
 
-	ui.PrintSuccess(fmt.Sprintf("%s processed successfully!", serviceDef.ShortName))
-	log(fmt.Sprintf("%s processed successfully!", serviceDef.ShortName))
+	ui.PrintSuccess(fmt.Sprintf("%s processed successfully!", serviceDef.ID))
+	log(fmt.Sprintf("%s processed successfully!", serviceDef.ID))
 	return nil
 }
 
 func installService(serviceDef config.ServiceDefinition, log func(string)) error {
+	if !serviceDef.IsManageable() {
+		log(fmt.Sprintf("Skipping systemd installation for non-manageable service %s", serviceDef.ID))
+		return nil
+	}
+	if serviceDef.SystemdName == "" {
+		log(fmt.Sprintf("Skipping systemd installation for service %s: no systemd name defined", serviceDef.ID))
+		return nil
+	}
+
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return fmt.Errorf("could not get user home directory: %w", err)
 	}
 
-	serviceFileName := serviceDef.GetSystemdName()
-	serviceFilePath := filepath.Join(homeDir, ".config", "systemd", "user", serviceFileName)
+	serviceFilePath := filepath.Join(homeDir, ".config", "systemd", "user", serviceDef.SystemdName)
 
 	dexterBinPath, err := config.ExpandPath(config.DexterBin)
 	if err != nil {
@@ -140,7 +169,7 @@ func installService(serviceDef config.ServiceDefinition, log func(string)) error
 
 	logFilePath, err := serviceDef.GetLogPath()
 	if err != nil {
-		return fmt.Errorf("could not expand dexter logs path: %w", err)
+		return fmt.Errorf("could not get log path: %w", err)
 	}
 
 	// Ensure directories exist
@@ -177,8 +206,8 @@ WantedBy=default.target
 	// Run systemctl commands
 	commands := [][]string{
 		{"systemctl", "--user", "daemon-reload"},
-		{"systemctl", "--user", "enable", serviceFileName},
-		{"systemctl", "--user", "restart", serviceFileName},
+		{"systemctl", "--user", "enable", serviceDef.SystemdName},
+		{"systemctl", "--user", "restart", serviceDef.SystemdName},
 	}
 
 	for _, args := range commands {

@@ -5,6 +5,7 @@ import (
 	"os/exec"
 
 	"github.com/EasterCompany/dex-cli/config"
+	"github.com/EasterCompany/dex-cli/ui"
 )
 
 // Service manages start, stop, and restart operations for Dexter services.
@@ -21,28 +22,27 @@ func Service(action, serviceShortName string) error {
 
 	log(fmt.Sprintf("Service command called with action '%s' for service '%s'", action, serviceShortName))
 
-	// 1. Resolve the alias to a full service definition
 	def, err := config.Resolve(serviceShortName)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to resolve service '%s': %w", serviceShortName, err)
 	}
 
-	// 2. Check if this service is manageable
-	if !config.IsManageable(def.ShortName) {
-		return fmt.Errorf("service '%s' (type: %s) cannot be %s", def.ShortName, def.Type, action)
+	if !def.IsManageable() {
+		return fmt.Errorf("service '%s' (type: %s) is not manageable", def.ShortName, def.Type)
+	}
+	if def.SystemdName == "" {
+		return fmt.Errorf("service '%s' has no systemd service name defined", def.ShortName)
 	}
 
-	// 3. Get the systemd name
-	systemdServiceName := def.GetSystemdName()
+	systemdServiceName := def.SystemdName
 
-	// 4. Check if the systemd service file actually exists
-	exists, err := def.CheckSystemdService()
+	// Check if the service file exists
+	serviceExists, err := def.CheckSystemdService()
 	if err != nil {
-		return fmt.Errorf("failed to check systemd status for '%s': %w", def.ShortName, err)
+		return fmt.Errorf("failed to check for systemd service: %w", err)
 	}
-	if !exists {
-		// Corrected error string: removed newline and punctuation
-		return fmt.Errorf("systemd service '%s' not found, run 'dex build %s' to install it", systemdServiceName, def.ShortName)
+	if !serviceExists {
+		return fmt.Errorf("systemd service '%s' not found. Run 'dex build %s' to install it", systemdServiceName, def.ShortName)
 	}
 
 	// Perform the action using systemctl --user
@@ -60,7 +60,7 @@ func Service(action, serviceShortName string) error {
 }
 
 func startService(systemdServiceName string, log func(string)) error {
-	fmt.Printf("Starting %s...\n", systemdServiceName)
+	ui.PrintInfo(fmt.Sprintf("Starting %s...", systemdServiceName))
 	log(fmt.Sprintf("Starting %s...", systemdServiceName))
 
 	cmd := exec.Command("systemctl", "--user", "start", systemdServiceName)
@@ -70,13 +70,13 @@ func startService(systemdServiceName string, log func(string)) error {
 		return fmt.Errorf("failed to start %s: %w\n%s", systemdServiceName, err, string(output))
 	}
 
-	fmt.Printf("%s started successfully\n", systemdServiceName)
+	ui.PrintSuccess(fmt.Sprintf("%s started", systemdServiceName))
 	log(fmt.Sprintf("%s started successfully", systemdServiceName))
 	return nil
 }
 
 func stopService(systemdServiceName string, log func(string)) error {
-	fmt.Printf("Stopping %s...\n", systemdServiceName)
+	ui.PrintInfo(fmt.Sprintf("Stopping %s...", systemdServiceName))
 	log(fmt.Sprintf("Stopping %s...", systemdServiceName))
 
 	cmd := exec.Command("systemctl", "--user", "stop", systemdServiceName)
@@ -86,13 +86,13 @@ func stopService(systemdServiceName string, log func(string)) error {
 		return fmt.Errorf("failed to stop %s: %w\n%s", systemdServiceName, err, string(output))
 	}
 
-	fmt.Printf("%s stopped successfully\n", systemdServiceName)
+	ui.PrintSuccess(fmt.Sprintf("%s stopped", systemdServiceName))
 	log(fmt.Sprintf("%s stopped successfully", systemdServiceName))
 	return nil
 }
 
 func restartService(systemdServiceName string, log func(string)) error {
-	fmt.Printf("Restarting %s...\n", systemdServiceName)
+	ui.PrintInfo(fmt.Sprintf("Restarting %s...", systemdServiceName))
 	log(fmt.Sprintf("Restarting %s...", systemdServiceName))
 
 	cmd := exec.Command("systemctl", "--user", "restart", systemdServiceName)
@@ -102,7 +102,7 @@ func restartService(systemdServiceName string, log func(string)) error {
 		return fmt.Errorf("failed to restart %s: %w\n%s", systemdServiceName, err, string(output))
 	}
 
-	fmt.Printf("%s restarted successfully\n", systemdServiceName)
+	ui.PrintSuccess(fmt.Sprintf("%s restarted", systemdServiceName))
 	log(fmt.Sprintf("%s restarted successfully", systemdServiceName))
 	return nil
 }

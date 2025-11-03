@@ -7,7 +7,7 @@ import (
 )
 
 // Resolve finds a service's definition by its shortName (alias).
-func (def ServiceDefinition) Resolve(shortName string) (*ServiceDefinition, error) {
+func Resolve(shortName string) (*ServiceDefinition, error) {
 	def, ok := ServiceDefinitions[shortName]
 	if !ok {
 		return nil, fmt.Errorf("service alias '%s' not found", shortName)
@@ -37,6 +37,9 @@ func ResolveSystemdName(systemdName string) (*ServiceDefinition, error) {
 
 // CheckSystemdService verifies if the service's .service file exists for the user.
 func (def *ServiceDefinition) CheckSystemdService() (bool, error) {
+	if def.SystemdName == "" {
+		return false, nil // Not a systemd service
+	}
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return false, fmt.Errorf("failed to get home directory: %w", err)
@@ -54,10 +57,11 @@ func (def *ServiceDefinition) CheckSystemdService() (bool, error) {
 }
 
 // IsManageable returns true if a service is not 'cli' or 'os'.
-func IsManageable(shortName string) bool {
-	def, ok := ServiceDefinitions[shortName]
-	if !ok {
-		return false
-	}
+func (def *ServiceDefinition) IsManageable() bool {
 	return def.Type != "cli" && def.Type != "os"
+}
+
+// IsBuildable returns true if a service has source code and is not 'cli' or 'os'.
+func (def *ServiceDefinition) IsBuildable() bool {
+	return def.IsManageable() && def.Source != "N/A" && def.Repo != "N/A"
 }

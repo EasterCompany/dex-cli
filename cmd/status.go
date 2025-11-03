@@ -43,26 +43,29 @@ func Status(serviceShortName string) error {
 		for _, serviceType := range serviceTypes {
 			services := serviceMap.Services[serviceType]
 			for _, service := range services {
-				row := checkServiceStatus(service, serviceType)
+				// We must resolve the service definition from the service-map ID
+				def, err := config.ResolveByID(service.ID)
+				if err != nil {
+					log(fmt.Sprintf("Warning: Service ID '%s' in service-map.json not found in definitions. Skipping.", service.ID))
+					continue
+				}
+				row := checkServiceStatus(service, *def)
 				rows = append(rows, row)
 				log(fmt.Sprintf("Service: %s, Type: %s, Status: %s", service.ID, serviceType, row[3]))
 			}
 		}
 	} else {
-		// 1. Resolve the alias to a full service definition
-		def, err := config.Resolve(serviceShortName)
+		serviceDef, err := config.Resolve(serviceShortName)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to resolve service '%s': %w", serviceShortName, err)
 		}
 
-		// 2. Find the corresponding entry in service-map.json
+		// Find the matching entry in the service-map.json
 		var resolvedServiceEntry *config.ServiceEntry
-		var serviceType string
-		for sType, services := range serviceMap.Services {
+		for _, services := range serviceMap.Services {
 			for _, service := range services {
-				if service.ID == def.ID {
+				if service.ID == serviceDef.ID {
 					resolvedServiceEntry = &service
-					serviceType = sType
 					break
 				}
 			}
@@ -72,18 +75,12 @@ func Status(serviceShortName string) error {
 		}
 
 		if resolvedServiceEntry == nil {
-			// Special case: 'dex-cli' is in ServiceDefinitions but not in service-map.json by default
-			if def.Type == "cli" {
-				row := checkServiceStatus(config.ServiceEntry{ID: def.ID}, def.Type)
-				rows = append(rows, row)
-			} else {
-				return fmt.Errorf("service '%s' (%s) not found in service-map.json. Run 'dex add %s'?", serviceShortName, def.ID, serviceShortName)
-			}
-		} else {
-			row := checkServiceStatus(*resolvedServiceEntry, serviceType)
-			rows = append(rows, row)
-			log(fmt.Sprintf("Service: %s, Type: %s, Status: %s", resolvedServiceEntry.ID, serviceType, row[3]))
+			return fmt.Errorf("service '%s' (ID: %s) not found in your service-map.json. Run 'dex add' to add it", serviceShortName, serviceDef.ID)
 		}
+
+		row := checkServiceStatus(*resolvedServiceEntry, *serviceDef)
+		rows = append(rows, row)
+		log(fmt.Sprintf("Service: %s, Type: %s, Status: %s", resolvedServiceEntry.ID, serviceDef.Type, row[3]))
 	}
 
 	// Render table
@@ -93,8 +90,16 @@ func Status(serviceShortName string) error {
 	return nil
 }
 
+// colorizeNA colors "N/A" values dark gray, and leaves other values as-is.
+func colorizeNA(value string) string {
+	if value == "N/A" {
+		return ui.Colorize(value, ui.ColorDarkGray)
+	}
+	return value
+}
+
 // checkServiceStatus acts as a dispatcher, routing to the correct status checker based on service type.
-func checkServiceStatus(service config.ServiceEntry, serviceType string) ui.TableRow {
+func checkServiceStatus(service config.ServiceEntry, def config.ServiceDefinition) ui.TableRow {
 	// Define max lengths for columns
 	const (
 		maxServiceLen = 19
@@ -103,19 +108,20 @@ func checkServiceStatus(service config.ServiceEntry, serviceType string) ui.Tabl
 		maxUptimeLen  = 10
 	)
 
-	serviceID := ui.Truncate(service.ID, maxServiceLen)
+	// Use the definition's shortName for display, as it's the user-facing alias
+	serviceName := ui.Truncate(def.ShortName, maxServiceLen)
 	address := ui.Truncate(stripProtocol(service.HTTP), maxAddressLen)
 
-	switch serviceType {
+	switch def.Type {
 	case "cli":
-		return checkCLIStatus(service, serviceID)
+		return checkCLIStatus(serviceName)
 	case "os":
-		return checkCacheStatus(service, serviceID, address)
+		return checkCacheStatus(service, serviceName, address)
 	default:
 		if service.HTTP == "" {
-			return ui.FormatTableRow(serviceID, colorizeNA("N/A"), colorizeNA("N/A"), colorizeStatus("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+			return ui.FormatTableRow(serviceName, colorizeNA("N/A"), colorizeNA("N/A"), colorizeStatus("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"))
 		}
-		return checkHTTPStatus(service, serviceID, address)
+		return checkHTTPStatus(service, serviceName, address)
 	}
 }
 
@@ -129,7 +135,7 @@ func stripProtocol(address string) string {
 }
 
 // checkCLIStatus checks if a CLI tool is installed and working
-func checkCLIStatus(service config.ServiceEntry, serviceID string) ui.TableRow {
+func checkCLIStatus(serviceName string) ui.TableRow {
 	cmd := exec.Command("dex", "version")
 	output, err := cmd.CombinedOutput()
 
@@ -139,22 +145,14 @@ func checkCLIStatus(service config.ServiceEntry, serviceID string) ui.TableRow {
 	}
 
 	version := "N/A"
-	// Get the last line of output, in case of update messages
-	outputLines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	outputStr := outputLines[len(outputLines)-1]
-
-	// Parse the version string, which is complex
-	// v0.3.0.main.5241102.2025-11-03-20-20-30.linux_amd64.lcr4rk
-	// We want to show: v0.3.0.5241102
-	parts := strings.Split(outputStr, ".")
-	if len(parts) >= 4 && strings.HasPrefix(parts[0], "v") {
-		version = fmt.Sprintf("%s.%s.%s.%s", parts[0], parts[1], parts[2], parts[4])
-	} else if strings.Contains(outputStr, " | Easter Company™") {
-		version = strings.Split(outputStr, " | Easter Company™")[0]
+	outputStr := strings.TrimSpace(string(output))
+	// The version command now just prints the version string.
+	if err == nil && outputStr != "" {
+		version = outputStr
 	}
 
 	return ui.FormatTableRow(
-		serviceID,
+		serviceName,
 		"local",
 		colorizeNA(ui.Truncate(version, 12)),
 		colorizeStatus(status),
@@ -166,10 +164,10 @@ func checkCLIStatus(service config.ServiceEntry, serviceID string) ui.TableRow {
 }
 
 // checkCacheStatus checks a cache/db service (Redis/Valkey) with an optional AUTH and a PING command.
-func checkCacheStatus(service config.ServiceEntry, serviceID, address string) ui.TableRow {
+func checkCacheStatus(service config.ServiceEntry, serviceName, address string) ui.TableRow {
 	conn, err := net.DialTimeout("tcp", service.HTTP, 2*time.Second)
 	if err != nil {
-		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(serviceName, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 	}
 	defer func() { _ = conn.Close() }()
 
@@ -178,65 +176,52 @@ func checkCacheStatus(service config.ServiceEntry, serviceID, address string) ui
 	if service.Credentials != nil && service.Credentials.Password != "" {
 		authCmd := fmt.Sprintf("AUTH %s\r\n", service.Credentials.Password)
 		if _, err = conn.Write([]byte(authCmd)); err != nil {
-			return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), "Auth failed", colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+			return ui.FormatTableRow(serviceName, address, colorizeNA("N/A"), colorizeStatus("BAD"), "Auth failed", colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 		}
 		response, err := reader.ReadString('\n')
 		if err != nil || !strings.HasPrefix(response, "+OK") {
-			return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), "Auth failed", colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+			return ui.FormatTableRow(serviceName, address, colorizeNA("N/A"), colorizeStatus("BAD"), "Auth failed", colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 		}
 	}
 
 	if _, err = conn.Write([]byte("PING\r\n")); err != nil {
-		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), "Ping failed", colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(serviceName, address, colorizeNA("N/A"), colorizeStatus("BAD"), "Ping failed", colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 	}
 
 	response, err := reader.ReadString('\n')
 	if err != nil || !strings.HasPrefix(response, "+PONG") {
-		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), "Ping failed", colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(serviceName, address, colorizeNA("N/A"), colorizeStatus("BAD"), "Ping failed", colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 	}
 
-	return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("OK"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+	return ui.FormatTableRow(serviceName, address, colorizeNA("N/A"), colorizeStatus("OK"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 }
 
 // checkHTTPStatus checks a service via its HTTP /status endpoint
-func checkHTTPStatus(service config.ServiceEntry, serviceID, address string) ui.TableRow {
-	// Construct the URL, assuming HTTP if no scheme is present
-	statusURL := service.HTTP
-	if !strings.HasPrefix(statusURL, "http://") && !strings.HasPrefix(statusURL, "https://") {
-		statusURL = "http://" + statusURL
-	}
-	// Add /status endpoint
-	statusURL = strings.TrimSuffix(statusURL, "/") + "/status"
-
-	client := http.Client{
-		Timeout: 2 * time.Second,
-	}
-	resp, err := client.Get(statusURL)
+func checkHTTPStatus(service config.ServiceEntry, serviceName, address string) ui.TableRow {
+	statusURL := "http://" + service.HTTP + "/status"
+	resp, err := http.Get(statusURL)
 	if err != nil {
-		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(serviceName, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(serviceName, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 	}
 
 	var statusResp health.StatusResponse
 	if err := json.Unmarshal(body, &statusResp); err != nil {
-		// If JSON fails, it might be a non-Go service. Check for 200 OK.
-		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("OK"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
-		}
-		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(serviceName, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 	}
 
-	uptime := ui.Truncate(formatUptime(time.Duration(statusResp.Uptime)*time.Second), 10)
-	goroutines := fmt.Sprintf("%d", statusResp.Metrics.Goroutines)
-	mem := fmt.Sprintf("%.2f", statusResp.Metrics.MemoryAllocMB)
+	uptime := colorizeNA(ui.Truncate(formatUptime(time.Duration(statusResp.Uptime)*time.Second), 10))
+	goroutines := colorizeNA(fmt.Sprintf("%d", statusResp.Metrics.Goroutines))
+	mem := colorizeNA(fmt.Sprintf("%.2f", statusResp.Metrics.MemoryAllocMB))
 
+	// Use the serviceName (short-name) from the definition, not the one from the /status response
 	return ui.FormatTableRow(
-		ui.Truncate(statusResp.Service, 19),
+		serviceName,
 		address,
 		colorizeNA(ui.Truncate(statusResp.Version, 12)),
 		colorizeStatus(statusResp.Status),
@@ -259,12 +244,4 @@ func colorizeStatus(status string) string {
 	default:
 		return status
 	}
-}
-
-// colorizeNA colors "N/A" values dark gray, and leaves other values as-is.
-func colorizeNA(value string) string {
-	if value == "N/A" {
-		return ui.Colorize(value, ui.ColorDarkGray)
-	}
-	return value
 }

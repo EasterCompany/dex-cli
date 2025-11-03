@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/EasterCompany/dex-cli/config"
+	"github.com/EasterCompany/dex-cli/ui"
 )
 
 // Logs displays logs for a given service
@@ -22,31 +24,39 @@ func Logs(args []string, follow bool) error {
 
 	log(fmt.Sprintf("Displaying logs for services: %v, follow: %t", args, follow))
 
-	var servicesToShow []string
+	// Determine which services to show logs for
+	servicesToShow := []config.ServiceDefinition{}
 	if len(args) == 0 || (len(args) > 0 && args[0] == "all") {
-		// Get all manageable service aliases
 		servicesToShow = config.GetManageableServices()
 	} else {
-		// Validate each alias
 		for _, arg := range args {
-			if !config.IsManageable(arg) {
-				return fmt.Errorf("service alias '%s' is not recognized or cannot be logged", arg)
+			serviceDef, err := config.Resolve(arg)
+			if err != nil {
+				return fmt.Errorf("failed to resolve service '%s': %w", arg, err)
 			}
-			servicesToShow = append(servicesToShow, arg)
+			if !serviceDef.IsManageable() {
+				ui.PrintWarning(fmt.Sprintf("Skipping logs for non-manageable service: %s", serviceDef.ShortName))
+				continue
+			}
+			servicesToShow = append(servicesToShow, *serviceDef)
 		}
 	}
 
 	// Show logs for the selected services
 	logFiles := []string{}
-	for _, alias := range servicesToShow {
-		def, _ := config.Resolve(alias) // Error already checked
-		logPath, err := def.GetLogPath()
+	for _, serviceDef := range servicesToShow {
+		logPath, err := serviceDef.GetLogPath()
 		if err != nil {
-			return fmt.Errorf("failed to expand log path for '%s': %w", alias, err)
+			return fmt.Errorf("failed to get log path for %s: %w", serviceDef.ShortName, err)
 		}
 
 		if _, err := os.Stat(logPath); os.IsNotExist(err) {
-			log(fmt.Sprintf("Log file for service '%s' not found at %s, creating it.", alias, logPath))
+			log(fmt.Sprintf("Log file for service '%s' not found at %s, creating it.", serviceDef.ID, logPath))
+			// Create the directory
+			if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
+				return fmt.Errorf("failed to create log directory: %w", err)
+			}
+			// Create the file
 			if _, err := os.Create(logPath); err != nil {
 				return fmt.Errorf("failed to create log file: %w", err)
 			}
@@ -54,14 +64,15 @@ func Logs(args []string, follow bool) error {
 		logFiles = append(logFiles, logPath)
 	}
 
+	if len(logFiles) == 0 {
+		ui.PrintInfo("No services selected or no manageable services found.")
+		return nil
+	}
+
 	tailArgs := []string{}
 	if follow {
 		tailArgs = append(tailArgs, "-f")
 	}
-	if len(logFiles) == 0 {
-		return fmt.Errorf("no manageable services found to log")
-	}
-
 	tailArgs = append(tailArgs, logFiles...)
 	cmd := exec.Command("tail", tailArgs...)
 
