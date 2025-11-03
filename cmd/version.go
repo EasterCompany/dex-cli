@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"runtime"
 	"strings"
 
@@ -10,29 +9,27 @@ import (
 )
 
 func Version(version, branch, commit, buildDate, buildYear string) {
-	exePath, err := os.Executable()
-	if err != nil {
-		exePath = "unknown"
-	}
+	// Format the build date: 2025-11-03T02:38:13Z -> 2025-11-03-02-38-13
+	formattedDate := strings.ReplaceAll(buildDate, "T", "-")
+	formattedDate = strings.ReplaceAll(formattedDate, ":", "-")
+	formattedDate = strings.TrimSuffix(formattedDate, "Z")
 
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		homeDir = ""
-	}
+	// Format the architecture: linux/amd64 -> linux_amd64
+	arch := fmt.Sprintf("%s_%s", runtime.GOOS, runtime.GOARCH)
 
-	displayPath := "/"
-	if homeDir != "" && strings.HasPrefix(exePath, homeDir) {
-		displayPath = "~" + strings.TrimPrefix(exePath, homeDir)
-	}
-
-	buildID := fmt.Sprintf("%s-%s-%s-%s", version, branch, commit, buildDate)
-	arch := fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
-
-	versionString := fmt.Sprintf(
-		"dex-cli @ %s | %s | %s | Easter Company™ © %s",
-		displayPath,
-		buildID,
+	// Create the full version string
+	fullVersion := fmt.Sprintf("v%s.%s.%s.%s.%s",
+		strings.TrimPrefix(version, "v"),
+		branch,
+		commit,
+		formattedDate,
 		arch,
+	)
+
+	// Assemble the final output
+	versionString := fmt.Sprintf(
+		"dex-cli | %s | Easter Company™ © %s",
+		fullVersion,
 		buildYear,
 	)
 	ui.PrintInfo(versionString)

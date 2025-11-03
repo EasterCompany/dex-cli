@@ -69,8 +69,17 @@ func pythonInit() error {
 		return fmt.Errorf("failed to create virtual environment: %w", err)
 	}
 
-	fmt.Println("Installing Python requirements...")
 	pipPath := filepath.Join(venvPath, "bin", "pip")
+
+	fmt.Println("Upgrading pip...")
+	upgradePipCmd := exec.Command(pipPath, "install", "--upgrade", "pip")
+	upgradePipCmd.Stdout = os.Stdout
+	upgradePipCmd.Stderr = os.Stderr
+	if err := upgradePipCmd.Run(); err != nil {
+		return fmt.Errorf("failed to upgrade pip: %w", err)
+	}
+
+	fmt.Println("Installing Python requirements...")
 	for _, req := range pythonRequirements {
 		cmd := exec.Command(pipPath, "install", req)
 		cmd.Stdout = os.Stdout
@@ -114,8 +123,17 @@ func pythonUpgrade() error {
 		return fmt.Errorf("python virtual environment not found. Run 'dex python init' first")
 	}
 
-	fmt.Println("Upgrading Python requirements...")
 	pipPath := filepath.Join(venvPath, "bin", "pip")
+
+	fmt.Println("Upgrading pip...")
+	upgradePipCmd := exec.Command(pipPath, "install", "--upgrade", "pip")
+	upgradePipCmd.Stdout = os.Stdout
+	upgradePipCmd.Stderr = os.Stderr
+	if err := upgradePipCmd.Run(); err != nil {
+		return fmt.Errorf("failed to upgrade pip: %w", err)
+	}
+
+	fmt.Println("Upgrading Python requirements...")
 	args := append([]string{"install", "--upgrade"}, pythonRequirements...)
 	cmd := exec.Command(pipPath, args...)
 	cmd.Stdout = os.Stdout
