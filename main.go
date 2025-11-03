@@ -69,7 +69,6 @@ func main() {
 	case "start", "stop", "restart":
 		if len(os.Args) < 3 {
 			ui.PrintError(fmt.Sprintf("Error: service name required for '%s' command", command))
-			printUsage(isDevMode, hasSourceServices)
 			os.Exit(1)
 		}
 		service := os.Args[2]
