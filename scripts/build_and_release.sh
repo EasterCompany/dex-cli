@@ -74,11 +74,11 @@ if [ ! -d "$EASTER_COMPANY_REPO_PATH" ]; then
 fi
 
 echo "Capturing full version label from the new binary..."
-FULL_VERSION_LABEL=$($DEX_BINARY_PATH version | awk '{print $1}')
+FULL_VERSION_LABEL=$($DEX_BINARY_PATH version 2>/dev/null | head -n 1 | awk '{print $1}')
 echo "Full version label: ${FULL_VERSION_LABEL}"
 
 echo "Updating latest version in ${TAGS_JSON_PATH}..."
-jq --arg version "${FULL_VERSION_LABEL}" '."dex-cli".latest = $version' "${TAGS_JSON_PATH}" > tmp.json && mv tmp.json "${TAGS_JSON_PATH}"
+jq --arg version "${FULL_VERSION_LABEL}" '.latest = $version' "${TAGS_JSON_PATH}" > tmp.json && mv tmp.json "${TAGS_JSON_PATH}"
 
 echo "Copying binary to ${LATEST_BINARY_PATH}..."
 cp "${DEX_BINARY_PATH}" "${LATEST_BINARY_PATH}"
