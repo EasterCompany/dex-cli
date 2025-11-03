@@ -148,12 +148,27 @@ func checkCLIStatus(serviceName string) ui.TableRow {
 	outputStr := strings.TrimSpace(string(output))
 	// The version command now just prints the version string.
 	if err == nil && outputStr != "" {
-		version = outputStr
+		// Full version string: v0.3.0.main.5241102.2025-11-03-20-20-30.linux_amd64.lcr4rk
+		// User wants: 0.3.0
+
+		// Trim the 'v' prefix
+		trimmedV := strings.TrimPrefix(outputStr, "v")
+
+		// Split by '.'
+		parts := strings.Split(trimmedV, ".")
+
+		// Check if we have at least 3 parts (major, minor, patch)
+		if len(parts) >= 3 {
+			version = strings.Join(parts[0:3], ".") // "0.3.0"
+		} else {
+			// Fallback in case the version string is not as expected
+			version = outputStr
+		}
 	}
 
 	return ui.FormatTableRow(
 		serviceName,
-		"local",
+		colorizeNA("N/A"),
 		colorizeNA(ui.Truncate(version, 12)),
 		colorizeStatus(status),
 		colorizeNA("N/A"),
@@ -193,7 +208,32 @@ func checkCacheStatus(service config.ServiceEntry, serviceName, address string) 
 		return ui.FormatTableRow(serviceName, address, colorizeNA("N/A"), colorizeStatus("BAD"), "Ping failed", colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 	}
 
-	return ui.FormatTableRow(serviceName, address, colorizeNA("N/A"), colorizeStatus("OK"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+	// --- Get Version ---
+	version := "N/A"
+	if _, err = conn.Write([]byte("INFO server\r\n")); err == nil {
+		// Read the bulk string header, e.g., "$1234"
+		header, err := reader.ReadString('\n')
+		if err == nil && strings.HasPrefix(header, "$") {
+			// Now read the actual info lines
+			for {
+				line, err := reader.ReadString('\n')
+				if err != nil || line == "\r\n" { // End of response or error
+					break
+				}
+				// Check for both redis_version and valkey_version
+				if strings.HasPrefix(line, "redis_version:") || strings.HasPrefix(line, "valkey_version:") {
+					parts := strings.Split(strings.TrimSpace(line), ":")
+					if len(parts) == 2 {
+						version = parts[1]
+						break // Found it
+					}
+				}
+			}
+		}
+	}
+	// --- End Get Version ---
+
+	return ui.FormatTableRow(serviceName, address, colorizeNA(ui.Truncate(version, 12)), colorizeStatus("OK"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 }
 
 // checkHTTPStatus checks a service via its HTTP /status endpoint
@@ -207,7 +247,7 @@ func checkHTTPStatus(service config.ServiceEntry, serviceName, address string) u
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return ui.FormatTableRow(serviceName, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(serviceName, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/Player/N/A"), time.Now().Format("15:04:05"))
 	}
 
 	var statusResp health.StatusResponse
