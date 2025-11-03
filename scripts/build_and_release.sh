@@ -119,7 +119,8 @@ echo -e "\n${COLOR_CYAN}=== Downloading ===${COLOR_RESET}"
 OLD_VERSION=""
 OLD_SIZE=0
 if [ -f "$DEX_BINARY_PATH" ]; then
-    OLD_VERSION=$($DEX_BINARY_PATH version 2>/dev/null | head -n 1 | awk '{print $1}' || echo "unknown")
+    # Capture only the last line (the actual version) and everything before the trademark
+    OLD_VERSION=$($DEX_BINARY_PATH version 2>/dev/null | tail -n 1 | sed 's/ |.*$//' || echo "unknown")
     OLD_SIZE=$(stat -f%z "$DEX_BINARY_PATH" 2>/dev/null || stat -c%s "$DEX_BINARY_PATH" 2>/dev/null || echo "0")
 fi
 
@@ -156,7 +157,8 @@ if [ ! -f "$DEX_BINARY_PATH" ]; then
     exit 1
 fi
 
-NEW_VERSION_FULL=$($DEX_BINARY_PATH version 2>/dev/null | head -n 1 | awk '{print $1}')
+# Capture only the last line (the actual version) and everything before the trademark
+NEW_VERSION_FULL=$($DEX_BINARY_PATH version 2>/dev/null | tail -n 1 | sed 's/ |.*$//')
 NEW_SIZE=$(stat -f%z "$DEX_BINARY_PATH" 2>/dev/null || stat -c%s "$DEX_BINARY_PATH" 2>/dev/null)
 
 #############################################
@@ -169,13 +171,27 @@ if [ ! -d "$EASTER_COMPANY_REPO_PATH" ]; then
 fi
 
 echo -e "\nUpdating latest version in ${TAGS_JSON_PATH}..."
-jq --arg version "${NEW_VERSION_FULL}" '.["dex-cli"].latest = $version' "${TAGS_JSON_PATH}" > tmp.json && mv tmp.json "${TAGS_JSON_PATH}"
+jq --arg version "${NEW_VERSION_FULL}" '{latest: $version}' <<< '{}' > tmp.json && mv tmp.json "${TAGS_JSON_PATH}"
 
 echo "Copying binary to ${LATEST_BINARY_PATH}..."
 cp "${DEX_BINARY_PATH}" "${LATEST_BINARY_PATH}"
 
 echo "Committing and pushing changes to easter.company..."
 (cd "${EASTER_COMPANY_REPO_PATH}" && git add latest/dex tags/dex-cli.json && git commit -m "release: dex-cli ${NEW_VERSION_FULL}" && git push)
+
+# Wait for easter.company to propagate changes (with spinner)
+echo -e "\nWaiting for easter.company to update..."
+spinner=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+for i in {1..600}; do  # 60 seconds (600 * 0.1s)
+    seconds_remaining=$((60 - i / 10))
+    printf "\r  ${COLOR_CYAN}${spinner[$((i % 10))]}${COLOR_RESET} Propagating changes... %02ds" $seconds_remaining
+    sleep 0.1
+done
+printf "\r  ${COLOR_GREEN}✓${COLOR_RESET} Changes propagated to easter.company     \n"
+
+# NOW fetch the latest version from easter.company (after propagation)
+echo "Fetching latest version from easter.company..."
+LATEST_VERSION=$(curl -s https://easter.company/tags/dex-cli.json | jq -r '.latest' 2>/dev/null || echo "")
 
 #############################################
 # SECTION: Git Tag and Release
@@ -223,10 +239,7 @@ OLD_SIZE_STR=$(format_bytes $OLD_SIZE)
 NEW_SIZE_STR=$(format_bytes $NEW_SIZE)
 DIFF_SIZE_STR=$(format_bytes $SIZE_DIFF)
 
-# Get latest version from easter.company to check for trademark
-LATEST_VERSION=$(curl -s https://easter.company/tags/dex-cli.json | jq -r '.["dex-cli"].latest' 2>/dev/null || echo "")
-
-# Display version comparison
+# Display version comparison (LATEST_VERSION was already fetched after propagation wait)
 if [ -n "$OLD_VERSION" ] && [ "$OLD_VERSION" != "unknown" ]; then
     echo -e "${COLOR_BLUE}  Previous version: ${COLOR_RESET}${OLD_VERSION}"
 fi

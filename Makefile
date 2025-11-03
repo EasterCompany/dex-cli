@@ -48,7 +48,7 @@ build-for-release: check
 		exit 1; \
 	fi
 	@echo "Building for release with version $(VERSION)..."
-	@$(GOBUILD) -ldflags "-X main.version=$(VERSION) -X main.branch=$(BRANCH) -X main.commit=$(COMMIT) -X main.buildDate=$(BUILD_DATE) -X main.buildYear=$(BUILD_YEAR)" -o $(EXECUTABLE_PATH) .
+	@$(GOBUILD) -ldflags "-X main.version=$(VERSION) -X main.branch=$(BRANCH) -X main.commit=$(COMMIT) -X main.buildDate=$(BUILD_DATE) -X main.buildYear=$(BUILD_YEAR) -X main.buildHash=$(BUILD_HASH)" -o $(EXECUTABLE_PATH) .
 
 install: build
 

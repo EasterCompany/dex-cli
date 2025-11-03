@@ -185,22 +185,22 @@ func FetchLatestVersion() string {
 		return ""
 	}
 
-	// Try new format first: {"dex-cli": {"latest": "..."}}
-	var tagsMap TagsMap
-	if err := json.Unmarshal(body, &tagsMap); err == nil {
-		if tagInfo, ok := tagsMap["dex-cli"]; ok {
+	// Try simple format first: {"latest": "..."}
+	var simpleFormat TagInfo
+	if err := json.Unmarshal(body, &simpleFormat); err == nil && simpleFormat.Latest != "" {
+		latest := strings.TrimSpace(simpleFormat.Latest)
+		cachedLatestVersion = &latest
+		return latest
+	}
+
+	// Fall back to nested format: {"dex-cli": {"latest": "..."}}
+	var nestedFormat TagsMap
+	if err := json.Unmarshal(body, &nestedFormat); err == nil {
+		if tagInfo, ok := nestedFormat["dex-cli"]; ok && tagInfo.Latest != "" {
 			latest := strings.TrimSpace(tagInfo.Latest)
 			cachedLatestVersion = &latest
 			return latest
 		}
-	}
-
-	// Fall back to old format: {"latest": "..."}
-	var oldFormat TagInfo
-	if err := json.Unmarshal(body, &oldFormat); err == nil {
-		latest := strings.TrimSpace(oldFormat.Latest)
-		cachedLatestVersion = &latest
-		return latest
 	}
 
 	return ""
