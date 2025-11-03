@@ -7,92 +7,153 @@ import (
 	"path/filepath"
 )
 
-// ServiceDefinition defines the static properties for a known Dexter service.
-// This is the new "source of truth" for all commands.
+// ServiceDefinition is the new universal source of truth for all services.
+// It is keyed by the shortName (e.g., "event") in the ServiceDefinitions map.
 type ServiceDefinition struct {
-	ShortName string // The alias, e.g., "event"
-	ID        string // The full ID, e.g., "dex-event-service"
-	Type      string // Service type, e.g., "cs", "be", "th"
-	Port      string // Default port
-	Repo      string // Full git repo URL
-	Source    string // Full source code path
+	ShortName   string // "event"
+	ID          string // "dex-event-service"
+	SystemdName string // "dex-event.service"
+	Type        string // "cs"
+	Port        string // "8100"
+	Repo        string // "git@github.com:EasterCompany/dex-event-service"
+	Source      string // "~/EasterCompany/dex-event-service"
 }
 
-// ServiceDefinitions is the hardcoded map of all known Dexter services,
-// keyed by their shorthand alias.
+// ServiceDefinitions is the new hardcoded map that drives all service commands.
+// All services MUST be defined here by their shortName.
 var ServiceDefinitions = map[string]ServiceDefinition{
+	// CLI
+	"cli": {
+		ShortName:   "cli",
+		ID:          "dex-cli",
+		SystemdName: "", // No systemd service
+		Type:        "cli",
+		Port:        "",
+		Repo:        "git@github.com:EasterCompany/dex-cli",
+		Source:      "~/EasterCompany/dex-cli",
+	},
+	// Core Services (cs)
 	"event": {
-		ShortName: "event",
-		ID:        "dex-event-service",
-		Type:      "cs",
-		Port:      "8100",
-		Repo:      "git@github.com:EasterCompany/dex-event-service",
-		Source:    "~/EasterCompany/dex-event-service",
+		ShortName:   "event",
+		ID:          "dex-event-service",
+		SystemdName: "dex-event.service",
+		Type:        "cs",
+		Port:        "8100",
+		Repo:        "git@github.com:EasterCompany/dex-event-service",
+		Source:      "~/EasterCompany/dex-event-service",
 	},
 	"model": {
-		ShortName: "model",
-		ID:        "dex-model-service",
-		Type:      "cs",
-		Port:      "8101",
-		Repo:      "git@github.com:EasterCompany/dex-model-service",
-		Source:    "~/EasterCompany/dex-model-service",
+		ShortName:   "model",
+		ID:          "dex-model-service",
+		SystemdName: "dex-model.service",
+		Type:        "cs",
+		Port:        "8101",
+		Repo:        "git@github.com:EasterCompany/dex-model-service",
+		Source:      "~/EasterCompany/dex-model-service",
 	},
+	// Back Ends (be)
 	"chat": {
-		ShortName: "chat",
-		ID:        "dex-chat-service",
-		Type:      "be",
-		Port:      "8200",
-		Repo:      "git@github.com:EasterCompany/dex-chat-service",
-		Source:    "~/EasterCompany/dex-chat-service",
+		ShortName:   "chat",
+		ID:          "dex-chat-service",
+		SystemdName: "dex-chat.service",
+		Type:        "be",
+		Port:        "8200",
+		Repo:        "git@github.com:EasterCompany/dex-chat-service",
+		Source:      "~/EasterCompany/dex-chat-service",
 	},
 	"tts": {
-		ShortName: "tts",
-		ID:        "dex-tts-service",
-		Type:      "be",
-		Port:      "8201",
-		Repo:      "git@github.com:EasterCompany/dex-tts-service",
-		Source:    "~/EasterCompany/dex-tts-service",
+		ShortName:   "tts",
+		ID:          "dex-tts-service",
+		SystemdName: "dex-tts.service",
+		Type:        "be",
+		Port:        "8201",
+		Repo:        "git@github.com:EasterCompany/dex-tts-service",
+		Source:      "~/EasterCompany/dex-tts-service",
 	},
 	"stt": {
-		ShortName: "stt",
-		ID:        "dex-stt-service",
-		Type:      "be",
-		Port:      "8202",
-		Repo:      "git@github.com:EasterCompany/dex-stt-service",
-		Source:    "~/EasterCompany/dex-stt-service",
+		ShortName:   "stt",
+		ID:          "dex-stt-service",
+		SystemdName: "dex-stt.service",
+		Type:        "be",
+		Port:        "8202",
+		Repo:        "git@github.com:EasterCompany/dex-stt-service",
+		Source:      "~/EasterCompany/dex-stt-service",
 	},
+	// 3rd Party (th)
 	"discord": {
-		ShortName: "discord",
-		ID:        "dex-discord-service",
-		Type:      "th",
-		Port:      "8300",
-		Repo:      "git@github.com:EasterCompany/dex-discord-service",
-		Source:    "~/EasterCompany/dex-discord-service",
+		ShortName:   "discord",
+		ID:          "dex-discord-service",
+		SystemdName: "dex-discord.service",
+		Type:        "th",
+		Port:        "8300",
+		Repo:        "git@github.com:EasterCompany/dex-discord-service",
+		Source:      "~/EasterCompany/dex-discord-service",
 	},
-	// --- Non-buildable/manageable services ---
-	"cli": {
-		ShortName: "cli",
-		ID:        "dex-cli",
-		Type:      "cli",
-		Repo:      "git@github.com:EasterCompany/dex-cli",
-		Source:    "~/EasterCompany/dex-cli",
-	},
+	// Other Services (os)
 	"local-cache": {
-		ShortName: "local-cache",
-		ID:        "local-cache-0",
-		Type:      "os",
-		Port:      "6379",
+		ShortName:   "local-cache",
+		ID:          "local-cache-0",
+		SystemdName: "redis.service", // Assumes a system-wide redis, or user-level
+		Type:        "os",
+		Port:        "6379",
+		Repo:        "N/A",
+		Source:      "N/A",
 	},
 	"cloud-cache": {
-		ShortName: "cloud-cache",
-		ID:        "cloud-cache-0",
-		Type:      "os",
-		Port:      "6379",
+		ShortName:   "cloud-cache",
+		ID:          "cloud-cache-0",
+		SystemdName: "", // No systemd service
+		Type:        "os",
+		Port:        "6379", // Example port, address is different
+		Repo:        "N/A",
+		Source:      "N/A",
 	},
+}
+
+// --- service-map.json struct definitions ---
+// These are still needed to read/write the service-map.json config file,
+// which represents the *user's specific installation*.
+
+// ServiceMapConfig represents the structure of service-map.json
+type ServiceMapConfig struct {
+	Doc          string                    `json:"_doc"`
+	ServiceTypes []ServiceType             `json:"service_types"`
+	Services     map[string][]ServiceEntry `json:"services"`
+}
+
+// ServiceType defines a category of services
+type ServiceType struct {
+	Type        string `json:"type"`
+	Label       string `json:"label"`
+	Description string `json:"description"`
+	MinPort     int    `json:"min_port"`
+	MaxPort     int    `json:"max_port"`
+}
+
+// ServiceEntry represents a single service in the service map
+type ServiceEntry struct {
+	ID          string              `json:"id"` // "dex-event-service"
+	Repo        string              `json:"repo"`
+	Source      string              `json:"source"`
+	HTTP        string              `json:"http,omitempty"`
+	Socket      string              `json:"socket,omitempty"`
+	Credentials *ServiceCredentials `json:"credentials,omitempty"`
+}
+
+// ServiceCredentials holds connection credentials for services (e.g., Redis)
+type ServiceCredentials struct {
+	Username string `json:"username,omitempty"`
+	Password string `json:"password"`
+	DB       int    `json:"db"`
 }
 
 // DefaultServiceMapConfig returns the default service map configuration
 func DefaultServiceMapConfig() *ServiceMapConfig {
+	// Find the definitions for cli, local-cache, and cloud-cache to add them by default
+	cliDef := ServiceDefinitions["cli"]
+	localCacheDef := ServiceDefinitions["local-cache"]
+	cloudCacheDef := ServiceDefinitions["cloud-cache"]
+
 	return &ServiceMapConfig{
 		Doc: "Maps service names to their configurations",
 		ServiceTypes: []ServiceType{
@@ -110,9 +171,9 @@ func DefaultServiceMapConfig() *ServiceMapConfig {
 			"th": {},
 			"os": {
 				{
-					ID:     ServiceDefinitions["local-cache"].ID,
-					Repo:   "N/A",
-					Source: "N/A",
+					ID:     localCacheDef.ID,
+					Repo:   localCacheDef.Repo,
+					Source: localCacheDef.Source,
 					HTTP:   "localhost:6379",
 					Socket: "N/A",
 					Credentials: &ServiceCredentials{
@@ -122,9 +183,9 @@ func DefaultServiceMapConfig() *ServiceMapConfig {
 					},
 				},
 				{
-					ID:     ServiceDefinitions["cloud-cache"].ID,
-					Repo:   "N/A",
-					Source: "N/A",
+					ID:     cloudCacheDef.ID,
+					Repo:   cloudCacheDef.Repo,
+					Source: cloudCacheDef.Source,
 					HTTP:   "cloud.easter.company:6379",
 					Socket: "N/A",
 					Credentials: &ServiceCredentials{
@@ -136,9 +197,9 @@ func DefaultServiceMapConfig() *ServiceMapConfig {
 			},
 			"cli": {
 				{
-					ID:     ServiceDefinitions["cli"].ID,
-					Repo:   ServiceDefinitions["cli"].Repo,
-					Source: ServiceDefinitions["cli"].Source,
+					ID:     cliDef.ID,
+					Repo:   cliDef.Repo,
+					Source: cliDef.Source,
 				},
 			},
 		},
