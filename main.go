@@ -111,6 +111,12 @@ func main() {
 			os.Exit(1)
 		}
 
+	case "python":
+		if err := cmd.Python(os.Args[2:]); err != nil {
+			ui.PrintError(fmt.Sprintf("Error: %v", err))
+			os.Exit(1)
+		}
+
 	case "help", "-h", "--help":
 		printUsage(isDevMode, hasSourceServices)
 
@@ -136,6 +142,7 @@ func printUsage(isDevMode bool, hasSourceServices bool) {
 		ui.PrintInfo("test       Run all tests")
 	}
 	ui.PrintInfo("system     Show system info and manage packages")
+	ui.PrintInfo("python     <init|remove|upgrade> Manage Dexter's Python environment")
 	ui.PrintInfo("version    Show version information")
 	ui.PrintInfo("help       Show this help message")
 	ui.PrintInfo("Dexter root:        ~/Dexter")

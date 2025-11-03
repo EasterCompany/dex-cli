@@ -76,9 +76,6 @@ var RequiredPackages = []Package{
 	{Name: "jsonlint", Required: true, InstallCommand: "npm install -g jsonlint", UpgradeCommand: "npm install -g jsonlint"},
 	{Name: "shfmt", Required: true, InstallCommand: "go install mvdan.cc/sh/v3/cmd/shfmt@latest", UpgradeCommand: "go install mvdan.cc/sh/v3/cmd/shfmt@latest"},
 	{Name: "shellcheck", Required: true, InstallCommand: "sudo pacman -S shellcheck || sudo apt install shellcheck", UpgradeCommand: "sudo pacman -Syu shellcheck || (sudo apt update && sudo apt upgrade -y shellcheck)"},
-	{Name: "black", Required: true, InstallCommand: "pip3 install black", UpgradeCommand: "pip3 install --upgrade black"},
-	{Name: "flake8", Required: true, InstallCommand: "pip3 install flake8", UpgradeCommand: "pip3 install --upgrade flake8"},
-	{Name: "pytest", Required: true, InstallCommand: "pip3 install pytest", UpgradeCommand: "pip3 install --upgrade pytest"},
 }
 
 // LoadSystemConfig loads or creates system.json
