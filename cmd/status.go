@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"net/http"
 	"os/exec"
 	"strings"
 	"time"
@@ -14,10 +13,11 @@ import (
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/health"
 	"github.com/EasterCompany/dex-cli/ui"
+	"net/http"
 )
 
 // Status checks the health of one or all services
-func Status(serviceName string) error {
+func Status(serviceShortName string) error {
 	logFile, err := config.LogFile()
 	if err != nil {
 		return fmt.Errorf("failed to get log file: %w", err)
@@ -28,7 +28,7 @@ func Status(serviceName string) error {
 		_, _ = fmt.Fprintln(logFile, message)
 	}
 
-	log(fmt.Sprintf("Checking status for service: %s", serviceName))
+	log(fmt.Sprintf("Checking status for service: %s", serviceShortName))
 
 	serviceMap, err := config.LoadServiceMapConfig()
 	if err != nil {
@@ -37,7 +37,7 @@ func Status(serviceName string) error {
 
 	var rows []ui.TableRow
 
-	if serviceName == "all" || serviceName == "" {
+	if serviceShortName == "all" || serviceShortName == "" {
 		// Iterate in the desired order for consistent output
 		serviceTypes := []string{"cli", "fe", "cs", "be", "th", "os"}
 		for _, serviceType := range serviceTypes {
@@ -49,25 +49,33 @@ func Status(serviceName string) error {
 			}
 		}
 	} else {
-		// Check a specific service
-		found := false
-		for serviceType, services := range serviceMap.Services {
+		projectDirName, err := config.ResolveProjectDirService(serviceShortName)
+		if err != nil {
+			return fmt.Errorf("failed to resolve service '%s': %w", serviceShortName, err)
+		}
+
+		var resolvedServiceEntry *config.ServiceEntry
+		var serviceType string
+		for sType, services := range serviceMap.Services {
 			for _, service := range services {
-				if service.ID == serviceName {
-					row := checkServiceStatus(service, serviceType)
-					rows = append(rows, row)
-					log(fmt.Sprintf("Service: %s, Type: %s, Status: %s", service.ID, serviceType, row[3]))
-					found = true
+				if service.ID == projectDirName {
+					resolvedServiceEntry = &service
+					serviceType = sType
 					break
 				}
 			}
-			if found {
+			if resolvedServiceEntry != nil {
 				break
 			}
 		}
-		if !found {
-			return fmt.Errorf("service '%s' not found in service-map.json", serviceName)
+
+		if resolvedServiceEntry == nil {
+			return fmt.Errorf("service '%s' (resolved to '%s') not found in service-map.json", serviceShortName, projectDirName)
 		}
+
+		row := checkServiceStatus(*resolvedServiceEntry, serviceType)
+		rows = append(rows, row)
+		log(fmt.Sprintf("Service: %s, Type: %s, Status: %s", resolvedServiceEntry.ID, serviceType, row[3]))
 	}
 
 	// Render table

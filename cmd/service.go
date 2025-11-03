@@ -3,13 +3,12 @@ package cmd
 import (
 	"fmt"
 	"os/exec"
-	"strings"
 
 	"github.com/EasterCompany/dex-cli/config"
 )
 
 // Service manages start, stop, and restart operations for Dexter services.
-func Service(action, serviceName string) error {
+func Service(action, serviceShortName string) error {
 	logFile, err := config.LogFile()
 	if err != nil {
 		return fmt.Errorf("failed to get log file: %w", err)
@@ -20,97 +19,71 @@ func Service(action, serviceName string) error {
 		_, _ = fmt.Fprintln(logFile, message)
 	}
 
-	log(fmt.Sprintf("Service command called with action '%s' for service '%s'", action, serviceName))
+	log(fmt.Sprintf("Service command called with action '%s' for service '%s'", action, serviceShortName))
 
-	// Load the service map
-	serviceMap, err := config.LoadServiceMapConfig()
+	systemdServiceName, err := config.ResolveSystemdService(serviceShortName)
 	if err != nil {
-		return fmt.Errorf("failed to load service map: %w", err)
-	}
-
-	// Find the service entry
-	var serviceEntry *config.ServiceEntry
-	for _, services := range serviceMap.Services {
-		for _, s := range services {
-			if s.ID == serviceName {
-				serviceEntry = &s
-				break
-			}
-		}
-		if serviceEntry != nil {
-			break
-		}
-	}
-
-	if serviceEntry == nil {
-		log(fmt.Sprintf("Service '%s' not found in service-map.json", serviceName))
-		return fmt.Errorf("service '%s' not found in service-map.json", serviceName)
-	}
-
-	// Check if this is a manageable service (dex-*-service only)
-	if !strings.HasPrefix(serviceEntry.ID, "dex-") || !strings.HasSuffix(serviceEntry.ID, "-service") {
-		log(fmt.Sprintf("Service '%s' cannot be managed with start/stop/restart commands", serviceName))
-		return fmt.Errorf("service '%s' cannot be managed with start/stop/restart commands", serviceName)
+		return fmt.Errorf("failed to resolve service '%s': %w", serviceShortName, err)
 	}
 
 	// Perform the action using systemctl --user
 	switch action {
 	case "start":
-		return startService(serviceEntry, log)
+		return startService(systemdServiceName, log)
 	case "stop":
-		return stopService(serviceEntry, log)
+		return stopService(systemdServiceName, log)
 	case "restart":
-		return restartService(serviceEntry, log)
+		return restartService(systemdServiceName, log)
 	default:
 		log(fmt.Sprintf("Unknown service action: %s", action))
 		return fmt.Errorf("unknown service action: %s", action)
 	}
 }
 
-func startService(service *config.ServiceEntry, log func(string)) error {
-	fmt.Printf("Starting %s...\n", service.ID)
-	log(fmt.Sprintf("Starting %s...", service.ID))
+func startService(systemdServiceName string, log func(string)) error {
+	fmt.Printf("Starting %s...\n", systemdServiceName)
+	log(fmt.Sprintf("Starting %s...", systemdServiceName))
 
-	cmd := exec.Command("systemctl", "--user", "start", service.ID+".service")
+	cmd := exec.Command("systemctl", "--user", "start", systemdServiceName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		log(fmt.Sprintf("Failed to start %s: %v\n%s", service.ID, err, string(output)))
-		return fmt.Errorf("failed to start %s: %w\n%s", service.ID, err, string(output))
+		log(fmt.Sprintf("Failed to start %s: %v\n%s", systemdServiceName, err, string(output)))
+		return fmt.Errorf("failed to start %s: %w\n%s", systemdServiceName, err, string(output))
 	}
 
-	fmt.Printf("%s started successfully\n", service.ID)
-	log(fmt.Sprintf("%s started successfully", service.ID))
+	fmt.Printf("%s started successfully\n", systemdServiceName)
+	log(fmt.Sprintf("%s started successfully", systemdServiceName))
 	return nil
 }
 
-func stopService(service *config.ServiceEntry, log func(string)) error {
-	fmt.Printf("Stopping %s...\n", service.ID)
-	log(fmt.Sprintf("Stopping %s...", service.ID))
+func stopService(systemdServiceName string, log func(string)) error {
+	fmt.Printf("Stopping %s...\n", systemdServiceName)
+	log(fmt.Sprintf("Stopping %s...", systemdServiceName))
 
-	cmd := exec.Command("systemctl", "--user", "stop", service.ID+".service")
+	cmd := exec.Command("systemctl", "--user", "stop", systemdServiceName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		log(fmt.Sprintf("Failed to stop %s: %v\n%s", service.ID, err, string(output)))
-		return fmt.Errorf("failed to stop %s: %w\n%s", service.ID, err, string(output))
+		log(fmt.Sprintf("Failed to stop %s: %v\n%s", systemdServiceName, err, string(output)))
+		return fmt.Errorf("failed to stop %s: %w\n%s", systemdServiceName, err, string(output))
 	}
 
-	fmt.Printf("%s stopped successfully\n", service.ID)
-	log(fmt.Sprintf("%s stopped successfully", service.ID))
+	fmt.Printf("%s stopped successfully\n", systemdServiceName)
+	log(fmt.Sprintf("%s stopped successfully", systemdServiceName))
 	return nil
 }
 
-func restartService(service *config.ServiceEntry, log func(string)) error {
-	fmt.Printf("Restarting %s...\n", service.ID)
-	log(fmt.Sprintf("Restarting %s...", service.ID))
+func restartService(systemdServiceName string, log func(string)) error {
+	fmt.Printf("Restarting %s...\n", systemdServiceName)
+	log(fmt.Sprintf("Restarting %s...", systemdServiceName))
 
-	cmd := exec.Command("systemctl", "--user", "restart", service.ID+".service")
+	cmd := exec.Command("systemctl", "--user", "restart", systemdServiceName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		log(fmt.Sprintf("Failed to restart %s: %v\n%s", service.ID, err, string(output)))
-		return fmt.Errorf("failed to restart %s: %w\n%s", service.ID, err, string(output))
+		log(fmt.Sprintf("Failed to restart %s: %v\n%s", systemdServiceName, err, string(output)))
+		return fmt.Errorf("failed to restart %s: %w\n%s", systemdServiceName, err, string(output))
 	}
 
-	fmt.Printf("%s restarted successfully\n", service.ID)
-	log(fmt.Sprintf("%s restarted successfully", service.ID))
+	fmt.Printf("%s restarted successfully\n", systemdServiceName)
+	log(fmt.Sprintf("%s restarted successfully", systemdServiceName))
 	return nil
 }

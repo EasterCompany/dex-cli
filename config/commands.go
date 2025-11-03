@@ -185,8 +185,6 @@ func HasEasterCompanyRoot() bool {
 }
 
 // GetDexServices returns a list of all dex-*-service directories in ~/EasterCompany
-
-// GetDexServices returns a list of all dex-*-service directories in ~/EasterCompany
 func GetDexServices() []string {
 	easterPath, err := ExpandPath(EasterCompanyRoot)
 	if err != nil {

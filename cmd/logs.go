@@ -23,14 +23,14 @@ func Logs(args []string, follow bool) error {
 
 	log(fmt.Sprintf("Displaying logs for services: %v, follow: %t", args, follow))
 
-	serviceMap, err := config.LoadServiceMapConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load service map: %w", err)
-	}
-
 	// Determine which services to show logs for
 	servicesToShow := []string{}
 	if len(args) == 0 || (len(args) > 0 && args[0] == "all") {
+		// Load the service map to get all services
+		serviceMap, err := config.LoadServiceMapConfig()
+		if err != nil {
+			return fmt.Errorf("failed to load service map: %w", err)
+		}
 		for _, services := range serviceMap.Services {
 			for _, service := range services {
 				if strings.HasPrefix(service.ID, "dex-") {
@@ -40,26 +40,11 @@ func Logs(args []string, follow bool) error {
 		}
 	} else {
 		for _, arg := range args {
-			serviceName := arg
-			if !strings.HasPrefix(serviceName, "dex-") {
-				serviceName = "dex-" + serviceName + "-service"
+			projectDirName, err := config.ResolveProjectDirService(arg)
+			if err != nil {
+				return fmt.Errorf("failed to resolve service '%s': %w", arg, err)
 			}
-			found := false
-			for _, services := range serviceMap.Services {
-				for _, service := range services {
-					if service.ID == serviceName {
-						servicesToShow = append(servicesToShow, service.ID)
-						found = true
-						break
-					}
-				}
-				if found {
-					break
-				}
-			}
-			if !found {
-				return fmt.Errorf("service '%s' not found", arg)
-			}
+			servicesToShow = append(servicesToShow, projectDirName)
 		}
 	}
 
