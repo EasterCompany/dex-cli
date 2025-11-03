@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
-
-	"github.com/charmbracelet/lipgloss"
 )
 
 const (
@@ -23,19 +22,15 @@ const (
 	ColorReset      = "\033[0m"
 )
 
-// TagInfo represents the structure of a single tag entry in the JSON
-type TagInfo struct {
-	Latest string `json:"latest"`
+// ansiRegex is used to strip ANSI escape codes.
+var ansiRegex = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+// StripANSI removes ANSI color codes from a string.
+func StripANSI(s string) string {
+	return ansiRegex.ReplaceAllString(s, "")
 }
 
-// TagsMap represents the overall JSON structure
-type TagsMap map[string]TagInfo
-
-// Cache for the latest version to avoid multiple HTTP requests
-var (
-	cachedLatestVersion *string
-	cacheInitialized    bool
-)
+// --- Basic Printing ---
 
 func PrintTitle(title string) {
 	fmt.Printf("%s=== %s ===%s\n", ColorCyan, title, ColorReset)
@@ -66,32 +61,18 @@ func Colorize(text string, color string) string {
 	return fmt.Sprintf("%s%s%s", color, text, ColorReset)
 }
 
-func RenderTitle(title string) string {
-	style := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("63")).
-		Padding(1, 2)
+// --- Update & Version Specific Helpers ---
 
-	return style.Render(title)
+type TagInfo struct {
+	Latest string `json:"latest"`
 }
 
-func RenderSubtitle(subtitle string) string {
-	style := lipgloss.NewStyle().
-		Italic(true).
-		Foreground(lipgloss.Color("245"))
+type TagsMap map[string]TagInfo
 
-	return style.Render(subtitle)
-}
-
-func RenderSectionTitle(title string) string {
-	style := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("99")).
-		Padding(0, 1).
-		MarginTop(1)
-
-	return style.Render(title)
-}
+var (
+	cachedLatestVersion *string
+	cacheInitialized    bool
+)
 
 func PrintSection(title string) {
 	fmt.Printf("\n%s=== %s ===%s\n", ColorCyan, title, ColorReset)
@@ -101,38 +82,23 @@ func PrintVersionComparison(oldVersion, newVersion, latestVersion, buildYear str
 	fmt.Printf("%s  Previous version: %s%s\n", ColorBlue, ColorReset, FormatVersionWithTrademark(oldVersion, buildYear))
 	fmt.Printf("%s  Current version:  %s%s\n", ColorBlue, ColorReset, FormatVersionWithTrademark(newVersion, buildYear))
 	if latestVersion != "" {
-		// Latest version ALWAYS shows trademark since it IS the official version by definition
-		darkStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")) // Dark grey
-		trademark := darkStyle.Render(fmt.Sprintf(" | Easter Company™ © %s", buildYear))
-		fmt.Printf("%s  Latest version:   %s%s%s\n", ColorBlue, ColorReset, latestVersion, trademark)
+		fmt.Printf("%s  Latest version:   %s%s\n", ColorBlue, ColorReset, FormatVersionWithTrademark(latestVersion, buildYear))
 	}
 
-	// Calculate size difference
 	sizeDiff := newSize - oldSize
-	var sizeColor string
-	var sizeIndicator string
-
+	var sizeColor, sizeIndicator string
 	if sizeDiff > 0 {
-		sizeColor = ColorRed
-		sizeIndicator = "↑"
+		sizeColor, sizeIndicator = ColorRed, "↑"
 	} else if sizeDiff < 0 {
-		sizeColor = ColorGreen
-		sizeIndicator = "↓"
+		sizeColor, sizeIndicator = ColorGreen, "↓"
 	} else {
-		sizeColor = ColorYellow
-		sizeIndicator = "="
+		sizeColor, sizeIndicator = ColorYellow, "="
 	}
 
-	// Format sizes
-	oldSizeStr := formatBytes(oldSize)
-	newSizeStr := formatBytes(newSize)
-	diffSizeStr := formatBytes(abs(sizeDiff))
+	fmt.Printf("%s  Binary size:      %s%s → %s (%s%s %s%s)\n",
+		ColorBlue, ColorReset, formatBytes(oldSize), formatBytes(newSize),
+		sizeColor, sizeIndicator, formatBytes(abs(sizeDiff)), ColorReset)
 
-	fmt.Printf("%s  Binary size:      %s%s → %s%s(%s %s)%s\n",
-		ColorBlue, ColorReset, oldSizeStr, newSizeStr,
-		sizeColor, sizeIndicator, diffSizeStr, ColorReset)
-
-	// Show source changes if available
 	if additions > 0 || deletions > 0 {
 		fmt.Printf("%s  Source changes:   %s%s+%d%s %s-%d%s\n",
 			ColorBlue, ColorReset,
@@ -161,7 +127,6 @@ func abs(n int64) int64 {
 	return n
 }
 
-// FetchLatestVersion fetches the latest version from easter.company (cached per execution)
 func FetchLatestVersion() string {
 	if cacheInitialized {
 		if cachedLatestVersion != nil {
@@ -169,7 +134,6 @@ func FetchLatestVersion() string {
 		}
 		return ""
 	}
-
 	cacheInitialized = true
 
 	resp, err := http.Get("https://easter.company/tags/dex-cli.json")
@@ -178,48 +142,29 @@ func FetchLatestVersion() string {
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK {
-		return ""
-	}
-
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return ""
 	}
 
-	// Try simple format first: {"latest": "..."}
-	var simpleFormat TagInfo
-	if err := json.Unmarshal(body, &simpleFormat); err == nil && simpleFormat.Latest != "" {
-		latest := strings.TrimSpace(simpleFormat.Latest)
+	var tagInfo TagInfo
+	if err := json.Unmarshal(body, &tagInfo); err == nil && tagInfo.Latest != "" {
+		latest := strings.TrimSpace(tagInfo.Latest)
 		cachedLatestVersion = &latest
 		return latest
-	}
-
-	// Fall back to nested format: {"dex-cli": {"latest": "..."}}
-	var nestedFormat TagsMap
-	if err := json.Unmarshal(body, &nestedFormat); err == nil {
-		if tagInfo, ok := nestedFormat["dex-cli"]; ok && tagInfo.Latest != "" {
-			latest := strings.TrimSpace(tagInfo.Latest)
-			cachedLatestVersion = &latest
-			return latest
-		}
 	}
 
 	return ""
 }
 
-// IsOfficialRelease checks if a version matches the official release on easter.company
 func IsOfficialRelease(fullVersion string) bool {
 	latest := FetchLatestVersion()
 	return latest != "" && latest == fullVersion
 }
 
-// FormatVersionWithTrademark adds the Easter Company trademark if version is official
 func FormatVersionWithTrademark(version string, buildYear string) string {
 	if IsOfficialRelease(version) {
-		darkStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")) // Dark grey
-		trademark := darkStyle.Render(fmt.Sprintf(" | Easter Company™ © %s", buildYear))
-		return version + trademark
+		return fmt.Sprintf("%s | Easter Company™ © %s", version, buildYear)
 	}
 	return version
 }

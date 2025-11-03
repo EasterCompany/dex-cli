@@ -87,24 +87,27 @@ func Status(serviceShortName string) error {
 
 // checkServiceStatus acts as a dispatcher, routing to the correct status checker based on service type.
 func checkServiceStatus(service config.ServiceEntry, serviceType string) ui.TableRow {
-	// Strip protocol and truncate address
-	address := stripProtocol(service.HTTP)
-	if len(address) >= 18 {
-		address = address[:14] + "..."
-	}
+	// Define max lengths for columns
+	const (
+		maxServiceLen = 19
+		maxAddressLen = 17
+		maxVersionLen = 12
+		maxUptimeLen  = 10
+	)
+
+	serviceID := ui.Truncate(service.ID, maxServiceLen)
+	address := ui.Truncate(stripProtocol(service.HTTP), maxAddressLen)
 
 	switch serviceType {
 	case "cli":
-		return checkCLIStatus(service)
+		return checkCLIStatus(service, serviceID)
 	case "os":
-		// All 'os' services are currently cache/db instances
-		return checkCacheStatus(service, address)
+		return checkCacheStatus(service, serviceID, address)
 	default:
-		// All other types are standard HTTP services
 		if service.HTTP == "" {
-			return ui.FormatTableRow(service.ID, "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A")
+			return ui.FormatTableRow(serviceID, "N/A", "N/A", colorizeStatus("N/A"), "N/A", "N/A", "N/A", "N/A")
 		}
-		return checkHTTPStatus(service, address)
+		return checkHTTPStatus(service, serviceID, address)
 	}
 }
 
@@ -118,24 +121,15 @@ func stripProtocol(address string) string {
 }
 
 // checkCLIStatus checks if a CLI tool is installed and working
-func checkCLIStatus(service config.ServiceEntry) ui.TableRow {
+func checkCLIStatus(service config.ServiceEntry, serviceID string) ui.TableRow {
 	cmd := exec.Command("dex", "version")
 	output, err := cmd.CombinedOutput()
 
+	status := "OK"
 	if err != nil {
-		return ui.FormatTableRow(
-			service.ID,
-			"local",
-			"N/A",
-			"BAD",
-			"N/A",
-			"N/A",
-			"N/A",
-			time.Now().Format("15:04:05"),
-		)
+		status = "BAD"
 	}
 
-	// Parse version from output (format: "dex version X.X.X")
 	version := "N/A"
 	outputStr := strings.TrimSpace(string(output))
 	if strings.HasPrefix(outputStr, "dex version ") {
@@ -143,10 +137,10 @@ func checkCLIStatus(service config.ServiceEntry) ui.TableRow {
 	}
 
 	return ui.FormatTableRow(
-		service.ID,
+		serviceID,
 		"local",
-		version,
-		colorizeStatus("OK"),
+		ui.Truncate(version, 12),
+		colorizeStatus(status),
 		"N/A",
 		"N/A",
 		"N/A",
@@ -155,95 +149,65 @@ func checkCLIStatus(service config.ServiceEntry) ui.TableRow {
 }
 
 // checkCacheStatus checks a cache/db service (Redis/Valkey) with an optional AUTH and a PING command.
-func checkCacheStatus(service config.ServiceEntry, address string) ui.TableRow {
+func checkCacheStatus(service config.ServiceEntry, serviceID, address string) ui.TableRow {
 	conn, err := net.DialTimeout("tcp", service.HTTP, 2*time.Second)
 	if err != nil {
-		return ui.FormatTableRow(service.ID, address, "N/A", colorizeStatus("BAD"), "N/A", "N/A", "N/A", time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(serviceID, address, "N/A", colorizeStatus("BAD"), "N/A", "N/A", "N/A", time.Now().Format("15:04:05"))
 	}
 	defer func() { _ = conn.Close() }()
 
 	reader := bufio.NewReader(conn)
 
-	// --- Handle Authentication ---
 	if service.Credentials != nil && service.Credentials.Password != "" {
 		authCmd := fmt.Sprintf("AUTH %s\r\n", service.Credentials.Password)
 		if _, err = conn.Write([]byte(authCmd)); err != nil {
-			return ui.FormatTableRow(service.ID, address, "N/A", colorizeStatus("BAD"), "Auth failed", "N/A", "N/A", time.Now().Format("15:04:05"))
+			return ui.FormatTableRow(serviceID, address, "N/A", colorizeStatus("BAD"), "Auth failed", "N/A", "N/A", time.Now().Format("15:04:05"))
 		}
 		response, err := reader.ReadString('\n')
 		if err != nil || !strings.HasPrefix(response, "+OK") {
-			return ui.FormatTableRow(service.ID, address, "N/A", colorizeStatus("BAD"), "Auth failed", "N/A", "N/A", time.Now().Format("15:04:05"))
+			return ui.FormatTableRow(serviceID, address, "N/A", colorizeStatus("BAD"), "Auth failed", "N/A", "N/A", time.Now().Format("15:04:05"))
 		}
 	}
 
-	// --- Send PING ---
 	if _, err = conn.Write([]byte("PING\r\n")); err != nil {
-		return ui.FormatTableRow(service.ID, address, "N/A", colorizeStatus("BAD"), "Ping failed", "N/A", "N/A", time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(serviceID, address, "N/A", colorizeStatus("BAD"), "Ping failed", "N/A", "N/A", time.Now().Format("15:04:05"))
 	}
 
-	// --- Read PONG response ---
 	response, err := reader.ReadString('\n')
 	if err != nil || !strings.HasPrefix(response, "+PONG") {
-		return ui.FormatTableRow(service.ID, address, "N/A", colorizeStatus("BAD"), "Ping failed", "N/A", "N/A", time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(serviceID, address, "N/A", colorizeStatus("BAD"), "Ping failed", "N/A", "N/A", time.Now().Format("15:04:05"))
 	}
 
-	// PING successful
-	return ui.FormatTableRow(service.ID, address, "N/A", colorizeStatus("OK"), "N/A", "N/A", "N/A", time.Now().Format("15:04:05"))
+	return ui.FormatTableRow(serviceID, address, "N/A", colorizeStatus("OK"), "N/A", "N/A", "N/A", time.Now().Format("15:04:05"))
 }
 
 // checkHTTPStatus checks a service via its HTTP /status endpoint
-func checkHTTPStatus(service config.ServiceEntry, address string) ui.TableRow {
-	statusURL := "http://" + strings.TrimPrefix(service.HTTP, "http://") + "/status"
+func checkHTTPStatus(service config.ServiceEntry, serviceID, address string) ui.TableRow {
+	statusURL := "http://" + service.HTTP + "/status"
 	resp, err := http.Get(statusURL)
 	if err != nil {
-		return ui.FormatTableRow(
-			service.ID,
-			address,
-			"N/A",
-			colorizeStatus("BAD"),
-			"N/A",
-			"N/A",
-			"N/A",
-			time.Now().Format("15:04:05"),
-		)
+		return ui.FormatTableRow(serviceID, address, "N/A", colorizeStatus("BAD"), "N/A", "N/A", "N/A", time.Now().Format("15:04:05"))
 	}
 	defer func() { _ = resp.Body.Close() }()
+
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return ui.FormatTableRow(
-			service.ID,
-			address,
-			"N/A",
-			colorizeStatus("BAD"),
-			"N/A",
-			"N/A",
-			"N/A",
-			time.Now().Format("15:04:05"),
-		)
+		return ui.FormatTableRow(serviceID, address, "N/A", colorizeStatus("BAD"), "N/A", "N/A", "N/A", time.Now().Format("15:04:05"))
 	}
 
 	var statusResp health.StatusResponse
 	if err := json.Unmarshal(body, &statusResp); err != nil {
-		return ui.FormatTableRow(
-			service.ID,
-			address,
-			"N/A",
-			colorizeStatus("BAD"),
-			"N/A",
-			"N/A",
-			"N/A",
-			time.Now().Format("15:04:05"),
-		)
+		return ui.FormatTableRow(serviceID, address, "N/A", colorizeStatus("BAD"), "N/A", "N/A", "N/A", time.Now().Format("15:04:05"))
 	}
 
-	uptime := formatUptime(time.Duration(statusResp.Uptime) * time.Second)
+	uptime := ui.Truncate(formatUptime(time.Duration(statusResp.Uptime)*time.Second), 10)
 	goroutines := fmt.Sprintf("%d", statusResp.Metrics.Goroutines)
 	mem := fmt.Sprintf("%.2f", statusResp.Metrics.MemoryAllocMB)
 
 	return ui.FormatTableRow(
-		statusResp.Service,
+		ui.Truncate(statusResp.Service, 19),
 		address,
-		statusResp.Version,
+		ui.Truncate(statusResp.Version, 12),
 		colorizeStatus(statusResp.Status),
 		uptime,
 		goroutines,

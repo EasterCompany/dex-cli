@@ -28,10 +28,22 @@ func NewTable(headers []string) Table {
 func (t *Table) AddRow(row TableRow) {
 	t.Rows = append(t.Rows, row)
 	for i, cell := range row {
-		if len(cell) > t.Columns[i].Width {
-			t.Columns[i].Width = len(cell)
+		// Calculate width based on the visible string, not the raw one with ANSI codes
+		visibleCell := StripANSI(cell)
+		if len(visibleCell) > t.Columns[i].Width {
+			t.Columns[i].Width = len(visibleCell)
 		}
 	}
+}
+
+// Truncate shortens a string to a max length, adding an ellipsis if necessary.
+func Truncate(s string, maxLength int) string {
+	if StripANSI(s) == s { // Only truncate if no ANSI codes
+		if len(s) > maxLength {
+			return s[:maxLength-3] + "..."
+		}
+	}
+	return s // Return colorized strings as-is
 }
 
 func (t *Table) Render() {
