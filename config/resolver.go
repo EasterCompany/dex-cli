@@ -4,54 +4,44 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
-	"strings"
 )
 
-// Resolve finds a service's static definition by its shorthand alias.
-// This is the primary function for validating and retrieving service info.
-func Resolve(shortName string) (ServiceDefinition, error) {
-	if def, ok := ServiceDefinitions[shortName]; ok {
-		return def, nil
+// Resolve finds a service's definition by its shortName (alias).
+func (def ServiceDefinition) Resolve(shortName string) (*ServiceDefinition, error) {
+	def, ok := ServiceDefinitions[shortName]
+	if !ok {
+		return nil, fmt.Errorf("service alias '%s' not found", shortName)
 	}
-	return ServiceDefinition{}, fmt.Errorf("service alias '%s' is not recognized", shortName)
+	return &def, nil
 }
 
-// IsValidService checks if a shorthand alias exists.
-func IsValidService(shortName string) bool {
-	_, ok := ServiceDefinitions[shortName]
-	return ok
-}
-
-// IsManageable checks if a service is controllable via systemd (start/stop/logs).
-func IsManageable(shortName string) bool {
-	if def, ok := ServiceDefinitions[shortName]; ok {
-		// cli and os services are not managed by systemd
-		return def.Type != "cli" && def.Type != "os"
+// ResolveByID finds a service's definition by its full ID (e.g., "dex-event-service").
+func ResolveByID(id string) (*ServiceDefinition, error) {
+	for _, def := range ServiceDefinitions {
+		if def.ID == id {
+			return &def, nil
+		}
 	}
-	return false
+	return nil, fmt.Errorf("service with ID '%s' not found", id)
 }
 
-// GetSystemdName constructs the systemd service name from a definition.
-// e.g., "dex-event-service" -> "dex-event.service"
-func (def *ServiceDefinition) GetSystemdName() string {
-	systemdName := strings.TrimSuffix(def.ID, "-service")
-	return fmt.Sprintf("%s.service", systemdName)
+// ResolveSystemdName finds a service's definition by its systemd name (e.g., "dex-event.service").
+func ResolveSystemdName(systemdName string) (*ServiceDefinition, error) {
+	for _, def := range ServiceDefinitions {
+		if def.SystemdName == systemdName {
+			return &def, nil
+		}
+	}
+	return nil, fmt.Errorf("service with systemd name '%s' not found", systemdName)
 }
 
-// GetLogPath constructs the log file path from a definition.
-func (def *ServiceDefinition) GetLogPath() (string, error) {
-	logName := fmt.Sprintf("%s.log", def.ID)
-	return ExpandPath(filepath.Join(DexterLogs, logName))
-}
-
-// CheckSystemdService checks if the systemd service file actually exists for the user.
+// CheckSystemdService verifies if the service's .service file exists for the user.
 func (def *ServiceDefinition) CheckSystemdService() (bool, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return false, fmt.Errorf("failed to get home directory: %w", err)
 	}
-	systemdServicePath := filepath.Join(homeDir, ".config", "systemd", "user", def.GetSystemdName())
+	systemdServicePath := filepath.Join(homeDir, ".config", "systemd", "user", def.SystemdName)
 
 	_, err = os.Stat(systemdServicePath)
 	if err == nil {
@@ -63,27 +53,11 @@ func (def *ServiceDefinition) CheckSystemdService() (bool, error) {
 	return false, err // Other error (e.g., permissions)
 }
 
-// GetManageableServices returns a sorted list of all manageable service aliases.
-func GetManageableServices() []string {
-	var aliases []string
-	for alias, def := range ServiceDefinitions {
-		if def.Type != "cli" && def.Type != "os" {
-			aliases = append(aliases, alias)
-		}
+// IsManageable returns true if a service is not 'cli' or 'os'.
+func IsManageable(shortName string) bool {
+	def, ok := ServiceDefinitions[shortName]
+	if !ok {
+		return false
 	}
-	sort.Strings(aliases)
-	return aliases
-}
-
-// GetBuildableServices returns a sorted list of all buildable service aliases.
-func GetBuildableServices() []string {
-	var aliases []string
-	for alias, def := range ServiceDefinitions {
-		// Only services with a defined Source path can be built
-		if def.Source != "" && def.Type != "cli" {
-			aliases = append(aliases, alias)
-		}
-	}
-	sort.Strings(aliases)
-	return aliases
+	return def.Type != "cli" && def.Type != "os"
 }
