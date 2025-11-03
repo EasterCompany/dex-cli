@@ -1,105 +1,171 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"os"
-	"os/exec"
-	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
-// Remove a service from the service map and systemd
+// ServiceToRemove is a helper struct to link a service entry with its short alias
+type ServiceToRemove struct {
+	Entry     config.ServiceEntry
+	ShortName string
+	Type      string
+}
+
+// Remove prompts the user to remove existing services from the service map.
 func Remove(args []string) error {
-	if len(args) == 0 {
-		return fmt.Errorf("service alias required (e.g., 'dex remove event')")
-	}
-	serviceAlias := args[0]
-
-	// 1. Resolve alias
-	def, err := config.Resolve(serviceAlias)
-	if err != nil {
-		return err
-	}
-	serviceID := def.ID
-
-	// 2. Remove from service-map.json
+	// Load existing service map
 	serviceMap, err := config.LoadServiceMapConfig()
 	if err != nil {
+		if os.IsNotExist(err) {
+			ui.PrintError("service-map.json not found. Nothing to remove.")
+			return nil
+		}
 		return fmt.Errorf("failed to load service map: %w", err)
 	}
 
-	found := false
-	for serviceType, services := range serviceMap.Services {
-		for i, service := range services {
-			if service.ID == serviceID {
-				serviceMap.Services[serviceType] = append(services[:i], services[i+1:]...)
-				found = true
-				break
+	// Find services that are in the map and are "manageable"
+	removable := []ServiceToRemove{}
+	for serviceType, serviceList := range serviceMap.Services {
+		for _, service := range serviceList {
+			// Get the service's definition to find its alias and check if manageable
+			def, err := config.ResolveByID(service.ID)
+			if err != nil {
+				continue // Skip if it's not in the universal definitions
+			}
+
+			if config.IsManageable(def.ShortName) {
+				removable = append(removable, ServiceToRemove{
+					Entry:     service,
+					ShortName: def.ShortName,
+					Type:      serviceType,
+				})
 			}
 		}
-		if found {
-			break
+	}
+
+	if len(removable) == 0 {
+		ui.PrintInfo("No manageable services found in service-map.json to remove.")
+		return nil
+	}
+
+	// Sort for consistent order
+	sort.Slice(removable, func(i, j int) bool {
+		return removable[i].ShortName < removable[j].ShortName
+	})
+
+	fmt.Println("Services available to remove:")
+	for i, service := range removable {
+		fmt.Printf("  %d: %s (ID: %s, Type: %s)\n", i+1, service.ShortName, service.Entry.ID, service.Type)
+	}
+
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Print("Enter number(s) to remove (e.g., 1 or 1,2): ")
+	input, _ := reader.ReadString('\n')
+
+	// --- Parsing Logic ---
+	servicesToRemove := []ServiceToRemove{}
+	invalidInputs := []string{}
+	seenIndices := make(map[int]bool) // To prevent removing the same service twice from "1,1"
+
+	// 1. Clean and split the input
+	input = strings.TrimSpace(input)
+	input = strings.TrimSuffix(input, ",")
+	numberStrings := strings.Split(input, ",")
+
+	if len(numberStrings) == 0 {
+		fmt.Println("No input provided.")
+		return nil
+	}
+
+	// 2. Parse each number string
+	for _, numStr := range numberStrings {
+		numStr = strings.TrimSpace(numStr)
+		if numStr == "" {
+			continue // Skip empty entries (e.g., "1,,2")
+		}
+
+		num, err := strconv.Atoi(numStr)
+		if err != nil {
+			invalidInputs = append(invalidInputs, fmt.Sprintf("'%s' (not a number)", numStr))
+			continue
+		}
+
+		// 3. Validate the number
+		if num <= 0 || num > len(removable) {
+			invalidInputs = append(invalidInputs, fmt.Sprintf("'%d' (out of range)", num))
+			continue
+		}
+
+		// 4. Get the 0-based index
+		index := num - 1
+
+		// 5. Check if already added to the remove list
+		if seenIndices[index] {
+			continue
+		}
+
+		// 6. Add to list
+		servicesToRemove = append(servicesToRemove, removable[index])
+		seenIndices[index] = true
+	}
+
+	// 7. Report errors
+	if len(invalidInputs) > 0 {
+		return fmt.Errorf("invalid inputs: %s", strings.Join(invalidInputs, ", "))
+	}
+
+	// 8. Check if any valid services were selected
+	if len(servicesToRemove) == 0 {
+		fmt.Println("No valid services selected.")
+		return nil
+	}
+
+	// 9. Create a map of IDs to remove for efficient filtering
+	removeIDMap := make(map[string]bool)
+	removedNames := []string{}
+	for _, service := range servicesToRemove {
+		removeIDMap[service.Entry.ID] = true
+		removedNames = append(removedNames, service.ShortName)
+	}
+
+	// 10. Filter the service map
+	// Create a new map to hold the services we're keeping
+	newServiceMapServices := config.DefaultServiceMapConfig().Services
+	// Copy over non-manageable types first
+	newServiceMapServices["cli"] = serviceMap.Services["cli"]
+	newServiceMapServices["os"] = serviceMap.Services["os"]
+
+	// Iterate through all manageable service types
+	manageableTypes := []string{"fe", "cs", "be", "th"}
+	for _, serviceType := range manageableTypes {
+		for _, service := range serviceMap.Services[serviceType] {
+			// If this service is NOT in the remove list, add it to our new map
+			if _, shouldRemove := removeIDMap[service.ID]; !shouldRemove {
+				newServiceMapServices[serviceType] = append(newServiceMapServices[serviceType], service)
+			}
 		}
 	}
 
-	if !found {
-		ui.PrintWarning(fmt.Sprintf("Service '%s' (%s) not found in service-map.json. Checking systemd...", serviceAlias, serviceID))
-	} else {
-		if err := config.SaveServiceMapConfig(serviceMap); err != nil {
-			return fmt.Errorf("failed to save service map: %w", err)
-		}
-		ui.PrintSuccess(fmt.Sprintf("Service '%s' removed from service-map.json.", serviceAlias))
+	// 11. Replace the old service map with the filtered one
+	serviceMap.Services = newServiceMapServices
+
+	// 12. Save the map
+	if err := config.SaveServiceMapConfig(serviceMap); err != nil {
+		return fmt.Errorf("failed to save service map: %w", err)
 	}
 
-	// 3. Remove from systemd
-	if config.IsManageable(serviceAlias) {
-		ui.PrintInfo(fmt.Sprintf("Attempting to remove systemd service for '%s'...", serviceAlias))
-		if err := removeSystemdService(def); err != nil {
-			// Don't fail if systemd removal fails, just warn
-			ui.PrintWarning(fmt.Sprintf("Could not remove systemd service: %v", err))
-		} else {
-			ui.PrintSuccess(fmt.Sprintf("Systemd service for '%s' removed.", serviceAlias))
-		}
-	}
-
-	return nil
-}
-
-func removeSystemdService(def config.ServiceDefinition) error {
-	systemdName := def.GetSystemdName()
-
-	// 1. Stop the service
-	cmdStop := exec.Command("systemctl", "--user", "stop", systemdName)
-	if err := cmdStop.Run(); err != nil {
-		// Don't fail if already stopped
-		fmt.Printf("Service '%s' could not be stopped (may already be stopped).\n", systemdName)
-	}
-
-	// 2. Disable the service
-	cmdDisable := exec.Command("systemctl", "--user", "disable", systemdName)
-	if err := cmdDisable.Run(); err != nil {
-		return fmt.Errorf("failed to disable service: %w", err)
-	}
-
-	// 3. Remove the service file
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("failed to get home dir: %w", err)
-	}
-	serviceFilePath := filepath.Join(homeDir, ".config", "systemd", "user", systemdName)
-	if err := os.Remove(serviceFilePath); err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf("service file not found at %s", serviceFilePath)
-		}
-		return fmt.Errorf("failed to remove service file: %w", err)
-	}
-
-	// 4. Reload daemon
-	cmdReload := exec.Command("systemctl", "--user", "daemon-reload")
-	if err := cmdReload.Run(); err != nil {
-		return fmt.Errorf("failed to reload systemd daemon: %w", err)
+	// 13. Final report
+	if len(removedNames) > 0 {
+		ui.PrintSuccess(fmt.Sprintf("Successfully removed: %s", strings.Join(removedNames, ", ")))
+		ui.PrintInfo("Note: This only updates service-map.json. Run 'dex stop <alias>' to stop running services.")
 	}
 
 	return nil
