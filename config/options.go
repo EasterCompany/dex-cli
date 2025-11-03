@@ -9,19 +9,56 @@ import (
 
 // OptionsConfig represents the structure of options.json
 type OptionsConfig struct {
-	Doc     string `json:"_doc"`
-	Editor  string `json:"editor"`
-	Theme   string `json:"theme"`
-	Logging bool   `json:"logging"`
+	Doc                string             `json:"_doc"`
+	Editor             string             `json:"editor"`
+	Theme              string             `json:"theme"`
+	Logging            bool               `json:"logging"`
+	Discord            DiscordOptions     `json:"discord"`
+	Redis              RedisOptions       `json:"redis"`
+	CommandPermissions CommandPermissions `json:"command_permissions"`
+}
+
+// DiscordOptions holds discord specific configurations
+type DiscordOptions struct {
+	Token          string `json:"token"`
+	ServerID       string `json:"server_id"`
+	DebugChannelID string `json:"debug_channel_id"`
+}
+
+// RedisOptions holds redis specific configurations
+type RedisOptions struct {
+	Password string `json:"password"`
+	DB       int    `json:"db"`
+}
+
+// CommandPermissions defines who can issue commands
+type CommandPermissions struct {
+	DefaultLevel  int      `json:"default_level"`
+	AllowedRoles  []string `json:"allowed_roles"`
+	UserWhitelist []string `json:"user_whitelist"`
 }
 
 // DefaultOptionsConfig returns the default options configuration
 func DefaultOptionsConfig() *OptionsConfig {
 	return &OptionsConfig{
-		Doc:     "User-specific options for dex-cli",
+		Doc:     "User-specific options for dex-cli and related services",
 		Editor:  "vscode",
 		Theme:   "dark",
 		Logging: true,
+		Discord: DiscordOptions{
+			Token:          "YOUR_DISCORD_BOT_TOKEN_HERE",
+			ServerID:       "YOUR_DISCORD_SERVER_ID_HERE",
+			DebugChannelID: "YOUR_DISCORD_DEBUG_CHANNEL_ID_HERE",
+		},
+		Redis: RedisOptions{
+			Password: "",
+			DB:       0,
+		},
+		CommandPermissions: CommandPermissions{
+			DefaultLevel:  1,
+			AllowedRoles:  []string{},
+			UserWhitelist: []string{},
+		},
 	}
 }
 

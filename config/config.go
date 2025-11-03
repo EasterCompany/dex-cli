@@ -198,21 +198,78 @@ func EnsureConfigFiles() error {
 		}
 	}
 
-	// Options
-	_, err = LoadOptionsConfig()
+	// Options - with healing
+	userOpts, err := LoadOptionsConfig()
 	if err != nil {
 		if os.IsNotExist(err) {
+			// File doesn't exist, create a new one with all defaults
 			fmt.Println("Creating default options.json...")
 			if err := SaveOptionsConfig(DefaultOptionsConfig()); err != nil {
 				return fmt.Errorf("failed to save default options.json: %w", err)
 			}
 		} else {
+			// Other error loading the file
 			return fmt.Errorf("failed to load options.json: %w", err)
+		}
+	} else {
+		// File exists, check if it needs healing
+		healed := healOptionsConfig(userOpts, DefaultOptionsConfig())
+		if healed {
+			fmt.Println("Healing options.json: Added missing default values.")
+			if err := SaveOptionsConfig(userOpts); err != nil {
+				return fmt.Errorf("failed to save healed options.json: %w", err)
+			}
 		}
 	}
 
 	return nil
 }
+
+// healOptionsConfig merges the default config into the user's config to add missing fields.
+// It modifies the userOpts object directly. Returns true if changes were made.
+func healOptionsConfig(userOpts *OptionsConfig, defaultOpts *OptionsConfig) bool {
+	healed := false
+
+	// Check top-level fields
+	if userOpts.Editor == "" {
+		userOpts.Editor = defaultOpts.Editor
+		healed = true
+	}
+	if userOpts.Theme == "" {
+		userOpts.Theme = defaultOpts.Theme
+		healed = true
+	}
+
+	// Check Discord options
+	if userOpts.Discord.Token == "" {
+		userOpts.Discord.Token = defaultOpts.Discord.Token
+		healed = true
+	}
+	if userOpts.Discord.ServerID == "" {
+		userOpts.Discord.ServerID = defaultOpts.Discord.ServerID
+		healed = true
+	}
+	if userOpts.Discord.DebugChannelID == "" {
+		userOpts.Discord.DebugChannelID = defaultOpts.Discord.DebugChannelID
+		healed = true
+	}
+
+	// Check Redis options (only password, as DB 0 is a valid default)
+	// Note: We don't check password as it can legitimately be empty for local Redis.
+
+	// Check Command Permissions
+	if userOpts.CommandPermissions.AllowedRoles == nil {
+		userOpts.CommandPermissions.AllowedRoles = defaultOpts.CommandPermissions.AllowedRoles
+		healed = true
+	}
+	if userOpts.CommandPermissions.UserWhitelist == nil {
+		userOpts.CommandPermissions.UserWhitelist = defaultOpts.CommandPermissions.UserWhitelist
+		healed = true
+	}
+
+	return healed
+}
+
 
 // LogFile returns a file handle to the dex-cli log file.
 func LogFile() (*os.File, error) {
