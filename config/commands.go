@@ -19,37 +19,37 @@ func GetCommandRequirements() map[string]CommandRequirement {
 	return map[string]CommandRequirement{
 		"update": {
 			Name:        "update",
-			Description: "Update dex-cli to latest version",
+			Description: "Update dex-cli and all services",
 			Check:       HasDexCliSource,
 		},
 		"build": {
 			Name:        "build",
-			Description: "Build one or all Dexter services",
+			Description: "Build and install all services from local source",
 			Check:       HasAnyDexService,
 		},
 		"start": {
 			Name:        "start",
-			Description: "Start a Dexter service",
+			Description: "Start a service",
 			Check:       HasAnySystemdService,
 		},
 		"stop": {
 			Name:        "stop",
-			Description: "Stop a Dexter service",
+			Description: "Stop a service",
 			Check:       HasAnySystemdService,
 		},
 		"restart": {
 			Name:        "restart",
-			Description: "Restart a Dexter service",
+			Description: "Restart a service",
 			Check:       HasAnySystemdService,
 		},
 		"status": {
 			Name:        "status",
 			Description: "Check the health of one or all services",
-			Check:       HasAnySystemdService,
+			Check:       func() bool { return true }, // Always available
 		},
 		"python": {
 			Name:        "python",
-			Description: "Manage Dexter's Python environment or run Python commands",
+			Description: "Manage Dexter's Python environment",
 			Check:       HasPythonVenv,
 		},
 		"bun": {
@@ -87,20 +87,15 @@ func GetCommandRequirements() map[string]CommandRequirement {
 			Description: "Show this help message",
 			Check:       func() bool { return true }, // Always available
 		},
-		"pull": {
-			Name:        "pull",
-			Description: "Pull latest changes for all Dexter services",
-			Check:       HasEasterCompanyRoot,
-		},
 		"add": {
 			Name:        "add",
-			Description: "Add a new service to the service map",
+			Description: "Add (clone, build, install) a new service",
 
 			Check: func() bool { return true }, // Always available
 		},
 		"remove": {
 			Name:        "remove",
-			Description: "Remove a service from the service map",
+			Description: "Uninstall and remove a service",
 			Check:       func() bool { return true }, // Always available
 		},
 	}
@@ -240,15 +235,29 @@ func GetSystemdServices() []string {
 	return services
 }
 
-// ServiceNameToSystemdName converts dex-discord-service to dex-discord
-func ServiceNameToSystemdName(serviceName string) string {
-	return strings.TrimSuffix(serviceName, "-service")
-}
-
-// SystemdNameToServiceName converts dex-discord to dex-discord-service
-func SystemdNameToServiceName(systemdName string) string {
-	if strings.HasSuffix(systemdName, "-service") {
-		return systemdName
+// HasSourceServices checks if any dex services with source code exist.
+func HasSourceServices() bool {
+	easterCompanyPath, err := ExpandPath(EasterCompanyRoot)
+	if err != nil {
+		return false
 	}
-	return systemdName + "-service"
+
+	if _, err := os.Stat(easterCompanyPath); os.IsNotExist(err) {
+		return false
+	}
+
+	// Check for any dex-* directories (including dex-cli, dex-*-service, etc.)
+	matches, err := filepath.Glob(filepath.Join(easterCompanyPath, "dex-*"))
+	if err != nil {
+		return false
+	}
+
+	// Filter to only directories
+	for _, match := range matches {
+		if info, err := os.Stat(match); err == nil && info.IsDir() {
+			return true
+		}
+	}
+
+	return false
 }

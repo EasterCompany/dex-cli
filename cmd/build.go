@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
-	"strings"
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
-// Build compiles one or all services
+// Build compiles all services from their local source.
+// It runs the full (format, lint, test, build, install) pipeline.
 func Build(args []string) error {
 	logFile, err := config.LogFile()
 	if err != nil {
@@ -23,201 +22,96 @@ func Build(args []string) error {
 		_, _ = fmt.Fprintln(logFile, message)
 	}
 
-	log(fmt.Sprintf("Build command called with args: %v", args))
-
-	// Load the service map
-	serviceMap, err := config.LoadServiceMapConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load service map: %w", err)
+	if len(args) > 0 {
+		return fmt.Errorf("build command takes no arguments")
 	}
 
-	// Determine which services to build
-	servicesToBuild := []config.ServiceDefinition{}
-	if len(args) == 0 || (len(args) > 0 && args[0] == "all") {
-		servicesToBuild = config.GetBuildableServices()
-	} else {
-		for _, arg := range args {
-			serviceDef, err := config.Resolve(arg)
-			if err != nil {
-				return fmt.Errorf("service '%s' not found: %w", arg, err)
-			}
-			if !serviceDef.IsBuildable() {
-				return fmt.Errorf("service '%s' is not buildable (type: %s)", arg, serviceDef.Type)
-			}
-			servicesToBuild = append(servicesToBuild, *serviceDef)
+	log("Build command called...")
+	ui.PrintSection("Building All Services from Local Source")
+
+	allServices := config.GetAllServices()
+	var dexCliDef config.ServiceDefinition
+
+	// Find dex-cli definition
+	for _, s := range allServices {
+		if s.ShortName == "cli" {
+			dexCliDef = s
+			break
 		}
 	}
 
-	// Check if these services are in the user's service-map.json
-	var buildableInMap []config.ServiceDefinition
-	for _, serviceDef := range servicesToBuild {
-		foundInMap := false
-		for _, services := range serviceMap.Services {
-			for _, serviceEntry := range services {
-				if serviceEntry.ID == serviceDef.ID {
-					foundInMap = true
-					break
-				}
-			}
-			if foundInMap {
-				break
-			}
-		}
+	// ---
+	// 1. Process dex-cli FIRST
+	// ---
+	ui.PrintInfo(ui.Colorize("--- Building dex-cli ---", ui.ColorCyan))
+	// For dex-cli, we run 'make install' as it correctly handles all steps
+	sourcePath, _ := config.ExpandPath(dexCliDef.Source)
+	if !checkFileExists(sourcePath) {
+		return fmt.Errorf("dex-cli source code not found at %s. Run 'dex update' to clone it", sourcePath)
+	}
 
-		if !foundInMap {
-			ui.PrintWarning(fmt.Sprintf("Service '%s' is defined but not in your service-map.json. Run 'dex add' to add it.", serviceDef.ShortName))
+	installCmd := exec.Command("make", "install")
+	installCmd.Dir = sourcePath
+	installCmd.Stdout = os.Stdout
+	installCmd.Stderr = os.Stderr
+
+	if err := installCmd.Run(); err != nil {
+		log(fmt.Sprintf("dex-cli 'make install' failed: %v", err))
+		return fmt.Errorf("dex-cli 'make install' failed: %w", err)
+	}
+
+	// ---
+	// 2. Process all OTHER services
+	// ---
+	servicesBuilt := 0
+	for _, def := range allServices {
+		// Skip os type and dex-cli (which we just did)
+		if !def.IsManageable() || def.ShortName == "cli" {
 			continue
 		}
-		buildableInMap = append(buildableInMap, serviceDef)
-	}
 
-	// Build logic
-	for _, serviceDef := range buildableInMap {
-		if err := buildService(serviceDef, log); err != nil {
-			ui.PrintError(fmt.Sprintf("Failed to build %s: %v", serviceDef.ID, err))
-			log(fmt.Sprintf("Failed to build %s: %v", serviceDef.ID, err))
+		// Check if source exists before trying to build
+		sourcePath, _ := config.ExpandPath(def.Source)
+		if !checkFileExists(sourcePath) {
+			ui.PrintWarning(fmt.Sprintf("Skipping %s: source code not found at %s. Run 'dex update' to clone it.", def.ShortName, sourcePath))
+			continue
 		}
-	}
 
-	ui.PrintSuccess("All requested services built.")
-	log("Build command complete.")
-	return nil
-}
+		fmt.Println()
+		ui.PrintInfo(ui.Colorize(fmt.Sprintf("--- Building %s ---", def.ShortName), ui.ColorCyan))
+		log(fmt.Sprintf("Building %s from local source...", def.ShortName))
 
-func buildService(serviceDef config.ServiceDefinition, log func(string)) error {
-	if serviceDef.Source == "" || serviceDef.Source == "N/A" {
-		ui.PrintInfo(fmt.Sprintf("Skipping %s: no source path defined", serviceDef.ID))
-		log(fmt.Sprintf("Skipping %s: no source path defined", serviceDef.ID))
-		return nil
-	}
-
-	sourcePath, err := config.ExpandPath(serviceDef.Source)
-	if err != nil {
-		return fmt.Errorf("failed to expand source path for %s: %w", serviceDef.ID, err)
-	}
-
-	if _, err := os.Stat(filepath.Join(sourcePath, "go.mod")); os.IsNotExist(err) {
-		ui.PrintInfo(fmt.Sprintf("Skipping %s: not a Go project (no go.mod)", serviceDef.ID))
-		log(fmt.Sprintf("Skipping %s: not a Go project (no go.mod)", serviceDef.ID))
-		return nil
-	}
-
-	// Expand paths for Dexter bin
-	dexterBinPath, err := config.ExpandPath(config.DexterBin)
-	if err != nil {
-		return fmt.Errorf("could not expand dexter bin path: %w", err)
-	}
-
-	// --- Pipeline Steps ---
-	steps := []struct {
-		name string
-		cmd  *exec.Cmd
-	}{
-		{"Formatting", exec.Command("go", "fmt", "./...")},
-		{"Linting", exec.Command("golangci-lint", "run")},
-		{"Testing", exec.Command("go", "test", "./...")},
-		{"Building", exec.Command("go", "build", "-o", filepath.Join(dexterBinPath, serviceDef.ID))},
-	}
-
-	for _, step := range steps {
-		ui.PrintInfo(fmt.Sprintf("[%s] Running %s...", serviceDef.ID, step.name))
-		log(fmt.Sprintf("[%s] Running %s...", serviceDef.ID, step.name))
-
-		step.cmd.Dir = sourcePath
-		output, err := step.cmd.CombinedOutput()
-		if err != nil {
-			log(fmt.Sprintf("[%s] Failed %s:\n%s", serviceDef.ID, step.name, string(output)))
-			return fmt.Errorf("failed %s for %s:\n%s", step.name, serviceDef.ID, string(output))
+		// 1. Format
+		if err := runServicePipelineStep(def, "format"); err != nil {
+			return err // Stop-on-failure
 		}
-	}
 
-	// --- Installation Step ---
-	ui.PrintInfo(fmt.Sprintf("[%s] Installing systemd service...", serviceDef.ID))
-	log(fmt.Sprintf("[%s] Installing systemd service...", serviceDef.ID))
-	if err := installService(serviceDef, log); err != nil {
-		log(fmt.Sprintf("[%s] Failed installation: %v", serviceDef.ID, err))
-		return fmt.Errorf("failed to install service %s: %w", serviceDef.ID, err)
-	}
-
-	ui.PrintSuccess(fmt.Sprintf("%s processed successfully!", serviceDef.ID))
-	log(fmt.Sprintf("%s processed successfully!", serviceDef.ID))
-	return nil
-}
-
-func installService(serviceDef config.ServiceDefinition, log func(string)) error {
-	if !serviceDef.IsManageable() {
-		log(fmt.Sprintf("Skipping systemd installation for non-manageable service %s", serviceDef.ID))
-		return nil
-	}
-	if serviceDef.SystemdName == "" {
-		log(fmt.Sprintf("Skipping systemd installation for service %s: no systemd name defined", serviceDef.ID))
-		return nil
-	}
-
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Errorf("could not get user home directory: %w", err)
-	}
-
-	serviceFilePath := filepath.Join(homeDir, ".config", "systemd", "user", serviceDef.SystemdName)
-
-	dexterBinPath, err := config.ExpandPath(config.DexterBin)
-	if err != nil {
-		return fmt.Errorf("could not expand dexter bin path: %w", err)
-	}
-	executablePath := filepath.Join(dexterBinPath, serviceDef.ID)
-
-	logFilePath, err := serviceDef.GetLogPath()
-	if err != nil {
-		return fmt.Errorf("could not get log path: %w", err)
-	}
-
-	// Ensure directories exist
-	if err := os.MkdirAll(filepath.Dir(serviceFilePath), 0755); err != nil {
-		return fmt.Errorf("could not create systemd directory: %w", err)
-	}
-	if err := os.MkdirAll(filepath.Dir(logFilePath), 0755); err != nil {
-		return fmt.Errorf("could not create log directory: %w", err)
-	}
-
-	// Create service file content
-	serviceFileContent := fmt.Sprintf(`[Unit]
-Description=%s
-After=network.target
-
-[Service]
-ExecStart=%s
-Restart=always
-RestartSec=3
-StandardOutput=append:%s
-StandardError=append:%s
-
-[Install]
-WantedBy=default.target
-`, serviceDef.ID, executablePath, logFilePath, logFilePath)
-
-	// Write the service file
-	if err := os.WriteFile(serviceFilePath, []byte(serviceFileContent), 0644); err != nil {
-		return fmt.Errorf("could not write service file: %w", err)
-	}
-
-	log(fmt.Sprintf("Wrote systemd service file to %s", serviceFilePath))
-
-	// Run systemctl commands
-	commands := [][]string{
-		{"systemctl", "--user", "daemon-reload"},
-		{"systemctl", "--user", "enable", serviceDef.SystemdName},
-		{"systemctl", "--user", "restart", serviceDef.SystemdName},
-	}
-
-	for _, args := range commands {
-		cmd := exec.Command(args[0], args[1:]...)
-		log(fmt.Sprintf("Executing: %s", strings.Join(args, " ")))
-		if output, err := cmd.CombinedOutput(); err != nil {
-			return fmt.Errorf("command failed: %s\nOutput: %s\nError: %w", strings.Join(args, " "), string(output), err)
+		// 2. Lint
+		if err := runServicePipelineStep(def, "lint"); err != nil {
+			return err // Stop-on-failure
 		}
+
+		// 3. Test
+		if err := runServicePipelineStep(def, "test"); err != nil {
+			return err // Stop-on-failure
+		}
+
+		// 4. Build
+		if err := runServicePipelineStep(def, "build"); err != nil {
+			return err // Stop-on-failure
+		}
+
+		// 5. Install
+		if err := installSystemdService(def); err != nil {
+			return err // Stop-on-failure
+		}
+
+		ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %s!", def.ShortName))
+		servicesBuilt++
 	}
 
-	log(fmt.Sprintf("Successfully enabled and restarted %s", serviceDef.ID))
+	fmt.Println()
+	ui.PrintSection("Complete")
+	ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %d service(s).", servicesBuilt+1)) // +1 for dex-cli
 	return nil
 }

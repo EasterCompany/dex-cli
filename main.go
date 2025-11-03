@@ -59,7 +59,7 @@ func main() {
 
 	case "start", "stop", "restart":
 		if len(os.Args) < 3 {
-			ui.PrintError(fmt.Sprintf("Error: service alias required for '%s' command (e.g., 'dex %s event')", command, command))
+			ui.PrintError(fmt.Sprintf("Error: service name required for '%s' command", command))
 			os.Exit(1)
 		}
 		service := os.Args[2]
@@ -96,9 +96,6 @@ func main() {
 	case "bunx":
 		runCommand(func() error { return cmd.Bunx(os.Args[2:]) })
 
-	case "pull":
-		runCommand(func() error { return cmd.Pull(os.Args[2:]) })
-
 	case "add":
 		runCommand(func() error { return cmd.Add(os.Args[2:]) })
 
@@ -129,25 +126,25 @@ func printUsage() {
 	ui.PrintInfo("dex <command> [options]")
 
 	if config.IsCommandAvailable("update") {
-		ui.PrintInfo("update     Update dex-cli to latest version")
+		ui.PrintInfo("update     Update dex-cli and all services")
 	}
 	if config.IsCommandAvailable("build") {
-		ui.PrintInfo("build      <alias|all> Build one or all Dexter services (e.g., 'dex build event')")
+		ui.PrintInfo("build      Build and install all services from local source")
 	}
 	if config.IsCommandAvailable("status") {
-		ui.PrintInfo("status     [alias] Check the health of one or all services (e.g., 'dex status event')")
+		ui.PrintInfo("status     [service] Check the health of one or all services")
 	}
 	if config.IsCommandAvailable("start") {
-		ui.PrintInfo("start      <alias> Start a Dexter service (e.g., 'dex start event')")
+		ui.PrintInfo("start      <service> Start a service")
 	}
 	if config.IsCommandAvailable("stop") {
-		ui.PrintInfo("stop       <alias> Stop a Dexter service (e.g., 'dex stop event')")
+		ui.PrintInfo("stop       <service> Stop a service")
 	}
 	if config.IsCommandAvailable("restart") {
-		ui.PrintInfo("restart    <alias> Restart a Dexter service (e.g., 'dex restart event')")
+		ui.PrintInfo("restart    <service> Restart a service")
 	}
 	if config.IsCommandAvailable("logs") {
-		ui.PrintInfo("logs       <alias> [-f] View service logs (e.g., 'dex logs event')")
+		ui.PrintInfo("logs       <service> [-f] View service logs")
 	}
 	if config.IsCommandAvailable("test") {
 		ui.PrintInfo("test       Run all tests")
@@ -156,7 +153,7 @@ func printUsage() {
 		ui.PrintInfo("system     Show system info and manage packages")
 	}
 	if config.IsCommandAvailable("python") {
-		ui.PrintInfo("python     [<subcommand>] [args...] Manage Dexter's Python environment or run Python commands")
+		ui.PrintInfo("python     [<subcommand>] [args...] Manage Dexter's Python environment")
 	}
 	if config.IsCommandAvailable("bun") {
 		ui.PrintInfo("bun        [args...] Proxy for the system's bun executable")
@@ -164,14 +161,11 @@ func printUsage() {
 	if config.IsCommandAvailable("bunx") {
 		ui.PrintInfo("bunx       [args...] Proxy for the system's bunx executable")
 	}
-	if config.IsCommandAvailable("pull") {
-		ui.PrintInfo("pull       Pull latest changes for all Dexter services")
-	}
 	if config.IsCommandAvailable("add") {
-		ui.PrintInfo("add        Add a new service to the service map")
+		ui.PrintInfo("add        Add (clone, build, install) a new service")
 	}
 	if config.IsCommandAvailable("remove") {
-		ui.PrintInfo("remove     <alias> Remove a service from the service map (e.g., 'dex remove event')")
+		ui.PrintInfo("remove     Uninstall and remove a service")
 	}
 	ui.PrintInfo("version    Show version information")
 	ui.PrintInfo("help       Show this help message")
