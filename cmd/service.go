@@ -23,7 +23,7 @@ func Service(action, serviceName string) error {
 	log(fmt.Sprintf("Service command called with action '%s' for service '%s'", action, serviceName))
 
 	// Load the service map
-	serviceMap, err := config.LoadServiceMap()
+	serviceMap, err := config.LoadServiceMapConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load service map: %w", err)
 	}

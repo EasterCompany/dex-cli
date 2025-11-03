@@ -153,6 +153,10 @@ func systemScan(log func(string)) error {
 		return fmt.Errorf("failed to save system config: %w", err)
 	}
 
+	if err := config.EnsureConfigFiles(); err != nil {
+		return fmt.Errorf("failed to ensure config files: %w", err)
+	}
+
 	fmt.Println("✓ System scan complete")
 	log("System scan complete.")
 	return systemInfo(log)

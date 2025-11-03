@@ -1,7 +1,6 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -23,40 +22,6 @@ var RequiredDexterDirs = []string{
 	"logs",
 }
 
-// ServiceMapConfig represents the structure of service-map.json
-type ServiceMapConfig struct {
-	Doc          string                    `json:"_doc"`
-	ServiceTypes []ServiceType             `json:"service_types"`
-	Services     map[string][]ServiceEntry `json:"services"`
-}
-
-// ServiceType defines a category of services
-type ServiceType struct {
-	Type        string `json:"type"`
-	Label       string `json:"label"`
-	Description string `json:"description"`
-	MinPort     int    `json:"min_port"`
-	MaxPort     int    `json:"max_port"`
-}
-
-// ServiceEntry represents a single service in the service map
-type ServiceEntry struct {
-	ID          string              `json:"id"`
-	Source      string              `json:"source"`
-	Repo        string              `json:"repo"`
-	Addr        string              `json:"addr"`
-	Socket      string              `json:"socket"`
-	Credentials *ServiceCredentials `json:"credentials,omitempty"`
-}
-
-// ServiceCredentials holds connection credentials for services (e.g., Redis)
-type ServiceCredentials struct {
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	Password string `json:"password"`
-	DB       int    `json:"db"`
-}
-
 // ExpandPath expands ~ to the user's home directory
 func ExpandPath(path string) (string, error) {
 	if !strings.HasPrefix(path, "~") {
@@ -73,26 +38,6 @@ func ExpandPath(path string) (string, error) {
 	}
 
 	return filepath.Join(homeDir, path[2:]), nil
-}
-
-// LoadServiceMap reads and parses the service-map.json file
-func LoadServiceMap() (*ServiceMapConfig, error) {
-	serviceMapPath, err := ExpandPath(filepath.Join(DexterRoot, "config", "service-map.json"))
-	if err != nil {
-		return nil, fmt.Errorf("failed to expand service-map path: %w", err)
-	}
-
-	data, err := os.ReadFile(serviceMapPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read service-map.json: %w", err)
-	}
-
-	var serviceMap ServiceMapConfig
-	if err := json.Unmarshal(data, &serviceMap); err != nil {
-		return nil, fmt.Errorf("failed to parse service-map.json: %w", err)
-	}
-
-	return &serviceMap, nil
 }
 
 // EnsureDirectoryStructure creates required directories if they don't exist
@@ -123,6 +68,37 @@ func EnsureDirectoryStructure() error {
 
 	if err := os.MkdirAll(easterCompanyPath, 0755); err != nil {
 		return fmt.Errorf("failed to create EasterCompany directory: %w", err)
+	}
+
+	return nil
+}
+
+// EnsureConfigFiles creates and validates all config files.
+func EnsureConfigFiles() error {
+	// Service Map
+	_, err := LoadServiceMapConfig()
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Println("Creating default service-map.json...")
+			if err := SaveServiceMapConfig(DefaultServiceMapConfig()); err != nil {
+				return fmt.Errorf("failed to save default service-map.json: %w", err)
+			}
+		} else {
+			return fmt.Errorf("failed to load service-map.json: %w", err)
+		}
+	}
+
+	// Options
+	_, err = LoadOptionsConfig()
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Println("Creating default options.json...")
+			if err := SaveOptionsConfig(DefaultOptionsConfig()); err != nil {
+				return fmt.Errorf("failed to save default options.json: %w", err)
+			}
+		} else {
+			return fmt.Errorf("failed to load options.json: %w", err)
+		}
 	}
 
 	return nil

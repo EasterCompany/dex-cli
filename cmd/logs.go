@@ -23,7 +23,7 @@ func Logs(args []string, follow bool) error {
 
 	log(fmt.Sprintf("Displaying logs for services: %v, follow: %t", args, follow))
 
-	serviceMap, err := config.LoadServiceMap()
+	serviceMap, err := config.LoadServiceMapConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load service map: %w", err)
 	}

@@ -25,7 +25,7 @@ func Build(args []string) error {
 	log(fmt.Sprintf("Build command called with args: %v", args))
 
 	// Load the service map
-	serviceMap, err := config.LoadServiceMap()
+	serviceMap, err := config.LoadServiceMapConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load service map: %w", err)
 	}

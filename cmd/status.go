@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os/exec"
 	"strings"
@@ -28,26 +30,33 @@ func Status(serviceName string) error {
 
 	log(fmt.Sprintf("Checking status for service: %s", serviceName))
 
-	// Load the service map
-	serviceMap, err := config.LoadServiceMap()
+	serviceMap, err := config.LoadServiceMapConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load service map: %w", err)
 	}
 
-	var servicesToCheck []config.ServiceEntry
+	var rows []ui.TableRow
 
 	if serviceName == "all" || serviceName == "" {
-		// Check all services
-		for _, services := range serviceMap.Services {
-			servicesToCheck = append(servicesToCheck, services...)
+		// Iterate in the desired order for consistent output
+		serviceTypes := []string{"cli", "fe", "cs", "be", "th", "os"}
+		for _, serviceType := range serviceTypes {
+			services := serviceMap.Services[serviceType]
+			for _, service := range services {
+				row := checkServiceStatus(service, serviceType)
+				rows = append(rows, row)
+				log(fmt.Sprintf("Service: %s, Type: %s, Status: %s", service.ID, serviceType, row[3]))
+			}
 		}
 	} else {
 		// Check a specific service
 		found := false
-		for _, services := range serviceMap.Services {
+		for serviceType, services := range serviceMap.Services {
 			for _, service := range services {
 				if service.ID == serviceName {
-					servicesToCheck = append(servicesToCheck, service)
+					row := checkServiceStatus(service, serviceType)
+					rows = append(rows, row)
+					log(fmt.Sprintf("Service: %s, Type: %s, Status: %s", service.ID, serviceType, row[3]))
 					found = true
 					break
 				}
@@ -61,14 +70,6 @@ func Status(serviceName string) error {
 		}
 	}
 
-	// Build table rows
-	var rows []ui.TableRow
-	for _, service := range servicesToCheck {
-		row := checkServiceStatus(service)
-		rows = append(rows, row)
-		log(fmt.Sprintf("Service: %s, Status: %s, Version: %s, Uptime: %s, Last Check: %s", row[0], row[3], row[2], row[4], row[5]))
-	}
-
 	// Render table
 	table := ui.CreateServiceTable(rows)
 	table.Render()
@@ -76,27 +77,21 @@ func Status(serviceName string) error {
 	return nil
 }
 
-// checkServiceStatus checks the status of a service based on its type
-func checkServiceStatus(service config.ServiceEntry) ui.TableRow {
-	// Handle dex-cli specially - check if command exists
-	if service.ID == "dex-cli" {
+// checkServiceStatus acts as a dispatcher, routing to the correct status checker based on service type.
+func checkServiceStatus(service config.ServiceEntry, serviceType string) ui.TableRow {
+	switch serviceType {
+	case "cli":
 		return checkCLIStatus(service)
+	case "os":
+		// All 'os' services are currently cache/db instances
+		return checkCacheStatus(service)
+	default:
+		// All other types are standard HTTP services
+		if service.HTTP == "" {
+			return ui.FormatTableRow(service.ID, "N/A", "N/A", "N/A", "N/A", "N/A")
+		}
+		return checkHTTPStatus(service)
 	}
-
-	// Handle services with no address (skipped)
-	if service.Addr == "" {
-		return ui.FormatTableRow(
-			service.ID,
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-			"N/A",
-		)
-	}
-
-	// All other services use HTTP status endpoint
-	return checkHTTPStatus(service)
 }
 
 // checkCLIStatus checks if a CLI tool is installed and working
@@ -132,14 +127,38 @@ func checkCLIStatus(service config.ServiceEntry) ui.TableRow {
 	)
 }
 
+// checkCacheStatus checks a cache/db service (Redis/Valkey) with a PING command.
+func checkCacheStatus(service config.ServiceEntry) ui.TableRow {
+	conn, err := net.DialTimeout("tcp", service.HTTP, 2*time.Second)
+	if err != nil {
+		return ui.FormatTableRow(service.ID, service.HTTP, "N/A", "BAD", "N/A", time.Now().Format("15:04:05"))
+	}
+	defer func() { _ = conn.Close() }()
+
+	// Send PING
+	if _, err = conn.Write([]byte("PING\r\n")); err != nil {
+		return ui.FormatTableRow(service.ID, service.HTTP, "N/A", "BAD", "N/A", time.Now().Format("15:04:05"))
+	}
+
+	// Read response
+	reader := bufio.NewReader(conn)
+	response, err := reader.ReadString('\n')
+	if err != nil || !strings.HasPrefix(response, "+PONG") {
+		return ui.FormatTableRow(service.ID, service.HTTP, "N/A", "BAD", "N/A", time.Now().Format("15:04:05"))
+	}
+
+	// PING successful
+	return ui.FormatTableRow(service.ID, service.HTTP, "N/A", "OK", "N/A", time.Now().Format("15:04:05"))
+}
+
 // checkHTTPStatus checks a service via its HTTP /status endpoint
 func checkHTTPStatus(service config.ServiceEntry) ui.TableRow {
-	statusURL := strings.TrimSuffix(service.Addr, "/") + "/status"
+	statusURL := strings.TrimSuffix(service.HTTP, "/") + "/status"
 	resp, err := http.Get(statusURL)
 	if err != nil {
 		return ui.FormatTableRow(
 			service.ID,
-			service.Addr,
+			service.HTTP,
 			"N/A",
 			"BAD",
 			"N/A",
@@ -151,7 +170,7 @@ func checkHTTPStatus(service config.ServiceEntry) ui.TableRow {
 	if err != nil {
 		return ui.FormatTableRow(
 			service.ID,
-			service.Addr,
+			service.HTTP,
 			"N/A",
 			"BAD",
 			"N/A",
@@ -163,7 +182,7 @@ func checkHTTPStatus(service config.ServiceEntry) ui.TableRow {
 	if err := json.Unmarshal(body, &statusResp); err != nil {
 		return ui.FormatTableRow(
 			service.ID,
-			service.Addr,
+			service.HTTP,
 			"N/A",
 			"BAD",
 			"N/A",
@@ -174,7 +193,7 @@ func checkHTTPStatus(service config.ServiceEntry) ui.TableRow {
 	uptime := formatUptime(time.Duration(statusResp.Uptime) * time.Second)
 	return ui.FormatTableRow(
 		statusResp.Service,
-		service.Addr,
+		service.HTTP,
 		statusResp.Version,
 		statusResp.Status,
 		uptime,
