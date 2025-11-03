@@ -105,13 +105,13 @@ func RenderTable(table Table) string {
 }
 
 func CreateServiceTable(rows []TableRow) Table {
-	table := NewTable([]string{"SERVICE", "ADDRESS", "VERSION", "STATUS", "UPTIME", "LAST CHECK"})
+	table := NewTable([]string{"SERVICE", "ADDRESS", "VERSION", "STATUS", "UPTIME", "GOROUTINES", "MEM (MB)", "LAST CHECK"})
 	for _, row := range rows {
 		table.AddRow(row)
 	}
 	return table
 }
 
-func FormatTableRow(service, address, version, status, uptime, timestamp string) TableRow {
-	return TableRow{service, address, version, status, uptime, timestamp}
+func FormatTableRow(service, address, version, status, uptime, goroutines, mem, timestamp string) TableRow {
+	return TableRow{service, address, version, status, uptime, goroutines, mem, timestamp}
 }

@@ -87,18 +87,24 @@ func Status(serviceShortName string) error {
 
 // checkServiceStatus acts as a dispatcher, routing to the correct status checker based on service type.
 func checkServiceStatus(service config.ServiceEntry, serviceType string) ui.TableRow {
+	// Truncate address
+	address := service.HTTP
+	if len(address) >= 18 {
+		address = address[:14] + "..."
+	}
+
 	switch serviceType {
 	case "cli":
 		return checkCLIStatus(service)
 	case "os":
 		// All 'os' services are currently cache/db instances
-		return checkCacheStatus(service)
+		return checkCacheStatus(service, address)
 	default:
 		// All other types are standard HTTP services
 		if service.HTTP == "" {
-			return ui.FormatTableRow(service.ID, "N/A", "N/A", "N/A", "N/A", "N/A")
+			return ui.FormatTableRow(service.ID, "N/A", "N/A", "N/A", "N/A", "N/A", "N/A", "N/A")
 		}
-		return checkHTTPStatus(service)
+		return checkHTTPStatus(service, address)
 	}
 }
 
@@ -113,6 +119,8 @@ func checkCLIStatus(service config.ServiceEntry) ui.TableRow {
 			"local",
 			"N/A",
 			"BAD",
+			"N/A",
+			"N/A",
 			"N/A",
 			time.Now().Format("15:04:05"),
 		)
@@ -131,15 +139,17 @@ func checkCLIStatus(service config.ServiceEntry) ui.TableRow {
 		version,
 		"OK",
 		"N/A",
+		"N/A",
+		"N/A",
 		time.Now().Format("15:04:05"),
 	)
 }
 
 // checkCacheStatus checks a cache/db service (Redis/Valkey) with an optional AUTH and a PING command.
-func checkCacheStatus(service config.ServiceEntry) ui.TableRow {
+func checkCacheStatus(service config.ServiceEntry, address string) ui.TableRow {
 	conn, err := net.DialTimeout("tcp", service.HTTP, 2*time.Second)
 	if err != nil {
-		return ui.FormatTableRow(service.ID, service.HTTP, "N/A", "BAD", "N/A", time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(service.ID, address, "N/A", "BAD", "N/A", "N/A", "N/A", time.Now().Format("15:04:05"))
 	}
 	defer func() { _ = conn.Close() }()
 
@@ -149,39 +159,41 @@ func checkCacheStatus(service config.ServiceEntry) ui.TableRow {
 	if service.Credentials != nil && service.Credentials.Password != "" {
 		authCmd := fmt.Sprintf("AUTH %s\r\n", service.Credentials.Password)
 		if _, err = conn.Write([]byte(authCmd)); err != nil {
-			return ui.FormatTableRow(service.ID, service.HTTP, "N/A", "BAD", "Auth failed", time.Now().Format("15:04:05"))
+			return ui.FormatTableRow(service.ID, address, "N/A", "BAD", "Auth failed", "N/A", "N/A", time.Now().Format("15:04:05"))
 		}
 		response, err := reader.ReadString('\n')
 		if err != nil || !strings.HasPrefix(response, "+OK") {
-			return ui.FormatTableRow(service.ID, service.HTTP, "N/A", "BAD", "Auth failed", time.Now().Format("15:04:05"))
+			return ui.FormatTableRow(service.ID, address, "N/A", "BAD", "Auth failed", "N/A", "N/A", time.Now().Format("15:04:05"))
 		}
 	}
 
 	// --- Send PING ---
 	if _, err = conn.Write([]byte("PING\r\n")); err != nil {
-		return ui.FormatTableRow(service.ID, service.HTTP, "N/A", "BAD", "Ping failed", time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(service.ID, address, "N/A", "BAD", "Ping failed", "N/A", "N/A", time.Now().Format("15:04:05"))
 	}
 
 	// --- Read PONG response ---
 	response, err := reader.ReadString('\n')
 	if err != nil || !strings.HasPrefix(response, "+PONG") {
-		return ui.FormatTableRow(service.ID, service.HTTP, "N/A", "BAD", "Ping failed", time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(service.ID, address, "N/A", "BAD", "Ping failed", "N/A", "N/A", time.Now().Format("15:04:05"))
 	}
 
 	// PING successful
-	return ui.FormatTableRow(service.ID, service.HTTP, "N/A", "OK", "N/A", time.Now().Format("15:04:05"))
+	return ui.FormatTableRow(service.ID, address, "N/A", "OK", "N/A", "N/A", "N/A", time.Now().Format("15:04:05"))
 }
 
 // checkHTTPStatus checks a service via its HTTP /status endpoint
-func checkHTTPStatus(service config.ServiceEntry) ui.TableRow {
-	statusURL := strings.TrimSuffix(service.HTTP, "/") + "/status"
+func checkHTTPStatus(service config.ServiceEntry, address string) ui.TableRow {
+	statusURL := "http://" + strings.TrimPrefix(service.HTTP, "http://") + "/status"
 	resp, err := http.Get(statusURL)
 	if err != nil {
 		return ui.FormatTableRow(
 			service.ID,
-			service.HTTP,
+			address,
 			"N/A",
 			"BAD",
+			"N/A",
+			"N/A",
 			"N/A",
 			time.Now().Format("15:04:05"),
 		)
@@ -191,9 +203,11 @@ func checkHTTPStatus(service config.ServiceEntry) ui.TableRow {
 	if err != nil {
 		return ui.FormatTableRow(
 			service.ID,
-			service.HTTP,
+			address,
 			"N/A",
 			"BAD",
+			"N/A",
+			"N/A",
 			"N/A",
 			time.Now().Format("15:04:05"),
 		)
@@ -203,21 +217,28 @@ func checkHTTPStatus(service config.ServiceEntry) ui.TableRow {
 	if err := json.Unmarshal(body, &statusResp); err != nil {
 		return ui.FormatTableRow(
 			service.ID,
-			service.HTTP,
+			address,
 			"N/A",
 			"BAD",
+			"N/A",
+			"N/A",
 			"N/A",
 			time.Now().Format("15:04:05"),
 		)
 	}
 
 	uptime := formatUptime(time.Duration(statusResp.Uptime) * time.Second)
+	goroutines := fmt.Sprintf("%d", statusResp.Metrics.Goroutines)
+	mem := fmt.Sprintf("%.2f", statusResp.Metrics.MemoryAllocMB)
+
 	return ui.FormatTableRow(
 		statusResp.Service,
-		service.HTTP,
+		address,
 		statusResp.Version,
 		statusResp.Status,
 		uptime,
+		goroutines,
+		mem,
 		time.Unix(statusResp.Timestamp, 0).Format("15:04:05"),
 	)
 }
