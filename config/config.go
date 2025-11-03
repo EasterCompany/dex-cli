@@ -13,6 +13,8 @@ import (
 // Hardcoded Dexter environment layout
 const (
 	DexterRoot        = "~/Dexter"
+	DexterBin         = "~/Dexter/bin"
+	DexterLogs        = "~/Dexter/logs"
 	EasterCompanyRoot = "~/EasterCompany"
 )
 

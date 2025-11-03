@@ -7,6 +7,22 @@ import (
 	"path/filepath"
 )
 
+// AllowedService defines the properties for an allowed service
+type AllowedService struct {
+	Type string
+	Port string
+}
+
+// AllowedServices is a hardcoded list of services that can be added
+var AllowedServices = map[string]AllowedService{
+	"event":   {Type: "cs", Port: "8100"},
+	"model":   {Type: "cs", Port: "8101"},
+	"chat":    {Type: "be", Port: "8200"},
+	"tts":     {Type: "be", Port: "8201"},
+	"stt":     {Type: "be", Port: "8202"},
+	"discord": {Type: "th", Port: "8300"},
+}
+
 // DefaultServiceMapConfig returns the default service map configuration
 func DefaultServiceMapConfig() *ServiceMapConfig {
 	return &ServiceMapConfig{

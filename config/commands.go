@@ -92,6 +92,17 @@ func GetCommandRequirements() map[string]CommandRequirement {
 			Description: "Pull latest changes for all Dexter services",
 			Check:       HasEasterCompanyRoot,
 		},
+		"add": {
+			Name:        "add",
+			Description: "Add a new service to the service map",
+
+			Check: func() bool { return true }, // Always available
+		},
+		"remove": {
+			Name:        "remove",
+			Description: "Remove a service from the service map",
+			Check:       func() bool { return true }, // Always available
+		},
 	}
 }
 

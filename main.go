@@ -99,6 +99,12 @@ func main() {
 	case "pull":
 		runCommand(func() error { return cmd.Pull(os.Args[2:]) })
 
+	case "add":
+		runCommand(func() error { return cmd.Add(os.Args[2:]) })
+
+	case "remove":
+		runCommand(func() error { return cmd.Remove(os.Args[2:]) })
+
 	case "help", "-h", "--help":
 		printUsage()
 
@@ -160,6 +166,12 @@ func printUsage() {
 	}
 	if config.IsCommandAvailable("pull") {
 		ui.PrintInfo("pull       Pull latest changes for all Dexter services")
+	}
+	if config.IsCommandAvailable("add") {
+		ui.PrintInfo("add        Add a new service to the service map")
+	}
+	if config.IsCommandAvailable("remove") {
+		ui.PrintInfo("remove     Remove a service from the service map")
 	}
 	ui.PrintInfo("version    Show version information")
 	ui.PrintInfo("help       Show this help message")
