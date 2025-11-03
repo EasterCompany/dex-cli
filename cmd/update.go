@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
+	"time"
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/git"
+	"github.com/EasterCompany/dex-cli/ui"
 )
 
 // Update manages the dex-cli update process
@@ -22,64 +23,47 @@ func Update(args []string) error {
 		_, _ = fmt.Fprintln(logFile, message)
 	}
 
-	// Check if the source directory exists
 	sourcePath, err := config.ExpandPath("~/EasterCompany/dex-cli")
 	if err != nil {
 		return err
 	}
 	if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
-		log("Update command is disabled because the source code is not found.")
-		log("If you want to enable updates, please install from source:")
-		log("curl -fsSL https://raw.githubusercontent.com/eastercompany/dex-cli/main/install.sh | bash")
+		ui.PrintError("Update command is disabled because the source code is not found.")
+		ui.PrintInfo("To enable updates, please install from source:")
+		ui.PrintInfo("curl -fsSL https://raw.githubusercontent.com/eastercompany/dex-cli/main/install.sh | bash")
 		return nil
 	}
 
-	branch := "main"
-	commit := "latest"
+	log("Updating to latest version...")
+	ui.PrintInfo("Switching to main branch and pulling latest changes...")
 
-	if len(args) > 0 {
-		if strings.HasPrefix(args[0], "@") {
-			commit = args[0][1:]
-		} else {
-			branch = args[0]
-			if len(args) > 1 && strings.HasPrefix(args[1], "@") {
-				commit = args[1][1:]
-			}
-		}
-	}
-
-	log(fmt.Sprintf("Updating to %s@%s...", branch, commit))
-
-	// Git Source Control
-	log("Updating git repository...")
-	if err := git.SwitchBranch(sourcePath, branch); err != nil {
+	if err := git.SwitchBranch(sourcePath, "main"); err != nil {
 		return err
 	}
-	log(fmt.Sprintf("Switched to branch '%s'", branch))
+	log("Switched to branch 'main'")
 
-	if commit == "latest" {
-		if err := git.Pull(sourcePath); err != nil {
-			return err
-		}
-		log("Pulled latest changes")
-	} else {
-		if err := git.CheckoutCommit(sourcePath, commit); err != nil {
-			return err
-		}
-		log(fmt.Sprintf("Checked out commit '%s'", commit))
+	if err := git.Pull(sourcePath); err != nil {
+		return err
 	}
+	log("Pulled latest changes")
 
-	// Build & Install using Makefile
+	ui.PrintInfo("Waiting for 2 seconds to show pull logs...")
+	time.Sleep(2 * time.Second)
+
 	log("Building and installing `dex-cli` from source using Makefile...")
+	ui.PrintInfo("Building and installing new version...")
 	installCmd := exec.Command("make", "install")
 	installCmd.Dir = sourcePath
-	if output, err := installCmd.CombinedOutput(); err != nil {
-		log(string(output))
+	installCmd.Stdout = os.Stdout
+	installCmd.Stderr = os.Stderr
+	if err := installCmd.Run(); err != nil {
+		log(fmt.Sprintf("make install failed: %v", err))
 		return fmt.Errorf("make install failed: %w", err)
 	}
 
 	newVersion, _ := exec.Command("dex", "version").Output()
-	log(fmt.Sprintf("Update complete. New version: %s", strings.TrimSpace(string(newVersion))))
+	log(fmt.Sprintf("Update complete. New version: %s", newVersion))
+	ui.PrintInfo(fmt.Sprintf("Update complete. New version: %s", newVersion))
 
 	return nil
 }
