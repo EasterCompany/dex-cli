@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/EasterCompany/dex-cli/config"
@@ -60,47 +61,93 @@ func Add(args []string) error {
 	}
 
 	reader := bufio.NewReader(os.Stdin)
-	var serviceDef config.ServiceDefinition
-	for {
-		fmt.Print("Enter service alias to add (e.g., 'event'): ")
-		input, _ := reader.ReadString('\n')
-		shortName := strings.TrimSpace(input)
+	fmt.Print("Enter number(s) to add (e.g., 1 or 1,2): ")
+	input, _ := reader.ReadString('\n')
 
-		// Check if the input is one of the available services
-		found := false
-		for _, def := range available {
-			if def.ShortName == shortName {
-				serviceDef = def
-				found = true
-				break
-			}
-		}
+	// --- New Parsing Logic ---
+	servicesToAdd := []config.ServiceDefinition{}
+	invalidInputs := []string{}
+	seenIndices := make(map[int]bool) // To prevent adding the same service twice from "1,1"
 
-		if found {
-			break
-		}
-		fmt.Println("Invalid alias. Please choose from the list above.")
+	// 1. Clean and split the input
+	input = strings.TrimSpace(input)
+	input = strings.TrimSuffix(input, ",")
+	numberStrings := strings.Split(input, ",")
+
+	if len(numberStrings) == 0 {
+		fmt.Println("No input provided.")
+		return nil
 	}
 
-	// Construct the new ServiceEntry from the definition
-	address := "0.0.0.0"
-	service := config.ServiceEntry{
-		ID:     serviceDef.ID,
-		Repo:   serviceDef.Repo,
-		Source: serviceDef.Source,
-		HTTP:   fmt.Sprintf("%s:%s", address, serviceDef.Port),
-		Socket: fmt.Sprintf("ws://%s:%s", address, serviceDef.Port),
+	// 2. Parse each number string
+	for _, numStr := range numberStrings {
+		numStr = strings.TrimSpace(numStr)
+		if numStr == "" {
+			continue // Skip empty entries (e.g., "1,,2")
+		}
+
+		num, err := strconv.Atoi(numStr)
+		if err != nil {
+			invalidInputs = append(invalidInputs, fmt.Sprintf("'%s' (not a number)", numStr))
+			continue
+		}
+
+		// 3. Validate the number
+		if num <= 0 || num > len(available) {
+			invalidInputs = append(invalidInputs, fmt.Sprintf("'%d' (out of range)", num))
+			continue
+		}
+
+		// 4. Get the 0-based index
+		index := num - 1
+
+		// 5. Check if already added
+		if seenIndices[index] {
+			continue
+		}
+
+		// 6. Add to list
+		servicesToAdd = append(servicesToAdd, available[index])
+		seenIndices[index] = true
 	}
 
-	// Add the new service to the correct type list
-	serviceMap.Services[serviceDef.Type] = append(serviceMap.Services[serviceDef.Type], service)
+	// 7. Report errors
+	if len(invalidInputs) > 0 {
+		return fmt.Errorf("invalid inputs: %s", strings.Join(invalidInputs, ", "))
+	}
 
-	// Save the updated service map
+	// 8. Check if any valid services were selected
+	if len(servicesToAdd) == 0 {
+		fmt.Println("No valid services selected.")
+		return nil
+	}
+
+	// 9. Add all selected services to the map
+	servicesAddedNames := []string{}
+	for _, serviceDef := range servicesToAdd {
+		address := "0.0.0.0"
+		service := config.ServiceEntry{
+			ID:     serviceDef.ID,
+			Repo:   serviceDef.Repo,
+			Source: serviceDef.Source,
+			HTTP:   fmt.Sprintf("%s:%s", address, serviceDef.Port),
+			Socket: fmt.Sprintf("ws://%s:%s", address, serviceDef.Port),
+		}
+
+		serviceMap.Services[serviceDef.Type] = append(serviceMap.Services[serviceDef.Type], service)
+		servicesAddedNames = append(servicesAddedNames, serviceDef.ShortName)
+	}
+
+	// 10. Save the map
 	if err := config.SaveServiceMapConfig(serviceMap); err != nil {
 		return fmt.Errorf("failed to save service map: %w", err)
 	}
 
-	ui.PrintSuccess(fmt.Sprintf("Service '%s' (%s) added successfully.", serviceDef.ShortName, serviceDef.ID))
-	ui.PrintInfo("Run 'dex build all' or 'dex build " + serviceDef.ShortName + "' to install and start it.")
+	// 11. Final report
+	if len(servicesAddedNames) > 0 {
+		ui.PrintSuccess(fmt.Sprintf("Successfully added: %s", strings.Join(servicesAddedNames, ", ")))
+		ui.PrintInfo("Run 'dex build all' or 'dex build <alias>' to install them.")
+	}
+
 	return nil
 }
