@@ -42,13 +42,6 @@ func Python(args []string) error {
 		return pythonRemove()
 	case "upgrade":
 		return pythonUpgrade()
-	case "version", "help":
-		// Pass version/help directly to python executable
-		cmd := exec.Command(pythonPath, args...)
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		return cmd.Run()
 	default:
 		// Pass all arguments directly to python executable
 		cmd := exec.Command(pythonPath, args...)

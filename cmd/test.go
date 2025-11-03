@@ -11,6 +11,12 @@ import (
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
+type Result struct {
+	Status  string
+	Message string
+	Tool    string
+}
+
 // Test runs format, lint, and test for all services
 func Test(args []string) error {
 	logFile, err := config.LogFile()
@@ -46,25 +52,15 @@ func Test(args []string) error {
 		fmt.Printf("▼ %s\n", projectName)
 		log(fmt.Sprintf("Testing project: %s", projectName))
 
-		// Format
 		formatResult := formatProject(project, log)
-		fmt.Printf("  Formatting: %s\n", formatResult)
-		log(fmt.Sprintf("  Formatting result: %s", formatResult))
-
-		// Lint
 		lintResult := lintProject(project, log)
-		fmt.Printf("  Linting: %s\n", lintResult)
-		log(fmt.Sprintf("  Linting result: %s", lintResult))
+		testResult := testProject(project, log)
 
-		// Test
-		testResult := "SKIPPED"
-		if strings.HasPrefix(projectName, "dex-") {
-			testResult = testProject(project, log)
-			fmt.Printf("  Testing: %s\n", testResult)
-			log(fmt.Sprintf("  Testing result: %s", testResult))
-		}
+		printDetailedResults("Formatting", formatResult)
+		printDetailedResults("Linting", lintResult)
+		printDetailedResults("Testing", testResult)
 
-		overallResults = append(overallResults, ui.TableRow{projectName, formatResult, lintResult, testResult})
+		overallResults = append(overallResults, ui.TableRow{projectName, formatResult.Status, lintResult.Status, testResult.Status})
 	}
 
 	fmt.Println("\n--- Overall Results ---")
@@ -77,6 +73,16 @@ func Test(args []string) error {
 	return nil
 }
 
+func printDetailedResults(category string, result Result) {
+	switch result.Status {
+	case "BAD":
+		fmt.Printf("  %s: %s\n", category, result.Status)
+		fmt.Printf("    └ %s\n", result.Message)
+	case "OK":
+		fmt.Printf("  %s: %s\n", category, result.Status)
+	}
+}
+
 func getExecutablePath(name string) (string, bool) {
 	virtualEnvPath, err := config.ExpandPath("~/Dexter/python/bin/" + name)
 	if err == nil {
@@ -85,150 +91,136 @@ func getExecutablePath(name string) (string, bool) {
 		}
 	}
 
-	// Fallback to system path
 	path, err := exec.LookPath(name)
-	if err != nil {
-		return "", false
-	}
-	return path, true
+	return path, err == nil
 }
 
-func formatProject(projectPath string, log func(string)) string {
-	// Go
-	if gofmtPath, ok := getExecutablePath("gofmt"); ok {
-		cmd := exec.Command(gofmtPath, "-w", ".")
-		cmd.Dir = projectPath
-		if err := cmd.Run(); err != nil {
-			return "Go: FAILED"
-		}
-	}
-
-	// Prettier for HTML, CSS, JS, TS, JSON, Markdown
-	if prettierPath, ok := getExecutablePath("prettier"); ok {
-		cmd := exec.Command(prettierPath, "--write", "--prose-wrap", "always", ".")
-		cmd.Dir = projectPath
-		_ = cmd.Run() // Prettier returns error if no files found, so we ignore it
-	}
-
-	// Shell
-	if shfmtPath, ok := getExecutablePath("shfmt"); ok {
-		cmd := exec.Command(shfmtPath, "-w", ".")
-		cmd.Dir = projectPath
-		if err := cmd.Run(); err != nil {
-			return "Shell: FAILED"
-		}
-	}
-
-	// Python
-	if blackPath, ok := getExecutablePath("black"); ok {
-		cmd := exec.Command(blackPath, ".")
-		cmd.Dir = projectPath
-		if err := cmd.Run(); err != nil {
-			return "Python: FAILED"
-		}
-	}
-
-	return "PASSED"
+func hasFiles(projectPath, pattern string) bool {
+	globPattern := filepath.Join(projectPath, pattern)
+	matches, err := filepath.Glob(globPattern)
+	return err == nil && len(matches) > 0
 }
 
-func lintProject(projectPath string, log func(string)) string {
-	// Go
-	if golintPath, ok := getExecutablePath("golangci-lint"); ok {
-		cmd := exec.Command(golintPath, "run")
-		cmd.Dir = projectPath
-		if err := cmd.Run(); err != nil {
-			return "Go: FAILED"
-		}
-	}
-
-	// ESLint for JS/TS
-	if eslintPath, ok := getExecutablePath("eslint"); ok {
-		cmd := exec.Command(eslintPath, ".")
-		cmd.Dir = projectPath
-		if err := cmd.Run(); err != nil {
-			return "JS/TS: FAILED"
-		}
-	}
-
-	// Stylelint for CSS
-	if stylelintPath, ok := getExecutablePath("stylelint"); ok {
-		cmd := exec.Command(stylelintPath, "**/*.css")
-		cmd.Dir = projectPath
-		if err := cmd.Run(); err != nil {
-			return "CSS: FAILED"
-		}
-	}
-
-	// HTMLHint for HTML
-	if htmlhintPath, ok := getExecutablePath("htmlhint"); ok {
-		cmd := exec.Command(htmlhintPath, "**/*.html")
-		cmd.Dir = projectPath
-		if err := cmd.Run(); err != nil {
-			return "HTML: FAILED"
-		}
-	}
-
-	// JSONLint for JSON
-	if jsonlintPath, ok := getExecutablePath("jsonlint"); ok {
-		cmd := exec.Command(jsonlintPath, "-q", ".")
-		cmd.Dir = projectPath
-		if err := cmd.Run(); err != nil {
-			return "JSON: FAILED"
-		}
-	}
-
-	// Markdown
-	if markdownlintPath, ok := getExecutablePath("markdownlint"); ok {
-		cmd := exec.Command(markdownlintPath, ".")
-		cmd.Dir = projectPath
-		if err := cmd.Run(); err != nil {
-			return "Markdown: FAILED"
-		}
-	}
-
-	// Shell
-	if shellcheckPath, ok := getExecutablePath("shellcheck"); ok {
-		cmd := exec.Command(shellcheckPath, ".")
-		cmd.Dir = projectPath
-		if err := cmd.Run(); err != nil {
-			return "Shell: FAILED"
-		}
-	}
-
-	// Python
-	if flake8Path, ok := getExecutablePath("flake8"); ok {
-		cmd := exec.Command(flake8Path, ".")
-		cmd.Dir = projectPath
-		if err := cmd.Run(); err != nil {
-			return "Python: FAILED"
-		}
-	}
-
-	return "PASSED"
+func hasConfigFile(projectPath, configFileName string) bool {
+	_, err := os.Stat(filepath.Join(projectPath, configFileName))
+	return err == nil
 }
 
-func testProject(projectPath string, log func(string)) string {
-	// Go
-	if _, err := os.Stat(filepath.Join(projectPath, "go.mod")); err == nil {
-		if goPath, ok := getExecutablePath("go"); ok {
-			cmd := exec.Command(goPath, "test", "./...")
-			cmd.Dir = projectPath
-			if err := cmd.Run(); err != nil {
-				return "Go: FAILED"
+func runCheck(projectPath, toolName, filePattern string, configFiles []string, args ...string) Result {
+	if !hasFiles(projectPath, filePattern) {
+		return Result{Status: "N/A", Tool: toolName}
+	}
+
+	hasConfig := false
+	if len(configFiles) == 0 {
+		hasConfig = true // No config file needed
+	} else {
+		for _, configFile := range configFiles {
+			if hasConfigFile(projectPath, configFile) {
+				hasConfig = true
+				break
 			}
 		}
 	}
 
-	// Python
-	if _, err := os.Stat(filepath.Join(projectPath, "requirements.txt")); err == nil {
-		if pytestPath, ok := getExecutablePath("pytest"); ok {
-			cmd := exec.Command(pytestPath)
-			cmd.Dir = projectPath
-			if err := cmd.Run(); err != nil {
-				return "Python: FAILED"
-			}
+	if !hasConfig {
+		return Result{Status: "N/A", Tool: toolName, Message: fmt.Sprintf("No config for %s found", toolName)}
+	}
+
+	executable, ok := getExecutablePath(toolName)
+	if !ok {
+		return Result{Status: "N/A", Tool: toolName, Message: fmt.Sprintf("%s not found", toolName)}
+	}
+
+	cmd := exec.Command(executable, args...)
+	cmd.Dir = projectPath
+	if output, err := cmd.CombinedOutput(); err != nil {
+		// Ignore "no files found" errors from prettier
+		if toolName == "prettier" && strings.Contains(string(output), "No files matching") {
+			return Result{Status: "OK", Tool: toolName}
+		}
+		msg := fmt.Sprintf("%s failed: %s", toolName, strings.Split(string(output), "\n")[0])
+		if len(msg) > 120 {
+			msg = msg[:120] + "..."
+		}
+		return Result{Status: "BAD", Tool: toolName, Message: msg}
+	}
+
+	return Result{Status: "OK", Tool: toolName}
+}
+
+func formatProject(projectPath string, log func(string)) Result {
+	projectName := filepath.Base(projectPath)
+	var results []Result
+	if strings.HasPrefix(projectName, "dex-") {
+		results = []Result{
+			runCheck(projectPath, "gofmt", "**/*.go", nil, "-w", "."),
+		}
+	} else if projectName == "easter.company" {
+		results = []Result{
+			runCheck(projectPath, "prettier", "**/*.js", []string{".prettierrc", ".prettierrc.json", ".prettierrc.js"}, "--write", "**/*.js"),
+			runCheck(projectPath, "prettier", "**/*.ts", []string{".prettierrc", ".prettierrc.json", ".prettierrc.js"}, "--write", "**/*.ts"),
+			runCheck(projectPath, "prettier", "**/*.css", []string{".prettierrc", ".prettierrc.json", ".prettierrc.js"}, "--write", "**/*.css"),
+			runCheck(projectPath, "prettier", "**/*.html", []string{".prettierrc", ".prettierrc.json", ".prettierrc.js"}, "--write", "**/*.html"),
+			runCheck(projectPath, "prettier", "**/*.json", []string{".prettierrc", ".prettierrc.json", ".prettierrc.js"}, "--write", "**/*.json"),
+			runCheck(projectPath, "prettier", "**/*.md", []string{".prettierrc", ".prettierrc.json", ".prettierrc.js"}, "--write", "**/*.md"),
+			runCheck(projectPath, "shfmt", "**/*.sh", nil, "-w", "**/*.sh"),
+		}
+	}
+	return aggregateResults(results)
+}
+
+func lintProject(projectPath string, log func(string)) Result {
+	projectName := filepath.Base(projectPath)
+	var results []Result
+	if strings.HasPrefix(projectName, "dex-") {
+		results = []Result{
+			runCheck(projectPath, "golangci-lint", "**/*.go", []string{".golangci.yml", ".golangci.yaml", ".golangci.json"}, "run"),
+		}
+	} else if projectName == "easter.company" {
+		results = []Result{
+			runCheck(projectPath, "eslint", "**/*.js", []string{".eslintrc.js", ".eslintrc.json"}, "**/*.js"),
+			runCheck(projectPath, "eslint", "**/*.ts", []string{".eslintrc.js", ".eslintrc.json"}, "**/*.ts"),
+			runCheck(projectPath, "stylelint", "**/*.css", []string{".stylelintrc.js", ".stylelintrc.json"}, "**/*.css"),
+			runCheck(projectPath, "htmlhint", "**/*.html", []string{".htmlhintrc"}, "**/*.html"),
+		}
+	}
+	return aggregateResults(results)
+}
+
+func testProject(projectPath string, log func(string)) Result {
+	projectName := filepath.Base(projectPath)
+	var results []Result
+	if strings.HasPrefix(projectName, "dex-") {
+		results = []Result{
+			runCheck(projectPath, "go", "go.mod", nil, "test", "./..."),
+		}
+	}
+	return aggregateResults(results)
+}
+
+func aggregateResults(results []Result) Result {
+	finalResult := Result{Status: "N/A"}
+	badMessages := []string{}
+
+	hasApplicable := false
+	for _, r := range results {
+		if r.Status == "BAD" {
+			finalResult.Status = "BAD"
+			badMessages = append(badMessages, r.Message)
+		}
+		if r.Status != "N/A" {
+			hasApplicable = true
 		}
 	}
 
-	return "PASSED"
+	if hasApplicable && finalResult.Status != "BAD" {
+		finalResult.Status = "OK"
+	}
+
+	if len(badMessages) > 0 {
+		finalResult.Message = strings.Join(badMessages, "; ")
+	}
+
+	return finalResult
 }

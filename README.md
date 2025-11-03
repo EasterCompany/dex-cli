@@ -1,6 +1,7 @@
-# dex-cli
+# Project: ~/EasterCompany/dex-cli/
 
-Fast, simple command-line tool for managing Dexter services.
+The Dexter `dex-cli` Command Line Interface tool is an essential requirement
+for all Dexter related services and products running on any system.
 
 ## Install
 
@@ -10,51 +11,11 @@ curl -fsSL https://raw.githubusercontent.com/eastercompany/dex-cli/main/install.
 
 **Requirements:** git, go
 
-## Usage
+## Development Notes
 
-```bash
-dex pull       # Clone/pull all services
-dex help       # Show help
-dex version    # Show version
-```
-
-## What It Does
-
-- Manages `~/Dexter` (binaries, configs, models)
-- Manages `~/EasterCompany` (source code)
-- Clones and updates all dex-* services
-- Safe git operations (won't pull with uncommitted changes)
-
-## Directory Structure
-
-```
-~/Dexter/           # Installation root
-  ├── bin/          # Compiled binaries
-  ├── config/       # Configuration files
-  └── models/       # AI models
-
-~/EasterCompany/    # Source code
-  ├── dex-cli/
-  ├── dex-*-service/
-  └── ...
-```
-
-## Development
-
-**Build from source:**
-```bash
-cd ~/EasterCompany/dex-cli
-go build -o ~/Dexter/bin/dex
-```
-
-**Project structure:**
-```
-main.go       # Entry point
-cmd/          # Commands
-config/       # Config management
-git/          # Git operations
-```
-
-## License
-
-MIT
+This applications source code must be located within `~/EasterCompany/dex-cli`,
+also this application must be able to...
+Build to `~/Dexter/bin/dex`,
+Read configuration files directly within `~/Dexter/config`,
+Read and append log files directly within `~/Dexter/logs`,
+Read and list model files directly within or nested (within sub-directories) `~/Dexter/models`.
