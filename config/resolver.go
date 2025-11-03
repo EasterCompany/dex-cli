@@ -4,72 +4,86 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 )
 
-// ResolveService takes a short-hand service name and attempts to resolve it to
-// a full systemd service name (e.g., "dex-discord.service") and a full
-// project directory name (e.g., "dex-discord-service").
-// It also handles the special case of "cli" for the dex-cli project.
-func ResolveService(shortName string) (systemdName string, projectDirName string, err error) {
-	if shortName == "cli" {
-		// Special case for dex-cli, which is not a systemd service but a project
-		return "", "dex-cli", nil
+// Resolve finds a service's static definition by its shorthand alias.
+// This is the primary function for validating and retrieving service info.
+func Resolve(shortName string) (ServiceDefinition, error) {
+	if def, ok := ServiceDefinitions[shortName]; ok {
+		return def, nil
 	}
+	return ServiceDefinition{}, fmt.Errorf("service alias '%s' is not recognized", shortName)
+}
 
-	// Try to resolve as a systemd service
-	potentialSystemdName := fmt.Sprintf("dex-%s.service", shortName)
+// IsValidService checks if a shorthand alias exists.
+func IsValidService(shortName string) bool {
+	_, ok := ServiceDefinitions[shortName]
+	return ok
+}
+
+// IsManageable checks if a service is controllable via systemd (start/stop/logs).
+func IsManageable(shortName string) bool {
+	if def, ok := ServiceDefinitions[shortName]; ok {
+		// cli and os services are not managed by systemd
+		return def.Type != "cli" && def.Type != "os"
+	}
+	return false
+}
+
+// GetSystemdName constructs the systemd service name from a definition.
+// e.g., "dex-event-service" -> "dex-event.service"
+func (def *ServiceDefinition) GetSystemdName() string {
+	systemdName := strings.TrimSuffix(def.ID, "-service")
+	return fmt.Sprintf("%s.service", systemdName)
+}
+
+// GetLogPath constructs the log file path from a definition.
+func (def *ServiceDefinition) GetLogPath() (string, error) {
+	logName := fmt.Sprintf("%s.log", def.ID)
+	return ExpandPath(filepath.Join(DexterLogs, logName))
+}
+
+// CheckSystemdService checks if the systemd service file actually exists for the user.
+func (def *ServiceDefinition) CheckSystemdService() (bool, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		return "", "", fmt.Errorf("failed to get home directory: %w", err)
+		return false, fmt.Errorf("failed to get home directory: %w", err)
 	}
-	systemdServicePath := filepath.Join(homeDir, ".config", "systemd", "user", potentialSystemdName)
+	systemdServicePath := filepath.Join(homeDir, ".config", "systemd", "user", def.GetSystemdName())
 
 	_, err = os.Stat(systemdServicePath)
 	if err == nil {
-		// Found a systemd service
-		return potentialSystemdName, fmt.Sprintf("dex-%s-service", shortName), nil
+		return true, nil // File exists
 	}
-
-	// If not a systemd service, try to resolve as a project directory
-	potentialProjectDirName := fmt.Sprintf("dex-%s-service", shortName)
-	easterCompanyPath, err := ExpandPath(EasterCompanyRoot)
-	if err != nil {
-		return "", "", fmt.Errorf("failed to expand EasterCompany root path: %w", err)
+	if os.IsNotExist(err) {
+		return false, nil // File does not exist
 	}
-	projectDirPath := filepath.Join(easterCompanyPath, potentialProjectDirName)
-
-	_, err = os.Stat(projectDirPath)
-	if err == nil {
-		// Found a project directory, derive systemd name from it
-		derivedSystemdName := fmt.Sprintf("dex-%s.service", shortName)
-		return derivedSystemdName, potentialProjectDirName, nil
-	}
-
-	return "", "", fmt.Errorf("service '%s' not found as a systemd service or project directory", shortName)
+	return false, err // Other error (e.g., permissions)
 }
 
-// ResolveSystemdService takes a short-hand service name and resolves it to a full systemd service name.
-// It returns an error if the service is not found or is not a systemd service.
-func ResolveSystemdService(shortName string) (string, error) {
-	systemdName, _, err := ResolveService(shortName)
-	if err != nil {
-		return "", err
+// GetManageableServices returns a sorted list of all manageable service aliases.
+func GetManageableServices() []string {
+	var aliases []string
+	for alias, def := range ServiceDefinitions {
+		if def.Type != "cli" && def.Type != "os" {
+			aliases = append(aliases, alias)
+		}
 	}
-	if systemdName == "" {
-		return "", fmt.Errorf("service '%s' is not a systemd service", shortName)
-	}
-	return systemdName, nil
+	sort.Strings(aliases)
+	return aliases
 }
 
-// ResolveProjectDirService takes a short-hand service name and resolves it to a full project directory name.
-// It returns an error if the service is not found or is not a project directory.
-func ResolveProjectDirService(shortName string) (string, error) {
-	_, projectDirName, err := ResolveService(shortName)
-	if err != nil {
-		return "", err
+// GetBuildableServices returns a sorted list of all buildable service aliases.
+func GetBuildableServices() []string {
+	var aliases []string
+	for alias, def := range ServiceDefinitions {
+		// Only services with a defined Source path can be built
+		if def.Source != "" && def.Type != "cli" {
+			aliases = append(aliases, alias)
+		}
 	}
-	if projectDirName == "" {
-		return "", fmt.Errorf("service '%s' is not a project directory", shortName)
-	}
-	return projectDirName, nil
+	sort.Strings(aliases)
+	return aliases
 }

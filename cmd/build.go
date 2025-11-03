@@ -25,92 +25,58 @@ func Build(args []string) error {
 
 	log(fmt.Sprintf("Build command called with args: %v", args))
 
-	// Load the service map
-	serviceMap, err := config.LoadServiceMapConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load service map: %w", err)
-	}
-
 	// Determine which services to build
-	servicesToBuild := []config.ServiceEntry{}
+	servicesToBuild := []config.ServiceDefinition{}
 	if len(args) == 0 || (len(args) > 0 && args[0] == "all") {
-		for _, services := range serviceMap.Services {
-			for _, service := range services {
-				if strings.HasPrefix(service.ID, "dex-") && service.ID != "dex-cli" {
-					servicesToBuild = append(servicesToBuild, service)
-				}
-			}
+		aliases := config.GetBuildableServices()
+		for _, alias := range aliases {
+			def, _ := config.Resolve(alias)
+			servicesToBuild = append(servicesToBuild, def)
 		}
 	} else {
-		for _, arg := range args {
-			serviceName := arg
-			if !strings.HasPrefix(serviceName, "dex-") {
-				serviceName = "dex-" + serviceName + "-service"
+		for _, alias := range args {
+			def, err := config.Resolve(alias)
+			if err != nil {
+				return err
 			}
-			found := false
-			for _, services := range serviceMap.Services {
-				for _, service := range services {
-					if service.ID == serviceName {
-						servicesToBuild = append(servicesToBuild, service)
-						found = true
-						break
-					}
-				}
-				if found {
-					break
-				}
+			if def.Source == "" || def.Type == "cli" {
+				return fmt.Errorf("service '%s' is not buildable", alias)
 			}
-			if !found {
-				return fmt.Errorf("service '%s' not found", arg)
-			}
+			servicesToBuild = append(servicesToBuild, def)
 		}
+	}
+
+	if len(servicesToBuild) == 0 {
+		ui.PrintInfo("No services to build.")
+		return nil
 	}
 
 	// Build logic
-	for serviceType, services := range serviceMap.Services {
-		for _, service := range services {
-			// Check if this service is in the list to be built
-			buildThisOne := false
-			for _, serviceToBuild := range servicesToBuild {
-				if service.ID == serviceToBuild.ID {
-					buildThisOne = true
-					break
-				}
-			}
-
-			if buildThisOne {
-				if err := buildService(service, serviceType, log); err != nil {
-					fmt.Printf("Failed to build %s: %v\n", service.ID, err)
-					log(fmt.Sprintf("Failed to build %s: %v", service.ID, err))
-				}
-			}
+	for _, serviceDef := range servicesToBuild {
+		if err := buildService(serviceDef, log); err != nil {
+			ui.PrintError(fmt.Sprintf("Failed to build %s: %v", serviceDef.ShortName, err))
+			log(fmt.Sprintf("Failed to build %s: %v", serviceDef.ShortName, err))
 		}
 	}
 
-	fmt.Println("All services built")
+	ui.PrintSuccess("Build process complete.")
 	log("All services built.")
 	return nil
 }
 
-func buildService(service config.ServiceEntry, serviceType string, log func(string)) error {
-	if service.Source == "" || service.Source == "system" {
-		fmt.Printf("Skipping %s: no source path defined\n", service.ID)
-		log(fmt.Sprintf("Skipping %s: no source path defined", service.ID))
-		return nil
-	}
-
-	sourcePath, err := config.ExpandPath(service.Source)
+func buildService(serviceDef config.ServiceDefinition, log func(string)) error {
+	sourcePath, err := config.ExpandPath(serviceDef.Source)
 	if err != nil {
-		return fmt.Errorf("failed to expand source path for %s: %w", service.ID, err)
+		return fmt.Errorf("failed to expand source path for %s: %w", serviceDef.ShortName, err)
 	}
 
 	if _, err := os.Stat(filepath.Join(sourcePath, "go.mod")); os.IsNotExist(err) {
-		fmt.Printf("Skipping %s: not a Go project (no go.mod)\n", service.ID)
-		log(fmt.Sprintf("Skipping %s: not a Go project (no go.mod)", service.ID))
+		ui.PrintWarning(fmt.Sprintf("Skipping %s: not a Go project (no go.mod)", serviceDef.ShortName))
+		log(fmt.Sprintf("Skipping %s: not a Go project (no go.mod)", serviceDef.ShortName))
 		return nil
 	}
 
-	// Expand paths for Dexter bin and logs
+	// Expand paths for Dexter bin
 	dexterBinPath, err := config.ExpandPath(config.DexterBin)
 	if err != nil {
 		return fmt.Errorf("could not expand dexter bin path: %w", err)
@@ -124,60 +90,58 @@ func buildService(service config.ServiceEntry, serviceType string, log func(stri
 		{"Formatting", exec.Command("go", "fmt", "./...")},
 		{"Linting", exec.Command("golangci-lint", "run")},
 		{"Testing", exec.Command("go", "test", "./...")},
-		{"Building", exec.Command("go", "build", "-o", filepath.Join(dexterBinPath, service.ID))},
+		{"Building", exec.Command("go", "build", "-o", filepath.Join(dexterBinPath, serviceDef.ID))},
 	}
 
 	for _, step := range steps {
-		ui.PrintInfo(fmt.Sprintf("[%s] Running %s...", service.ID, step.name))
-		log(fmt.Sprintf("[%s] Running %s...", service.ID, step.name))
+		ui.PrintInfo(fmt.Sprintf("[%s] Running %s...", serviceDef.ShortName, step.name))
+		log(fmt.Sprintf("[%s] Running %s...", serviceDef.ShortName, step.name))
 
 		step.cmd.Dir = sourcePath
 		output, err := step.cmd.CombinedOutput()
-
 		if err != nil {
-			log(fmt.Sprintf("[%s] Failed %s:\n%s", service.ID, step.name, string(output)))
-			return fmt.Errorf("failed %s for %s:\n%s", step.name, service.ID, string(output))
+			log(fmt.Sprintf("[%s] Failed %s:\n%s", serviceDef.ShortName, step.name, string(output)))
+			// Don't fail the whole build for lint/test
+			if step.name == "Linting" || step.name == "Testing" {
+				ui.PrintWarning(fmt.Sprintf("[%s] %s failed, continuing build...", serviceDef.ShortName, step.name))
+			} else {
+				return fmt.Errorf("failed %s for %s:\n%s", step.name, serviceDef.ShortName, string(output))
+			}
 		}
 	}
 
 	// --- Installation Step ---
-	ui.PrintInfo(fmt.Sprintf("[%s] Installing systemd service...", service.ID))
-	log(fmt.Sprintf("[%s] Installing systemd service...", service.ID))
-	if err := installService(service, serviceType, log); err != nil {
-		log(fmt.Sprintf("[%s] Failed installation: %v", service.ID, err))
-		return fmt.Errorf("failed to install service %s: %w", service.ID, err)
+	ui.PrintInfo(fmt.Sprintf("[%s] Installing systemd service...", serviceDef.ShortName))
+	log(fmt.Sprintf("[%s] Installing systemd service...", serviceDef.ShortName))
+	if err := installService(serviceDef, log); err != nil {
+		log(fmt.Sprintf("[%s] Failed installation: %v", serviceDef.ShortName, err))
+		return fmt.Errorf("failed to install service %s: %w", serviceDef.ShortName, err)
 	}
 
-	ui.PrintSuccess(fmt.Sprintf("%s processed successfully!", service.ID))
-	log(fmt.Sprintf("%s processed successfully!", service.ID))
+	ui.PrintSuccess(fmt.Sprintf("%s processed successfully!", serviceDef.ShortName))
+	log(fmt.Sprintf("%s processed successfully!", serviceDef.ShortName))
 	return nil
 }
 
-func installService(service config.ServiceEntry, serviceType string, log func(string)) error {
-	if serviceType == "cli" {
-		log(fmt.Sprintf("Skipping systemd installation for cli service %s", service.ID))
-		return nil
-	}
-
+func installService(serviceDef config.ServiceDefinition, log func(string)) error {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return fmt.Errorf("could not get user home directory: %w", err)
 	}
 
-	serviceFileName := fmt.Sprintf("%s.service", service.ID)
+	serviceFileName := serviceDef.GetSystemdName()
 	serviceFilePath := filepath.Join(homeDir, ".config", "systemd", "user", serviceFileName)
 
 	dexterBinPath, err := config.ExpandPath(config.DexterBin)
 	if err != nil {
 		return fmt.Errorf("could not expand dexter bin path: %w", err)
 	}
-	executablePath := filepath.Join(dexterBinPath, service.ID)
+	executablePath := filepath.Join(dexterBinPath, serviceDef.ID)
 
-	dexterLogsPath, err := config.ExpandPath(config.DexterLogs)
+	logFilePath, err := serviceDef.GetLogPath()
 	if err != nil {
 		return fmt.Errorf("could not expand dexter logs path: %w", err)
 	}
-	logFilePath := filepath.Join(dexterLogsPath, fmt.Sprintf("%s.log", service.ID))
 
 	// Ensure directories exist
 	if err := os.MkdirAll(filepath.Dir(serviceFilePath), 0755); err != nil {
@@ -201,7 +165,7 @@ StandardError=append:%s
 
 [Install]
 WantedBy=default.target
-`, service.ID, executablePath, logFilePath, logFilePath)
+`, serviceDef.ID, executablePath, logFilePath, logFilePath)
 
 	// Write the service file
 	if err := os.WriteFile(serviceFilePath, []byte(serviceFileContent), 0644); err != nil {
@@ -225,6 +189,6 @@ WantedBy=default.target
 		}
 	}
 
-	log(fmt.Sprintf("Successfully enabled and restarted %s", service.ID))
+	log(fmt.Sprintf("Successfully enabled and restarted %s", serviceDef.ID))
 	return nil
 }

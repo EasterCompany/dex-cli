@@ -21,9 +21,27 @@ func Service(action, serviceShortName string) error {
 
 	log(fmt.Sprintf("Service command called with action '%s' for service '%s'", action, serviceShortName))
 
-	systemdServiceName, err := config.ResolveSystemdService(serviceShortName)
+	// 1. Resolve the alias to a full service definition
+	def, err := config.Resolve(serviceShortName)
 	if err != nil {
-		return fmt.Errorf("failed to resolve service '%s': %w", serviceShortName, err)
+		return err
+	}
+
+	// 2. Check if this service is manageable
+	if !config.IsManageable(def.ShortName) {
+		return fmt.Errorf("service '%s' (type: %s) cannot be %s", def.ShortName, def.Type, action)
+	}
+
+	// 3. Get the systemd name
+	systemdServiceName := def.GetSystemdName()
+
+	// 4. Check if the systemd service file actually exists
+	exists, err := def.CheckSystemdService()
+	if err != nil {
+		return fmt.Errorf("failed to check systemd status for '%s': %w", def.ShortName, err)
+	}
+	if !exists {
+		return fmt.Errorf("systemd service '%s' not found.\nRun 'dex build %s' to install it.", systemdServiceName, def.ShortName)
 	}
 
 	// Perform the action using systemctl --user

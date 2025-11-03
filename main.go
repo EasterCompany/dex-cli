@@ -59,7 +59,7 @@ func main() {
 
 	case "start", "stop", "restart":
 		if len(os.Args) < 3 {
-			ui.PrintError(fmt.Sprintf("Error: service name required for '%s' command", command))
+			ui.PrintError(fmt.Sprintf("Error: service alias required for '%s' command (e.g., 'dex %s event')", command, command))
 			os.Exit(1)
 		}
 		service := os.Args[2]
@@ -132,22 +132,22 @@ func printUsage() {
 		ui.PrintInfo("update     Update dex-cli to latest version")
 	}
 	if config.IsCommandAvailable("build") {
-		ui.PrintInfo("build      <service|all> Build one or all Dexter services")
+		ui.PrintInfo("build      <alias|all> Build one or all Dexter services (e.g., 'dex build event')")
 	}
 	if config.IsCommandAvailable("status") {
-		ui.PrintInfo("status     [service] Check the health of one or all services")
+		ui.PrintInfo("status     [alias] Check the health of one or all services (e.g., 'dex status event')")
 	}
 	if config.IsCommandAvailable("start") {
-		ui.PrintInfo("start      <service> Start a Dexter service")
+		ui.PrintInfo("start      <alias> Start a Dexter service (e.g., 'dex start event')")
 	}
 	if config.IsCommandAvailable("stop") {
-		ui.PrintInfo("stop       <service> Stop a Dexter service")
+		ui.PrintInfo("stop       <alias> Stop a Dexter service (e.g., 'dex stop event')")
 	}
 	if config.IsCommandAvailable("restart") {
-		ui.PrintInfo("restart    <service> Restart a Dexter service")
+		ui.PrintInfo("restart    <alias> Restart a Dexter service (e.g., 'dex restart event')")
 	}
 	if config.IsCommandAvailable("logs") {
-		ui.PrintInfo("logs       <service> [-f] View service logs")
+		ui.PrintInfo("logs       <alias> [-f] View service logs (e.g., 'dex logs event')")
 	}
 	if config.IsCommandAvailable("test") {
 		ui.PrintInfo("test       Run all tests")
@@ -171,7 +171,7 @@ func printUsage() {
 		ui.PrintInfo("add        Add a new service to the service map")
 	}
 	if config.IsCommandAvailable("remove") {
-		ui.PrintInfo("remove     Remove a service from the service map")
+		ui.PrintInfo("remove     <alias> Remove a service from the service map (e.g., 'dex remove event')")
 	}
 	ui.PrintInfo("version    Show version information")
 	ui.PrintInfo("help       Show this help message")
