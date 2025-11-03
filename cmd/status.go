@@ -135,7 +135,7 @@ func checkCLIStatus(service config.ServiceEntry) ui.TableRow {
 	)
 }
 
-// checkCacheStatus checks a cache/db service (Redis/Valkey) with a PING command.
+// checkCacheStatus checks a cache/db service (Redis/Valkey) with an optional AUTH and a PING command.
 func checkCacheStatus(service config.ServiceEntry) ui.TableRow {
 	conn, err := net.DialTimeout("tcp", service.HTTP, 2*time.Second)
 	if err != nil {
@@ -143,16 +143,29 @@ func checkCacheStatus(service config.ServiceEntry) ui.TableRow {
 	}
 	defer func() { _ = conn.Close() }()
 
-	// Send PING
-	if _, err = conn.Write([]byte("PING\r\n")); err != nil {
-		return ui.FormatTableRow(service.ID, service.HTTP, "N/A", "BAD", "N/A", time.Now().Format("15:04:05"))
+	reader := bufio.NewReader(conn)
+
+	// --- Handle Authentication ---
+	if service.Credentials != nil && service.Credentials.Password != "" {
+		authCmd := fmt.Sprintf("AUTH %s\r\n", service.Credentials.Password)
+		if _, err = conn.Write([]byte(authCmd)); err != nil {
+			return ui.FormatTableRow(service.ID, service.HTTP, "N/A", "BAD", "Auth failed", time.Now().Format("15:04:05"))
+		}
+		response, err := reader.ReadString('\n')
+		if err != nil || !strings.HasPrefix(response, "+OK") {
+			return ui.FormatTableRow(service.ID, service.HTTP, "N/A", "BAD", "Auth failed", time.Now().Format("15:04:05"))
+		}
 	}
 
-	// Read response
-	reader := bufio.NewReader(conn)
+	// --- Send PING ---
+	if _, err = conn.Write([]byte("PING\r\n")); err != nil {
+		return ui.FormatTableRow(service.ID, service.HTTP, "N/A", "BAD", "Ping failed", time.Now().Format("15:04:05"))
+	}
+
+	// --- Read PONG response ---
 	response, err := reader.ReadString('\n')
 	if err != nil || !strings.HasPrefix(response, "+PONG") {
-		return ui.FormatTableRow(service.ID, service.HTTP, "N/A", "BAD", "N/A", time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(service.ID, service.HTTP, "N/A", "BAD", "Ping failed", time.Now().Format("15:04:05"))
 	}
 
 	// PING successful
