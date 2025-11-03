@@ -10,16 +10,16 @@ import (
 )
 
 const (
-	ColorRed        = "\033[31m"
-	ColorBrightRed  = "\033[91m"
-	ColorGreen      = "\033[32m"
-	ColorYellow     = "\033[33m"
-	ColorBlue       = "\033[34m"
-	ColorPurple     = "\033[35m"
-	ColorCyan       = "\033[36m"
-	ColorWhite      = "\033[37m"
-	ColorDarkGray   = "\033[90m"
-	ColorReset      = "\033[0m"
+	ColorRed       = "\033[31m"
+	ColorBrightRed = "\033[91m"
+	ColorGreen     = "\033[32m"
+	ColorYellow    = "\033[33m"
+	ColorBlue      = "\033[34m"
+	ColorPurple    = "\033[35m"
+	ColorCyan      = "\033[36m"
+	ColorWhite     = "\033[37m"
+	ColorDarkGray  = "\033[90m"
+	ColorReset     = "\033[0m"
 )
 
 // ansiRegex is used to strip ANSI escape codes.
