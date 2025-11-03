@@ -42,7 +42,7 @@ func Version(version, branch, commit, buildDate, buildYear string) {
 
 	// Conditionally add the trademark part
 	trademarkPart := ""
-	if isOfficialRelease(version) {
+	if isOfficialRelease(fullVersion) {
 		trademarkPart = darkStyle.Render(fmt.Sprintf("| Easter Company™ © %s", buildYear))
 	}
 
@@ -54,7 +54,7 @@ func Version(version, branch, commit, buildDate, buildYear string) {
 	}
 }
 
-func isOfficialRelease(currentVersion string) bool {
+func isOfficialRelease(fullVersion string) bool {
 	resp, err := http.Get("https://easter.company/tags/dex-cli.json")
 	if err != nil {
 		return false
@@ -75,8 +75,8 @@ func isOfficialRelease(currentVersion string) bool {
 		return false
 	}
 
-	for _, tagInfo := range tagsMap {
-		if strings.TrimSpace(tagInfo.Latest) == currentVersion {
+	if tagInfo, ok := tagsMap["dex-cli"]; ok {
+		if strings.TrimSpace(tagInfo.Latest) == fullVersion {
 			return true
 		}
 	}
