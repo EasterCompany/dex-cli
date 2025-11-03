@@ -15,6 +15,7 @@ var (
 	commit    string
 	buildDate string
 	buildYear string
+	buildHash string
 )
 
 func main() {
@@ -45,13 +46,13 @@ func main() {
 
 	switch command {
 	case "update":
-		runCommand(func() error { return cmd.Update(os.Args[2:]) })
+		runCommand(func() error { return cmd.Update(os.Args[2:], buildYear) })
 
 	case "system":
 		runCommand(func() error { return cmd.System(os.Args[2:]) })
 
 	case "version", "-v", "--version":
-		cmd.Version(version, branch, commit, buildDate, buildYear)
+		cmd.Version(version, branch, commit, buildDate, buildYear, buildHash)
 
 	case "build":
 		runCommand(func() error { return cmd.Build(os.Args[2:]) })

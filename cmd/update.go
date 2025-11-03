@@ -12,7 +12,7 @@ import (
 )
 
 // Update manages the dex-cli update process
-func Update(args []string) error {
+func Update(args []string, buildYear string) error {
 	logFile, err := config.LogFile()
 	if err != nil {
 		return fmt.Errorf("failed to get log file: %w", err)
@@ -104,14 +104,13 @@ func Update(args []string) error {
 	log(fmt.Sprintf("Update complete. New version: %s", newVersionStr))
 	ui.PrintSection("Complete")
 
-	// Fetch latest version from easter.company
-	latestVersion, err := fetchLatestVersion()
-	if err != nil {
-		log(fmt.Sprintf("Failed to fetch latest version: %v", err))
-		latestVersion = "" // Continue without showing latest version
+	// Fetch latest version from easter.company (cached)
+	latestVersion := ui.FetchLatestVersion()
+	if latestVersion == "" {
+		log("Failed to fetch latest version from easter.company")
 	}
 
-	ui.PrintVersionComparison(currentVersionStr, newVersionStr, latestVersion, currentSize, newSize, additions, deletions)
+	ui.PrintVersionComparison(currentVersionStr, newVersionStr, latestVersion, buildYear, currentSize, newSize, additions, deletions)
 
 	return nil
 }
