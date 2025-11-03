@@ -72,10 +72,15 @@ func (t *Table) Render() {
 }
 
 func padRight(s string, width int) string {
-	if len(s) >= width {
+	// Get the visible length of the string, stripping ANSI codes
+	visibleLength := len(StripANSI(s))
+
+	if visibleLength >= width {
 		return s
 	}
-	return s + strings.Repeat(" ", width-len(s))
+
+	// Calculate padding based on the visible length
+	return s + strings.Repeat(" ", width-visibleLength)
 }
 
 func FormatFormatTableRow(service, status string) TableRow {

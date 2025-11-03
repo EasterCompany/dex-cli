@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"os/exec"
 	"strings"
 	"time"
@@ -13,7 +14,6 @@ import (
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/health"
 	"github.com/EasterCompany/dex-cli/ui"
-	"net/http"
 )
 
 // Status checks the health of one or all services
@@ -105,7 +105,7 @@ func checkServiceStatus(service config.ServiceEntry, serviceType string) ui.Tabl
 		return checkCacheStatus(service, serviceID, address)
 	default:
 		if service.HTTP == "" {
-			return ui.FormatTableRow(serviceID, "N/A", "N/A", colorizeStatus("N/A"), "N/A", "N/A", "N/A", "N/A")
+			return ui.FormatTableRow(serviceID, colorizeNA("N/A"), colorizeNA("N/A"), colorizeStatus("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 		}
 		return checkHTTPStatus(service, serviceID, address)
 	}
@@ -139,11 +139,11 @@ func checkCLIStatus(service config.ServiceEntry, serviceID string) ui.TableRow {
 	return ui.FormatTableRow(
 		serviceID,
 		"local",
-		ui.Truncate(version, 12),
+		colorizeNA(ui.Truncate(version, 12)),
 		colorizeStatus(status),
-		"N/A",
-		"N/A",
-		"N/A",
+		colorizeNA("N/A"),
+		colorizeNA("N/A"),
+		colorizeNA("N/A"),
 		time.Now().Format("15:04:05"),
 	)
 }
@@ -152,7 +152,7 @@ func checkCLIStatus(service config.ServiceEntry, serviceID string) ui.TableRow {
 func checkCacheStatus(service config.ServiceEntry, serviceID, address string) ui.TableRow {
 	conn, err := net.DialTimeout("tcp", service.HTTP, 2*time.Second)
 	if err != nil {
-		return ui.FormatTableRow(serviceID, address, "N/A", colorizeStatus("BAD"), "N/A", "N/A", "N/A", time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 	}
 	defer func() { _ = conn.Close() }()
 
@@ -161,24 +161,24 @@ func checkCacheStatus(service config.ServiceEntry, serviceID, address string) ui
 	if service.Credentials != nil && service.Credentials.Password != "" {
 		authCmd := fmt.Sprintf("AUTH %s\r\n", service.Credentials.Password)
 		if _, err = conn.Write([]byte(authCmd)); err != nil {
-			return ui.FormatTableRow(serviceID, address, "N/A", colorizeStatus("BAD"), "Auth failed", "N/A", "N/A", time.Now().Format("15:04:05"))
+			return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), "Auth failed", colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 		}
 		response, err := reader.ReadString('\n')
 		if err != nil || !strings.HasPrefix(response, "+OK") {
-			return ui.FormatTableRow(serviceID, address, "N/A", colorizeStatus("BAD"), "Auth failed", "N/A", "N/A", time.Now().Format("15:04:05"))
+			return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), "Auth failed", colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 		}
 	}
 
 	if _, err = conn.Write([]byte("PING\r\n")); err != nil {
-		return ui.FormatTableRow(serviceID, address, "N/A", colorizeStatus("BAD"), "Ping failed", "N/A", "N/A", time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), "Ping failed", colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 	}
 
 	response, err := reader.ReadString('\n')
 	if err != nil || !strings.HasPrefix(response, "+PONG") {
-		return ui.FormatTableRow(serviceID, address, "N/A", colorizeStatus("BAD"), "Ping failed", "N/A", "N/A", time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), "Ping failed", colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 	}
 
-	return ui.FormatTableRow(serviceID, address, "N/A", colorizeStatus("OK"), "N/A", "N/A", "N/A", time.Now().Format("15:04:05"))
+	return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("OK"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 }
 
 // checkHTTPStatus checks a service via its HTTP /status endpoint
@@ -186,18 +186,22 @@ func checkHTTPStatus(service config.ServiceEntry, serviceID, address string) ui.
 	statusURL := "http://" + service.HTTP + "/status"
 	resp, err := http.Get(statusURL)
 	if err != nil {
-		return ui.FormatTableRow(serviceID, address, "N/A", colorizeStatus("BAD"), "N/A", "N/A", "N/A", time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return ui.FormatTableRow(serviceID, address, "N/A", colorizeStatus("BAD"), "N/A", "N/A", "N/A", time.Now().Format("15:04:05"))
+		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 	}
 
 	var statusResp health.StatusResponse
 	if err := json.Unmarshal(body, &statusResp); err != nil {
-		return ui.FormatTableRow(serviceID, address, "N/A", colorizeStatus("BAD"), "N/A", "N/A", "N/A", time.Now().Format("15:04:05"))
+		// If JSON fails, it might be a non-Go service. Check for 200 OK.
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("OK"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+		}
+		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 	}
 
 	uptime := ui.Truncate(formatUptime(time.Duration(statusResp.Uptime)*time.Second), 10)
@@ -207,7 +211,7 @@ func checkHTTPStatus(service config.ServiceEntry, serviceID, address string) ui.
 	return ui.FormatTableRow(
 		ui.Truncate(statusResp.Service, 19),
 		address,
-		ui.Truncate(statusResp.Version, 12),
+		colorizeNA(ui.Truncate(statusResp.Version, 12)),
 		colorizeStatus(statusResp.Status),
 		uptime,
 		goroutines,
@@ -228,4 +232,12 @@ func colorizeStatus(status string) string {
 	default:
 		return status
 	}
+}
+
+// colorizeNA colors "N/A" values dark gray, and leaves other values as-is.
+func colorizeNA(value string) string {
+	if value == "N/A" {
+		return ui.Colorize(value, ui.ColorDarkGray)
+	}
+	return value
 }
