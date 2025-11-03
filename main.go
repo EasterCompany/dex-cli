@@ -45,25 +45,16 @@ func main() {
 
 	switch command {
 	case "update":
-		if err := cmd.Update(os.Args[2:]); err != nil {
-			ui.PrintError(fmt.Sprintf("Error: %v", err))
-			os.Exit(1)
-		}
+		runCommand(func() error { return cmd.Update(os.Args[2:]) })
 
 	case "system":
-		if err := cmd.System(os.Args[2:]); err != nil {
-			ui.PrintError(fmt.Sprintf("Error: %v", err))
-			os.Exit(1)
-		}
+		runCommand(func() error { return cmd.System(os.Args[2:]) })
 
 	case "version", "-v", "--version":
 		cmd.Version(version, branch, commit, buildDate, buildYear)
 
 	case "build":
-		if err := cmd.Build(os.Args[2:]); err != nil {
-			ui.PrintError(fmt.Sprintf("Error: %v", err))
-			os.Exit(1)
-		}
+		runCommand(func() error { return cmd.Build(os.Args[2:]) })
 
 	case "start", "stop", "restart":
 		if len(os.Args) < 3 {
@@ -71,20 +62,14 @@ func main() {
 			os.Exit(1)
 		}
 		service := os.Args[2]
-		if err := cmd.Service(command, service); err != nil {
-			ui.PrintError(fmt.Sprintf("Error: %v", err))
-			os.Exit(1)
-		}
+		runCommand(func() error { return cmd.Service(command, service) })
 
 	case "status":
 		service := "all"
 		if len(os.Args) > 2 {
 			service = os.Args[2]
 		}
-		if err := cmd.Status(service); err != nil {
-			ui.PrintError(fmt.Sprintf("Error: %v", err))
-			os.Exit(1)
-		}
+		runCommand(func() error { return cmd.Status(service) })
 
 	case "logs":
 		follow := false
@@ -96,41 +81,22 @@ func main() {
 				break
 			}
 		}
-		if err := cmd.Logs(args, follow); err != nil {
-			ui.PrintError(fmt.Sprintf("Error: %v", err))
-			os.Exit(1)
-		}
+		runCommand(func() error { return cmd.Logs(args, follow) })
 
 	case "test":
-		if err := cmd.Test(os.Args[2:]); err != nil {
-			if ui.PrintError(fmt.Sprintf("Error: %v", err)); err != nil {
-				os.Exit(1)
-			}
-		}
+		runCommand(func() error { return cmd.Test(os.Args[2:]) })
 
 	case "python":
-		if err := cmd.Python(os.Args[2:]); err != nil {
-			ui.PrintError(fmt.Sprintf("Error: %v", err))
-			os.Exit(1)
-		}
+		runCommand(func() error { return cmd.Python(os.Args[2:]) })
 
 	case "bun":
-		if err := cmd.Bun(os.Args[2:]); err != nil {
-			ui.PrintError(fmt.Sprintf("Error: %v", err))
-			os.Exit(1)
-		}
+		runCommand(func() error { return cmd.Bun(os.Args[2:]) })
 
 	case "bunx":
-		if err := cmd.Bunx(os.Args[2:]); err != nil {
-			ui.PrintError(fmt.Sprintf("Error: %v", err))
-			os.Exit(1)
-		}
+		runCommand(func() error { return cmd.Bunx(os.Args[2:]) })
 
 	case "pull":
-		if err := cmd.Pull(os.Args[2:]); err != nil {
-			ui.PrintError(fmt.Sprintf("Error: %v", err))
-			os.Exit(1)
-		}
+		runCommand(func() error { return cmd.Pull(os.Args[2:]) })
 
 	case "help", "-h", "--help":
 		printUsage()
@@ -140,6 +106,16 @@ func main() {
 		printUsage()
 		os.Exit(1)
 	}
+}
+
+// runCommand is a universal wrapper for all commands.
+// It executes the command function and prints a blank line at the end.
+func runCommand(commandFunc func() error) {
+	if err := commandFunc(); err != nil {
+		ui.PrintError(fmt.Sprintf("Error: %v", err))
+		os.Exit(1)
+	}
+	fmt.Println()
 }
 
 func printUsage() {
