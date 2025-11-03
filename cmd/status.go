@@ -87,8 +87,8 @@ func Status(serviceShortName string) error {
 
 // checkServiceStatus acts as a dispatcher, routing to the correct status checker based on service type.
 func checkServiceStatus(service config.ServiceEntry, serviceType string) ui.TableRow {
-	// Truncate address
-	address := service.HTTP
+	// Strip protocol and truncate address
+	address := stripProtocol(service.HTTP)
 	if len(address) >= 18 {
 		address = address[:14] + "..."
 	}
@@ -106,6 +106,15 @@ func checkServiceStatus(service config.ServiceEntry, serviceType string) ui.Tabl
 		}
 		return checkHTTPStatus(service, address)
 	}
+}
+
+// stripProtocol removes common URL schemes from a string.
+func stripProtocol(address string) string {
+	address = strings.TrimPrefix(address, "http://")
+	address = strings.TrimPrefix(address, "https://")
+	address = strings.TrimPrefix(address, "ws://")
+	address = strings.TrimPrefix(address, "wss://")
+	return address
 }
 
 // checkCLIStatus checks if a CLI tool is installed and working

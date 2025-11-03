@@ -270,7 +270,6 @@ func healOptionsConfig(userOpts *OptionsConfig, defaultOpts *OptionsConfig) bool
 	return healed
 }
 
-
 // LogFile returns a file handle to the dex-cli log file.
 func LogFile() (*os.File, error) {
 	logPath, err := ExpandPath(filepath.Join(DexterRoot, "logs", "dex-cli.log"))
