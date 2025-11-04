@@ -95,6 +95,7 @@ func Update(args []string, buildYear string) error {
 
 		fmt.Println()
 		ui.PrintInfo(ui.Colorize(fmt.Sprintf("# Updating %s", def.ShortName), ui.ColorCyan))
+		ui.PrintInfo(fmt.Sprintf("  Version: %s", oldVersions[def.ID]))
 
 		// 1. Download
 		if err := gitUpdateService(def); err != nil {
@@ -127,6 +128,7 @@ func Update(args []string, buildYear string) error {
 		}
 
 		ui.PrintSuccess(fmt.Sprintf("Successfully updated and installed %s!", def.ShortName))
+		ui.PrintInfo(fmt.Sprintf("  New Version: %s", getServiceVersion(def)))
 	}
 
 	// ---

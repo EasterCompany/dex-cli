@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/EasterCompany/dex-cli/config"
+	"github.com/EasterCompany/dex-cli/git"
 	"github.com/EasterCompany/dex-cli/health"
 	"github.com/EasterCompany/dex-cli/ui"
 )
@@ -183,20 +184,10 @@ func checkCLIStatus(service config.ServiceDefinition, serviceID string) ui.Table
 		status = "BAD"
 	}
 
-	// Parse version: v0.3.0.main.5241102.2025-11-03-20-20-30... -> 0.3.0
 	version := "N/A"
-	outputStr := strings.TrimSpace(string(output))
-	if strings.HasPrefix(outputStr, "v") {
-		parts := strings.Split(outputStr, ".")
-		if len(parts) >= 3 {
-			// Find the first part that isn't just a number, or take 3 parts
-			versionParts := []string{}
-			versionParts = append(versionParts, parts[0:3]...) // Fixed: Replaced loop with linter suggestion
-			version = strings.Join(versionParts, ".")[1:]      // [1:] to remove 'v'
-		}
-	} else if len(outputStr) > 0 {
-		// Fallback for non-standard version string
-		version = outputStr
+	parsedVersion, err := git.Parse(strings.TrimSpace(string(output)))
+	if err == nil {
+		version = parsedVersion.Short()
 	}
 
 	return []string{
@@ -316,15 +307,15 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 	return []string{serviceID, address, colorizeNA(ui.Truncate(version, 12)), colorizeStatus("OK"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 }
 
-// checkHTTPStatus checks a service via its HTTP /status endpoint
+// checkHTTPStatus checks a service via its HTTP /service endpoint
 func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string) ui.TableRow {
-	statusURL := service.GetHTTP("/status")
+	serviceURL := service.GetHTTP("/service")
 
 	// Use a custom HTTP client with a 2-second timeout
 	client := http.Client{
 		Timeout: 2 * time.Second,
 	}
-	resp, err := client.Get(statusURL)
+	resp, err := client.Get(serviceURL)
 	if err != nil {
 		return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 	}
@@ -335,27 +326,24 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 		return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 	}
 
-	var statusResp health.StatusResponse
-	if err := json.Unmarshal(body, &statusResp); err != nil {
+	var serviceReport health.ServiceReport
+	if err := json.Unmarshal(body, &serviceReport); err != nil {
 		return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 	}
 
-	uptime := ui.Truncate(formatUptime(time.Duration(statusResp.Uptime)*time.Second), 10)
+	uptime := ui.Truncate(formatUptime(time.Duration(serviceReport.Health.Uptime)*time.Second), 10)
+	goroutines := fmt.Sprintf("%d", serviceReport.Health.Metrics.Goroutines)
+	mem := fmt.Sprintf("%.2f", serviceReport.Health.Metrics.MemoryAllocMB)
 
-	goroutines := fmt.Sprintf("%d", statusResp.Metrics.Goroutines)
-	mem := fmt.Sprintf("%.2f", statusResp.Metrics.MemoryAllocMB)
-
-	// Use the service's shortName for the table, not the ID from the status response
-	// (which might be the full ID)
 	return []string{
 		serviceID,
 		address,
-		colorizeNA(ui.Truncate(statusResp.Version, 12)),
-		colorizeStatus(statusResp.Status),
+		colorizeNA(ui.Truncate(serviceReport.Version.Tag, 12)),
+		colorizeStatus(serviceReport.Status),
 		colorizeNA(uptime),
 		colorizeNA(goroutines),
 		colorizeNA(mem),
-		time.Unix(statusResp.Timestamp, 0).Format("15:00:00"), // Shortened timestamp
+		time.Unix(serviceReport.Health.Timestamp, 0).Format("15:00:00"), // Shortened timestamp
 	}
 }
 

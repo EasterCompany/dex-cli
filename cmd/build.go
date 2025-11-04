@@ -90,6 +90,7 @@ func Build(args []string) error {
 
 		fmt.Println()
 		ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, fmt.Sprintf("# Building %s", def.ShortName), ui.ColorReset))
+		ui.PrintInfo(fmt.Sprintf("  Version: %s", oldVersions[def.ID]))
 		log(fmt.Sprintf("Building %s from local source...", def.ShortName))
 
 		// 1. Format
@@ -118,6 +119,7 @@ func Build(args []string) error {
 		}
 
 		ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %s!", def.ShortName))
+		ui.PrintInfo(fmt.Sprintf("  New Version: %s", getServiceVersion(def)))
 		servicesBuilt++
 	}
 

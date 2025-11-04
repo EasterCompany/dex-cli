@@ -108,13 +108,13 @@ func getCacheVersion(service config.ServiceDefinition) string {
 	return "N/A"
 }
 
-// getHTTPVersion fetches the version from a service's /status endpoint.
+// getHTTPVersion fetches the version from a service's /service endpoint.
 func getHTTPVersion(service config.ServiceDefinition) string {
-	statusURL := service.GetHTTP("/status")
+	serviceURL := service.GetHTTP("/service")
 	client := http.Client{
 		Timeout: 2 * time.Second,
 	}
-	resp, err := client.Get(statusURL)
+	resp, err := client.Get(serviceURL)
 	if err != nil {
 		return "N/A"
 	}
@@ -125,10 +125,10 @@ func getHTTPVersion(service config.ServiceDefinition) string {
 		return "N/A"
 	}
 
-	var statusResp health.StatusResponse
-	if err := json.Unmarshal(body, &statusResp); err != nil {
+	var serviceReport health.ServiceReport
+	if err := json.Unmarshal(body, &serviceReport); err != nil {
 		return "N/A"
 	}
 
-	return statusResp.Version
+	return serviceReport.Version.Str
 }
