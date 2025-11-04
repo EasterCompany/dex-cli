@@ -216,8 +216,7 @@ func gitAddCommitPush(def config.ServiceDefinition) error {
 	}
 
 	// Git Commit
-	newVersion := getServiceVersion(def)
-	commitMsg := fmt.Sprintf("build: %s", newVersion)
+	commitMsg := "dex build: successful build"
 	commitCmd := exec.Command("git", "commit", "-m", commitMsg)
 	commitCmd.Dir = sourcePath
 	if output, err := commitCmd.CombinedOutput(); err != nil {
