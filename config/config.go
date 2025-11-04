@@ -51,14 +51,14 @@ func EnsureDirectoryStructure() error {
 		return fmt.Errorf("failed to expand Dexter root path: %w", err)
 	}
 
-	if err := os.MkdirAll(dexterPath, 0755); err != nil {
+	if err := os.MkdirAll(dexterPath, 0o755); err != nil {
 		return fmt.Errorf("failed to create Dexter directory: %w", err)
 	}
 
 	// Ensure all required subdirectories exist
 	for _, dir := range RequiredDexterDirs {
 		dirPath := filepath.Join(dexterPath, dir)
-		if err := os.MkdirAll(dirPath, 0755); err != nil {
+		if err := os.MkdirAll(dirPath, 0o755); err != nil {
 			return fmt.Errorf("failed to create %s directory: %w", dir, err)
 		}
 	}
@@ -69,7 +69,7 @@ func EnsureDirectoryStructure() error {
 		return fmt.Errorf("failed to expand EasterCompany root path: %w", err)
 	}
 
-	if err := os.MkdirAll(easterCompanyPath, 0755); err != nil {
+	if err := os.MkdirAll(easterCompanyPath, 0o755); err != nil {
 		return fmt.Errorf("failed to create EasterCompany directory: %w", err)
 	}
 
@@ -147,9 +147,6 @@ func healOptionsConfig(userOpts *OptionsConfig, defaultOpts *OptionsConfig) bool
 		healed = true
 	}
 
-	// Check Redis options (only password, as DB 0 is a valid default)
-	// Note: We don't check password as it can legitimately be empty for local Redis.
-
 	// Check Command Permissions
 	if userOpts.CommandPermissions.AllowedRoles == nil {
 		userOpts.CommandPermissions.AllowedRoles = defaultOpts.CommandPermissions.AllowedRoles
@@ -171,12 +168,12 @@ func LogFile() (*os.File, error) {
 	}
 
 	// Ensure the directory exists.
-	if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create log directory: %w", err)
 	}
 
 	// Open the file in append mode, create it if it doesn't exist.
-	file, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open log file: %w", err)
 	}

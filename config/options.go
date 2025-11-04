@@ -14,7 +14,6 @@ type OptionsConfig struct {
 	Theme              string             `json:"theme"`
 	Logging            bool               `json:"logging"`
 	Discord            DiscordOptions     `json:"discord"`
-	Redis              RedisOptions       `json:"redis"`
 	CommandPermissions CommandPermissions `json:"command_permissions"`
 }
 
@@ -23,12 +22,6 @@ type DiscordOptions struct {
 	Token          string `json:"token"`
 	ServerID       string `json:"server_id"`
 	DebugChannelID string `json:"debug_channel_id"`
-}
-
-// RedisOptions holds redis specific configurations
-type RedisOptions struct {
-	Password string `json:"password"`
-	DB       int    `json:"db"`
 }
 
 // CommandPermissions defines who can issue commands
@@ -49,10 +42,6 @@ func DefaultOptionsConfig() *OptionsConfig {
 			Token:          "YOUR_DISCORD_BOT_TOKEN_HERE",
 			ServerID:       "YOUR_DISCORD_SERVER_ID_HERE",
 			DebugChannelID: "YOUR_DISCORD_DEBUG_CHANNEL_ID_HERE",
-		},
-		Redis: RedisOptions{
-			Password: "",
-			DB:       0,
 		},
 		CommandPermissions: CommandPermissions{
 			DefaultLevel:  1,
@@ -97,5 +86,5 @@ func SaveOptionsConfig(options *OptionsConfig) error {
 		return fmt.Errorf("failed to marshal options.json: %w", err)
 	}
 
-	return os.WriteFile(optionsPath, data, 0644)
+	return os.WriteFile(optionsPath, data, 0o644)
 }
