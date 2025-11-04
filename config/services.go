@@ -175,18 +175,6 @@ var serviceDefinitions = []ServiceDefinition{
 			DB:       0,
 		},
 	},
-	{
-		ID:        "cloud-cache-0",
-		ShortName: "cloud-cache",
-		Type:      "os",
-		Domain:    "redis-18309.c243.eu-west-1-3.ec2.redns.redis-cloud.com",
-		Port:      "18309",
-		Credentials: &ServiceCredentials{
-			Username: "default",
-			Password: "",
-			DB:       0,
-		},
-	},
 }
 
 // GetAllServices returns a copy of the master service list.
