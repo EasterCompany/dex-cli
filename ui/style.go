@@ -164,7 +164,8 @@ func IsOfficialRelease(fullVersion string) bool {
 
 func FormatVersionWithTrademark(version string, buildYear string) string {
 	if IsOfficialRelease(version) {
-		return fmt.Sprintf("%s | Easter Company™ © %s", version, buildYear)
+		// Use ColorDarkGray for the trademark part
+		return fmt.Sprintf("%s %s| Easter Company™ © %s%s", version, ColorDarkGray, buildYear, ColorReset)
 	}
 	return version
 }
