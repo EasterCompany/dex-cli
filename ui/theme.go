@@ -9,16 +9,16 @@ import (
 // --- Color and ANSI Constants ---
 
 const (
-	ColorRed       = `\033[31m`
-	ColorBrightRed = `\033[91m` // Used for SubHeaders (Orange-like)
-	ColorGreen     = `\033[32m`
-	ColorYellow    = `\033[33m` // Used for Headers
-	ColorBlue      = `\033[34m`
-	ColorPurple    = `\033[35m`
-	ColorCyan      = `\033[36m`
-	ColorWhite     = `\033[37m`
-	ColorDarkGray  = `\033[90m`
-	ColorReset     = `\033[0m`
+	ColorRed       = "\x1b[31m"
+	ColorBrightRed = "\x1b[91m" // Used for SubHeaders (Orange-like)
+	ColorGreen     = "\x1b[32m"
+	ColorYellow    = "\x1b[33m" // Used for Headers
+	ColorBlue      = "\x1b[34m"
+	ColorPurple    = "\x1b[35m"
+	ColorCyan      = "\x1b[36m"
+	ColorWhite     = "\x1b[37m"
+	ColorDarkGray  = "\x1b[90m"
+	ColorReset     = "\x1b[0m"
 )
 
 // Global UI Constants and Emojis
@@ -50,6 +50,11 @@ var ansiRegex = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 // StripANSI removes ANSI color codes from a string.
 func StripANSI(s string) string {
 	return ansiRegex.ReplaceAllString(s, "")
+}
+
+// Colorize wraps a string with a given ANSI color code and reset code.
+func Colorize(s string, color string) string {
+	return fmt.Sprintf("%s%s%s", color, s, ColorReset)
 }
 
 // PrintRaw is the lowest-level printing function, used by all other functions.
@@ -89,6 +94,11 @@ func PrintSubHeader(title string) {
 	PrintRaw(fmt.Sprintf("\n%s▶ %s%s\n", ColorBrightRed, styledTitle, ColorReset))
 }
 
+// PrintSection prints a cyan-colored section title.
+func PrintSection(title string) {
+	PrintRaw(fmt.Sprintf("%s%s%s\n", ColorCyan, title, ColorReset))
+}
+
 // --- Basic Utility Printing (Used in main.go) ---
 
 // PrintInfo prints a standard informational message.
@@ -109,4 +119,9 @@ func PrintError(message string) {
 // PrintWarning prints a standard warning message.
 func PrintWarning(message string) {
 	PrintRaw(fmt.Sprintf("%s! %s%s\n", ColorYellow, message, ColorReset))
+}
+
+// FormatVersionWithTrademark formats the version string with a trademark symbol and the build year.
+func FormatVersionWithTrademark(version, buildYear string) string {
+	return fmt.Sprintf("%s %s © %s The Easter Company. All rights reserved.", version, "™", buildYear)
 }

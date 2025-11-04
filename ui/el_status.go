@@ -47,3 +47,9 @@ func PrintRunningStatus(message string) {
 func PrintInfoStatus(message string) {
 	PrintStatusIndicator("info", message)
 }
+
+// FetchLatestVersion returns the latest version of the CLI.
+func FetchLatestVersion() string {
+	// In the future, this could fetch the version from a remote server.
+	return "v1.0.0" // Placeholder
+}

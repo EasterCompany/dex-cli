@@ -104,3 +104,8 @@ func CreateServiceTable(rows []TableRow) Table {
 	}
 	return table
 }
+
+// PrintVersionComparison prints a comparison of the old and new versions.
+func PrintVersionComparison(currentVersionStr, newVersionStr, latestVersion, buildYear string, currentSize, newSize, oldSize, newSize2 int64) {
+	fmt.Printf("Version updated from %s to %s\n", currentVersionStr, newVersionStr)
+}
