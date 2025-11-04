@@ -20,11 +20,16 @@ func Version(version, branch, commit, buildDate, buildYear, buildHash string) {
 	// Split version string into components
 	versionParts := strings.Split(strings.TrimPrefix(version, "v"), "-")
 	tag := versionParts[0]
+	dev := ""
+	if len(versionParts) > 1 {
+		dev = fmt.Sprintf("-%s", versionParts[1])
+	}
 
 	// Create the colored version string
-	coloredVersion := fmt.Sprintf("%s %s%s%s%s%s%s%s%s%s%s%s",
+	coloredVersion := fmt.Sprintf("%s %s%s%s%s%s%s%s%s%s%s%s%s",
 		ui.Colorize(" v ", ui.ColorDarkGray),
 		ui.Colorize(tag, ui.ColorReset), // White
+		ui.Colorize(dev, ui.ColorDarkGray),
 		ui.Colorize(".", ui.ColorDarkGray),
 		ui.Colorize(branch, ui.ColorDarkGray),
 		ui.Colorize(".", ui.ColorDarkGray),
