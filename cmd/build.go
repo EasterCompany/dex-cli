@@ -163,12 +163,17 @@ func Build(args []string) error {
 			oldVersion, errOld := git.Parse(oldVersionStr)
 			newVersion, errNew := git.Parse(newVersionStr)
 
-			if errOld == nil && errNew == nil {
-				ui.PrintInfo(fmt.Sprintf("%s %s -> %s", s.ShortName, oldVersion.Short(), newVersion.Short()))
-			} else {
-				// Fallback for non-standard versions
-				ui.PrintInfo(fmt.Sprintf("%s version: %s -> %s", s.ShortName, oldVersionStr, newVersionStr))
+			finalOldVersion := oldVersionStr
+			finalNewVersion := newVersionStr
+
+			if errOld == nil {
+				finalOldVersion = oldVersion.Short()
 			}
+			if errNew == nil {
+				finalNewVersion = newVersion.Short()
+			}
+
+			ui.PrintInfo(fmt.Sprintf("%s %s -> %s", s.ShortName, finalOldVersion, finalNewVersion))
 		}
 	}
 
