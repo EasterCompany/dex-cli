@@ -8,8 +8,10 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -17,6 +19,70 @@ import (
 	"github.com/EasterCompany/dex-cli/health"
 	"github.com/EasterCompany/dex-cli/ui"
 )
+
+// getConfiguredServices loads the service-map.json and merges its values
+// with the master service definitions. This ensures user-configured
+// domains, ports, and credentials are used.
+func getConfiguredServices() ([]config.ServiceDefinition, error) {
+	// 1. Load the user's service-map.json
+	serviceMap, err := config.LoadServiceMapConfig()
+	if err != nil {
+		if os.IsNotExist(err) {
+			// If it doesn't exist, use the default map
+			serviceMap = config.DefaultServiceMapConfig()
+		} else {
+			// Other error
+			return nil, fmt.Errorf("failed to load service-map.json: %w", err)
+		}
+	}
+
+	// 2. Get the hardcoded master list of all *possible* services
+	// This master list knows the ShortName, Type, ID, etc.
+	masterList := config.GetAllServices()
+	masterDefs := make(map[string]config.ServiceDefinition)
+	for _, def := range masterList {
+		masterDefs[def.ID] = def
+	}
+
+	// 3. Create the final list by merging the service map values
+	var configuredServices []config.ServiceDefinition
+
+	for serviceType, serviceEntries := range serviceMap.Services {
+		for _, entry := range serviceEntries {
+			// Find the master definition for this service ID
+			masterDef, ok := masterDefs[entry.ID]
+			if !ok {
+				// This service is in service-map.json but not in the hardcoded master list
+				// We can't check it if we don't know its type, shortname etc.
+				// For now, we'll just use the entry data directly, but 'Type' and 'ShortName' might be incomplete.
+				// A better approach: The masterDef *must* exist.
+				// Let's assume for status, we only check services known to the CLI.
+				continue
+			}
+
+			// Merge: Use master def as base, but override with user's config
+			masterDef.Type = serviceType // Ensure type is from the map key
+			if entry.Domain != "" {
+				masterDef.Domain = entry.Domain
+			}
+			if entry.Port != "" {
+				masterDef.Port = entry.Port
+			}
+			if entry.Credentials != nil {
+				masterDef.Credentials = entry.Credentials
+			}
+
+			configuredServices = append(configuredServices, masterDef)
+		}
+	}
+
+	// Sort by port to maintain a consistent order
+	sort.Slice(configuredServices, func(i, j int) bool {
+		return configuredServices[i].Port < configuredServices[j].Port
+	})
+
+	return configuredServices, nil
+}
 
 // Status checks the health of one or all services
 func Status(serviceShortName string) error {
@@ -32,24 +98,39 @@ func Status(serviceShortName string) error {
 
 	log(fmt.Sprintf("Checking status for service: %s", serviceShortName))
 
+	// Get the list of services *from the service-map.json*
+	allServices, err := getConfiguredServices()
+	if err != nil {
+		return fmt.Errorf("failed to get configured services: %w", err)
+	}
+
 	var rows []ui.TableRow
-	allServices := config.GetAllServices()
+	var servicesToCheck []config.ServiceDefinition
 
 	if serviceShortName == "all" || serviceShortName == "" {
-		for _, serviceDef := range allServices {
-			row := checkServiceStatus(serviceDef)
-			rows = append(rows, row)
-			log(fmt.Sprintf("Service: %s, Type: %s, Status: %s", serviceDef.ID, serviceDef.Type, row[3]))
-		}
+		servicesToCheck = allServices
 	} else {
-		def, err := config.Resolve(serviceShortName)
-		if err != nil {
-			return fmt.Errorf("failed to resolve service '%s': %w", serviceShortName, err)
+		// Find the specific service by its short name from the configured list
+		var foundService *config.ServiceDefinition
+		for i, s := range allServices {
+			if s.ShortName == serviceShortName {
+				// Use the address of the item in the slice
+				foundService = &allServices[i]
+				break
+			}
 		}
 
-		row := checkServiceStatus(*def)
+		if foundService == nil {
+			return fmt.Errorf("service alias '%s' not found in configured services (service-map.json)", serviceShortName)
+		}
+		servicesToCheck = append(servicesToCheck, *foundService)
+	}
+
+	// Check status for all selected services
+	for _, serviceDef := range servicesToCheck {
+		row := checkServiceStatus(serviceDef)
 		rows = append(rows, row)
-		log(fmt.Sprintf("Service: %s, Type: %s, Status: %s", def.ID, def.Type, row[3]))
+		log(fmt.Sprintf("Service: %s, Type: %s, Address: %s, Status: %s", serviceDef.ID, serviceDef.Type, serviceDef.GetHost(), row[3]))
 	}
 
 	// Render table
@@ -69,7 +150,8 @@ func checkServiceStatus(service config.ServiceDefinition) ui.TableRow {
 		maxUptimeLen  = 10
 	)
 
-	serviceID := ui.Truncate(service.ID, maxServiceLen)
+	// Use the ShortName from the definition for the table
+	serviceID := ui.Truncate(service.ShortName, maxServiceLen)
 	address := ui.Truncate(service.GetHost(), maxAddressLen)
 
 	switch service.Type {
@@ -107,8 +189,16 @@ func checkCLIStatus(service config.ServiceDefinition, serviceID string) ui.Table
 	if strings.HasPrefix(outputStr, "v") {
 		parts := strings.Split(outputStr, ".")
 		if len(parts) >= 3 {
-			version = strings.Join(parts[0:3], ".")[1:] // [1:] to remove 'v'
+			// Find the first part that isn't just a number, or take 3 parts
+			versionParts := []string{}
+			for _, part := range parts[0:3] {
+				versionParts = append(versionParts, part)
+			}
+			version = strings.Join(versionParts, ".")[1:] // [1:] to remove 'v'
 		}
+	} else if len(outputStr) > 0 {
+		// Fallback for non-standard version string
+		version = outputStr
 	}
 
 	return ui.FormatTableRow(
@@ -135,13 +225,14 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 
 	// Set a 2-second timeout for the initial connection
 	dialer := &net.Dialer{Timeout: 2 * time.Second}
+	host := service.GetHost() // Get "domain:port" from the definition
 
 	if isCloudDomain(service.Domain) {
 		// --- FIX 1: Use TLS for cloud domains ---
-		conn, err = tls.DialWithDialer(dialer, "tcp", service.GetHost(), &tls.Config{})
+		conn, err = tls.DialWithDialer(dialer, "tcp", host, &tls.Config{})
 	} else {
 		// Use plain TCP for local domains
-		conn, err = dialer.Dial("tcp", service.GetHost())
+		conn, err = dialer.Dial("tcp", host)
 	}
 
 	if err != nil {
@@ -159,14 +250,31 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 	// 1. Authenticate if password is provided
 	if service.Credentials != nil && service.Credentials.Password != "" {
 		// --- FIX 2: Use Username and Password for AUTH ---
-		authCmd := fmt.Sprintf("AUTH %s %s\r\n", service.Credentials.Username, service.Credentials.Password)
+		var authCmd string
+		if service.Credentials.Username != "" && service.Credentials.Username != "default" {
+			authCmd = fmt.Sprintf("AUTH %s %s\r\n", service.Credentials.Username, service.Credentials.Password)
+		} else {
+			// Fallback for older Redis (just password) or "default" user
+			authCmd = fmt.Sprintf("AUTH %s\r\n", service.Credentials.Password)
+		}
 
 		if _, err = conn.Write([]byte(authCmd)); err != nil {
 			return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Auth"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 		}
 		response, err := reader.ReadString('\n')
 		if err != nil || !strings.HasPrefix(response, "+OK") {
-			return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Auth"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+			// Try fallback AUTH (just password) if user+pass failed
+			if strings.Contains(authCmd, " ") {
+				authCmd = fmt.Sprintf("AUTH %s\r\n", service.Credentials.Password)
+				if _, err = conn.Write([]byte(authCmd)); err == nil {
+					response, err = reader.ReadString('\n')
+				}
+			}
+
+			// If it still fails
+			if err != nil || !strings.HasPrefix(response, "+OK") {
+				return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Auth"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+			}
 		}
 		// Reset deadline for the next operation
 		if err := conn.SetDeadline(time.Now().Add(2 * time.Second)); err != nil {
@@ -238,15 +346,17 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 	goroutines := fmt.Sprintf("%d", statusResp.Metrics.Goroutines)
 	mem := fmt.Sprintf("%.2f", statusResp.Metrics.MemoryAllocMB)
 
+	// Use the service's shortName for the table, not the ID from the status response
+	// (which might be the full ID)
 	return ui.FormatTableRow(
-		ui.Truncate(statusResp.Service, 19),
+		serviceID,
 		address,
 		colorizeNA(ui.Truncate(statusResp.Version, 12)),
 		colorizeStatus(statusResp.Status),
 		colorizeNA(uptime),
 		colorizeNA(goroutines),
 		colorizeNA(mem),
-		time.Unix(statusResp.Timestamp, 0).Format("15:04:05"),
+		time.Unix(statusResp.Timestamp, 0).Format("15:00:00"), // Shortened timestamp
 	)
 }
 
