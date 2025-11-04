@@ -1,4 +1,3 @@
-// cmd/remove.go
 package cmd
 
 import (
@@ -11,84 +10,67 @@ import (
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
-// Remove prompts the user to uninstall and remove services.
-// It lists any service that has *any* artifact on the system.
+// Remove prompts the user to uninstall services that have artifacts on the system.
 func Remove(args []string) error {
 	if len(args) > 0 {
-		return fmt.Errorf("remove command takes no arguments")
+		return fmt.Errorf("remove does not take any arguments")
 	}
 
+	reader := bufio.NewReader(os.Stdin)
 	serviceMap, err := config.LoadServiceMapConfig()
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to load service map: %w", err)
-	}
-	if serviceMap == nil {
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("failed to load service map: %w", err)
+		}
+		// If map doesn't exist, create a default one (it will be empty of manageable services)
 		serviceMap = config.DefaultServiceMapConfig()
 	}
 
-	// Find services that are "dirty" (have artifacts)
-	type selectableService struct {
-		Index int
-		Def   config.ServiceDefinition
-	}
-	removableServices := []selectableService{}
-	idx := 1
-	allServices := config.GetAllServices()
-
-	for _, def := range allServices {
+	// Find all services that have artifacts
+	removableServices := []config.ServiceDefinition{}
+	for _, def := range config.GetAllServices() {
 		if !def.IsManageable() {
 			continue
 		}
-
-		hasArtifacts, err := HasArtifacts(def, serviceMap)
+		has, err := HasArtifacts(def, serviceMap)
 		if err != nil {
-			ui.PrintWarning(fmt.Sprintf("Could not check status of %s: %v", def.ShortName, err))
+			ui.PrintWarning(fmt.Sprintf("Error checking service %s: %v", def.ShortName, err))
 			continue
 		}
-
-		if hasArtifacts {
-			removableServices = append(removableServices, selectableService{Index: idx, Def: def})
-			idx++
+		if has {
+			removableServices = append(removableServices, def)
 		}
 	}
 
 	if len(removableServices) == 0 {
-		ui.PrintInfo("No manageable services found to remove.")
+		ui.PrintInfo("No services found to remove.")
 		return nil
 	}
 
-	// Sort by name for consistent display
+	// Sort alphabetically
 	sort.Slice(removableServices, func(i, j int) bool {
-		return removableServices[i].Def.ShortName < removableServices[j].Def.ShortName
+		return removableServices[i].ShortName < removableServices[j].ShortName
 	})
 
 	fmt.Println("Services that can be removed:")
-	for _, s := range removableServices {
-		fmt.Printf("  %d: %s\n", s.Index, s.Def.ShortName)
+	for i, def := range removableServices {
+		fmt.Printf("  %d: %s\n", i+1, def.ShortName)
 	}
 
 	fmt.Print("Enter number(s) to remove (e.g., '1' or '1, 2'): ")
-	reader := bufio.NewReader(os.Stdin)
 	input, _ := reader.ReadString('\n')
 
-	selectedIndices, err := parseNumericInput(input)
+	indices, err := parseNumericInput(input)
 	if err != nil {
-		return fmt.Errorf("invalid input: %w", err)
+		return err
 	}
 
 	servicesToRemove := []config.ServiceDefinition{}
-	for _, selectedIdx := range selectedIndices {
-		found := false
-		for _, s := range removableServices {
-			if s.Index == selectedIdx {
-				servicesToRemove = append(servicesToRemove, s.Def)
-				found = true
-				break
-			}
+	for _, idx := range indices {
+		if idx < 1 || idx > len(removableServices) {
+			return fmt.Errorf("invalid number: %d", idx)
 		}
-		if !found {
-			return fmt.Errorf("invalid number: %d", selectedIdx)
-		}
+		servicesToRemove = append(servicesToRemove, removableServices[idx-1])
 	}
 
 	if len(servicesToRemove) == 0 {
@@ -96,17 +78,14 @@ func Remove(args []string) error {
 		return nil
 	}
 
-	servicesRemoved := 0
+	// Uninstall selected services
 	for _, def := range servicesToRemove {
 		if err := fullServiceUninstall(def, serviceMap); err != nil {
-			ui.PrintError(fmt.Sprintf("Failed to fully remove %s: %v", def.ShortName, err))
-			continue
+			return fmt.Errorf("failed to remove %s: %w", def.ShortName, err)
 		}
 		ui.PrintSuccess(fmt.Sprintf("Successfully removed %s.", def.ShortName))
-		servicesRemoved++
 	}
 
-	fmt.Println()
-	ui.PrintSuccess(fmt.Sprintf("Successfully removed %d service(s).", servicesRemoved))
+	ui.PrintSuccess("All selected services removed.")
 	return nil
 }

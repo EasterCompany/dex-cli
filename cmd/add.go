@@ -1,4 +1,3 @@
-// cmd/add.go
 package cmd
 
 import (
@@ -11,44 +10,35 @@ import (
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
-// Add prompts the user to clone, build, and install new services.
-// It only lists services that do not have any artifacts on the system.
+// Add prompts the user to create a new service in the new service map.
 func Add(args []string) error {
 	if len(args) > 0 {
-		return fmt.Errorf("add command takes no arguments")
+		return fmt.Errorf("add does not take any arguments")
 	}
 
+	reader := bufio.NewReader(os.Stdin)
 	serviceMap, err := config.LoadServiceMapConfig()
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("failed to load service map: %w", err)
-	}
-	if serviceMap == nil {
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("failed to load service map: %w", err)
+		}
+		// If map doesn't exist, create a default one
 		serviceMap = config.DefaultServiceMapConfig()
 	}
 
-	// Find services that are "clean" (no artifacts) and not in the map
-	type selectableService struct {
-		Index int
-		Def   config.ServiceDefinition
-	}
-	availableServices := []selectableService{}
-	idx := 1
-	allServices := config.GetAllServices()
-
-	for _, def := range allServices {
+	// Find all manageable services that do NOT have artifacts
+	availableServices := []config.ServiceDefinition{}
+	for _, def := range config.GetAllServices() {
 		if !def.IsManageable() {
 			continue
 		}
-
-		hasArtifacts, err := HasArtifacts(def, serviceMap)
+		has, err := HasArtifacts(def, serviceMap)
 		if err != nil {
-			ui.PrintWarning(fmt.Sprintf("Could not check status of %s: %v", def.ShortName, err))
+			ui.PrintWarning(fmt.Sprintf("Error checking service %s: %v", def.ShortName, err))
 			continue
 		}
-
-		if !hasArtifacts {
-			availableServices = append(availableServices, selectableService{Index: idx, Def: def})
-			idx++
+		if !has {
+			availableServices = append(availableServices, def)
 		}
 	}
 
@@ -57,38 +47,30 @@ func Add(args []string) error {
 		return nil
 	}
 
-	// Sort by name for consistent display
+	// Sort services alphabetically
 	sort.Slice(availableServices, func(i, j int) bool {
-		return availableServices[i].Def.ShortName < availableServices[j].Def.ShortName
+		return availableServices[i].ShortName < availableServices[j].ShortName
 	})
 
 	fmt.Println("Available services to add:")
-	for _, s := range availableServices {
-		fmt.Printf("  %d: %s (Port: %s, Type: %s)\n", s.Index, s.Def.ShortName, s.Def.Port, s.Def.Type)
+	for i, def := range availableServices {
+		fmt.Printf("  %d: %s (Port: %s, Type: %s)\n", i+1, def.ShortName, def.Port, def.Type)
 	}
 
 	fmt.Print("Enter number(s) to add (e.g., '1' or '1, 2'): ")
-	reader := bufio.NewReader(os.Stdin)
 	input, _ := reader.ReadString('\n')
 
-	selectedIndices, err := parseNumericInput(input)
+	indices, err := parseNumericInput(input)
 	if err != nil {
-		return fmt.Errorf("invalid input: %w", err)
+		return err
 	}
 
 	servicesToAdd := []config.ServiceDefinition{}
-	for _, selectedIdx := range selectedIndices {
-		found := false
-		for _, s := range availableServices {
-			if s.Index == selectedIdx {
-				servicesToAdd = append(servicesToAdd, s.Def)
-				found = true
-				break
-			}
+	for _, idx := range indices {
+		if idx < 1 || idx > len(availableServices) {
+			return fmt.Errorf("invalid number: %d", idx)
 		}
-		if !found {
-			return fmt.Errorf("invalid number: %d", selectedIdx)
-		}
+		servicesToAdd = append(servicesToAdd, availableServices[idx-1])
 	}
 
 	if len(servicesToAdd) == 0 {
@@ -96,55 +78,72 @@ func Add(args []string) error {
 		return nil
 	}
 
-	servicesAdded := 0
+	// Process selected services
 	for _, def := range servicesToAdd {
-		fmt.Println(ui.Colorize(fmt.Sprintf("--- Installing %s ---", def.ShortName), ui.ColorCyan))
+		fmt.Println()
+		ui.PrintInfo(ui.Colorize(fmt.Sprintf("--- Installing %s ---", def.ShortName), ui.ColorCyan))
 
-		// 1. Download
+		// 1. Clone
 		if err := gitCloneService(def); err != nil {
 			ui.PrintError(fmt.Sprintf("Failed to clone %s: %v", def.ShortName, err))
-			ui.PrintInfo(fmt.Sprintf("Cleaning up artifacts for %s...", def.ShortName))
+			ui.PrintInfo("Cleaning up...")
 			_ = fullServiceUninstall(def, serviceMap) // Attempt cleanup
-			continue
+			return err
 		}
 
-		// 2. Add to service map *before* build
+		// 2. Format
+		if err := runServicePipelineStep(def, "format"); err != nil {
+			ui.PrintError(fmt.Sprintf("Failed to format %s: %v", def.ShortName, err))
+			ui.PrintInfo("Cleaning up...")
+			_ = fullServiceUninstall(def, serviceMap) // Attempt cleanup
+			return err
+		}
+
+		// 3. Lint
+		if err := runServicePipelineStep(def, "lint"); err != nil {
+			ui.PrintError(fmt.Sprintf("Failed to lint %s: %v", def.ShortName, err))
+			ui.PrintInfo("Cleaning up...")
+			_ = fullServiceUninstall(def, serviceMap) // Attempt cleanup
+			return err
+		}
+
+		// 4. Test
+		if err := runServicePipelineStep(def, "test"); err != nil {
+			ui.PrintError(fmt.Sprintf("Failed to test %s: %v", def.ShortName, err))
+			ui.PrintInfo("Cleaning up...")
+			_ = fullServiceUninstall(def, serviceMap) // Attempt cleanup
+			return err
+		}
+
+		// 5. Build
+		if err := runServicePipelineStep(def, "build"); err != nil {
+			ui.PrintError(fmt.Sprintf("Failed to build %s: %v", def.ShortName, err))
+			ui.PrintInfo("Cleaning up...")
+			_ = fullServiceUninstall(def, serviceMap) // Attempt cleanup
+			return err
+		}
+
+		// 6. Install
+		if err := installSystemdService(def); err != nil {
+			ui.PrintError(fmt.Sprintf("Failed to install %s: %v", def.ShortName, err))
+			ui.PrintInfo("Cleaning up...")
+			_ = fullServiceUninstall(def, serviceMap) // Attempt cleanup
+			return err
+		}
+
+		// 7. Add to service-map.json
 		serviceMap.Services[def.Type] = append(serviceMap.Services[def.Type], def.ToServiceEntry())
 		if err := config.SaveServiceMapConfig(serviceMap); err != nil {
-			ui.PrintError(fmt.Sprintf("Failed to save service map for %s: %v", def.ShortName, err))
+			ui.PrintError(fmt.Sprintf("Failed to save service map: %v", err))
+			ui.PrintInfo("Cleaning up...")
 			_ = fullServiceUninstall(def, serviceMap) // Attempt cleanup
-			continue
-		}
-
-		// 3. Run full build pipeline
-		pipeline := []string{"format", "lint", "test", "build"}
-		pipelineFailed := false
-		for _, step := range pipeline {
-			if err := runServicePipelineStep(def, step); err != nil {
-				ui.PrintError(fmt.Sprintf("Failed pipeline step '%s' for %s: %v", step, def.ShortName, err))
-				ui.PrintInfo(fmt.Sprintf("Cleaning up artifacts for %s...", def.ShortName))
-				_ = fullServiceUninstall(def, serviceMap) // Attempt cleanup
-				pipelineFailed = true
-				break
-			}
-		}
-		if pipelineFailed {
-			continue
-		}
-
-		// 4. Install systemd service
-		if err := installSystemdService(def); err != nil {
-			ui.PrintError(fmt.Sprintf("Failed to install systemd service for %s: %v", def.ShortName, err))
-			ui.PrintInfo(fmt.Sprintf("Cleaning up artifacts for %s...", def.ShortName))
-			_ = fullServiceUninstall(def, serviceMap) // Attempt cleanup
-			continue
+			return err
 		}
 
 		ui.PrintSuccess(fmt.Sprintf("Successfully installed %s!", def.ShortName))
-		servicesAdded++
 	}
 
 	fmt.Println()
-	ui.PrintSuccess(fmt.Sprintf("Successfully added %d service(s).", servicesAdded))
+	ui.PrintSuccess("All selected services installed successfully.")
 	return nil
 }
