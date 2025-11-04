@@ -168,7 +168,7 @@ func checkServiceStatus(service config.ServiceDefinition) ui.TableRow {
 // colorizeNA colors "N/A" values dark gray, and leaves other values as-is.
 func colorizeNA(value string) string {
 	if value == "N/A" {
-		return ui.Colorize(value, ui.ColorDarkGray)
+		return fmt.Sprintf("%s%s%s", ui.ColorDarkGray, value, ui.ColorReset)
 	}
 	return value
 }
@@ -199,7 +199,7 @@ func checkCLIStatus(service config.ServiceDefinition, serviceID string) ui.Table
 		version = outputStr
 	}
 
-	return ui.FormatTableRow(
+	return []string{
 		serviceID,
 		colorizeNA("N/A"), // Address is N/A for CLI
 		colorizeNA(ui.Truncate(version, 12)),
@@ -208,7 +208,7 @@ func checkCLIStatus(service config.ServiceDefinition, serviceID string) ui.Table
 		colorizeNA("N/A"),
 		colorizeNA("N/A"),
 		time.Now().Format("15:04:05"),
-	)
+	}
 }
 
 // isCloudDomain checks if the domain is a known cloud Redis provider requiring TLS.
@@ -234,13 +234,13 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 	}
 
 	if err != nil {
-		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+		return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 	}
 	defer func() { _ = conn.Close() }()
 
 	// Set a deadline for all subsequent Read/Write operations
 	if err := conn.SetDeadline(time.Now().Add(2 * time.Second)); err != nil {
-		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+		return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 	}
 
 	reader := bufio.NewReader(conn)
@@ -257,7 +257,7 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 		}
 
 		if _, err = conn.Write([]byte(authCmd)); err != nil {
-			return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Auth"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+			return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Auth"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 		}
 		response, err := reader.ReadString('\n')
 		if err != nil || !strings.HasPrefix(response, "+OK") {
@@ -271,29 +271,29 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 
 			// If it still fails
 			if err != nil || !strings.HasPrefix(response, "+OK") {
-				return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Auth"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+				return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Auth"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 			}
 		}
 		// Reset deadline for the next operation
 		if err := conn.SetDeadline(time.Now().Add(2 * time.Second)); err != nil {
-			return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+			return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 		}
 	}
 
 	// 2. Ping
 	if _, err = conn.Write([]byte("PING\r\n")); err != nil {
-		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Ping"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+		return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Ping"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 	}
 	response, err := reader.ReadString('\n')
 	if err != nil || !strings.HasPrefix(response, "+PONG") {
-		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Ping"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+		return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Ping"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 	}
 
 	// 3. Get Version
 	version := "N/A"
 	// Reset deadline for the next operation
 	if err := conn.SetDeadline(time.Now().Add(2 * time.Second)); err != nil {
-		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("OK"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+		return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("OK"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 	}
 
 	if _, err = conn.Write([]byte("INFO server\r\n")); err == nil {
@@ -313,7 +313,7 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 		}
 	}
 
-	return ui.FormatTableRow(serviceID, address, colorizeNA(ui.Truncate(version, 12)), colorizeStatus("OK"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+	return []string{serviceID, address, colorizeNA(ui.Truncate(version, 12)), colorizeStatus("OK"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 }
 
 // checkHTTPStatus checks a service via its HTTP /status endpoint
@@ -326,27 +326,28 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 	}
 	resp, err := client.Get(statusURL)
 	if err != nil {
-		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+		return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+		return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 	}
 
 	var statusResp health.StatusResponse
 	if err := json.Unmarshal(body, &statusResp); err != nil {
-		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+		return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 	}
 
 	uptime := ui.Truncate(formatUptime(time.Duration(statusResp.Uptime)*time.Second), 10)
+
 	goroutines := fmt.Sprintf("%d", statusResp.Metrics.Goroutines)
 	mem := fmt.Sprintf("%.2f", statusResp.Metrics.MemoryAllocMB)
 
 	// Use the service's shortName for the table, not the ID from the status response
 	// (which might be the full ID)
-	return ui.FormatTableRow(
+	return []string{
 		serviceID,
 		address,
 		colorizeNA(ui.Truncate(statusResp.Version, 12)),
@@ -355,18 +356,18 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 		colorizeNA(goroutines),
 		colorizeNA(mem),
 		time.Unix(statusResp.Timestamp, 0).Format("15:00:00"), // Shortened timestamp
-	)
+	}
 }
 
 // colorizeStatus applies color coding to the status string.
 func colorizeStatus(status string) string {
 	switch status {
 	case "OK":
-		return ui.Colorize(status, ui.ColorGreen)
+		return fmt.Sprintf("%s%s%s", ui.ColorGreen, status, ui.ColorReset)
 	case "BAD":
-		return ui.Colorize(status, ui.ColorBrightRed)
+		return fmt.Sprintf("%s%s%s", ui.ColorBrightRed, status, ui.ColorReset)
 	case "N/A":
-		return ui.Colorize(status, ui.ColorDarkGray)
+		return fmt.Sprintf("%s%s%s", ui.ColorDarkGray, status, ui.ColorReset)
 	default:
 		return status
 	}

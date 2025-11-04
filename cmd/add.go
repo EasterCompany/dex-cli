@@ -81,7 +81,7 @@ func Add(args []string) error {
 	// Process selected services
 	for _, def := range servicesToAdd {
 		fmt.Println()
-		ui.PrintInfo(ui.Colorize(fmt.Sprintf("--- Installing %s ---", def.ShortName), ui.ColorCyan))
+		ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, fmt.Sprintf("--- Installing %s ---", def.ShortName), ui.ColorReset))
 
 		// 1. Clone
 		if err := gitCloneService(def); err != nil {

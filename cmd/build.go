@@ -27,7 +27,7 @@ func Build(args []string) error {
 	}
 
 	log("Build command called...")
-	ui.PrintSection("Building All Services from Local Source")
+	ui.PrintHeader("Building All Services from Local Source")
 
 	allServices := config.GetAllServices()
 	var dexCliDef config.ServiceDefinition
@@ -43,7 +43,7 @@ func Build(args []string) error {
 	// ---
 	// 1. Process dex-cli FIRST
 	// ---
-	ui.PrintInfo(ui.Colorize("--- Building dex-cli ---", ui.ColorCyan))
+	ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, "--- Building dex-cli ---", ui.ColorReset))
 	// For dex-cli, we run 'make install' as it correctly handles all steps
 	sourcePath, _ := config.ExpandPath(dexCliDef.Source)
 	if !checkFileExists(sourcePath) {
@@ -78,7 +78,7 @@ func Build(args []string) error {
 		}
 
 		fmt.Println()
-		ui.PrintInfo(ui.Colorize(fmt.Sprintf("--- Building %s ---", def.ShortName), ui.ColorCyan))
+		ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, fmt.Sprintf("--- Building %s ---", def.ShortName), ui.ColorReset))
 		log(fmt.Sprintf("Building %s from local source...", def.ShortName))
 
 		// 1. Format
@@ -111,7 +111,7 @@ func Build(args []string) error {
 	}
 
 	fmt.Println()
-	ui.PrintSection("Complete")
+	ui.PrintHeader("Complete")
 	ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %d service(s).", servicesBuilt+1)) // +1 for dex-cli
 	return nil
 }

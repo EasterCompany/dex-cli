@@ -131,7 +131,7 @@ func cacheList() error {
 			return err
 		}
 		table.AddRow([]string{
-			ui.Colorize("(other)", ui.ColorDarkGray),
+			fmt.Sprintf("%s%s%s", ui.ColorDarkGray, "(other)", ui.ColorReset),
 			fmt.Sprintf("%d", len(otherKeys)),
 			FormatBytes(totalBytes),
 		})

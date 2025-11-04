@@ -17,8 +17,13 @@ type Result struct {
 	Tool    string
 }
 
-// Test runs format, lint, and test for all services
+// Test runs format, lint, and test for all services, or a specific service if provided.
 func Test(args []string) error {
+	var serviceName string
+	if len(args) > 0 {
+		serviceName = args[0]
+	}
+
 	logFile, err := config.LogFile()
 	if err != nil {
 		return fmt.Errorf("failed to get log file: %w", err)
@@ -36,18 +41,36 @@ func Test(args []string) error {
 		return err
 	}
 
-	projects, err := filepath.Glob(filepath.Join(easterCompanyPath, "*"))
-	if err != nil {
-		return err
+	var projects []string
+	if serviceName != "" {
+		// If a service name is provided, test only that service
+		resolvedServiceName, err := resolveServiceName(serviceName)
+		if err != nil {
+			return err
+		}
+		projectPath := filepath.Join(easterCompanyPath, resolvedServiceName)
+		if _, err := os.Stat(projectPath); os.IsNotExist(err) {
+			return fmt.Errorf("service '%s' not found in %s", resolvedServiceName, easterCompanyPath)
+		}
+		projects = []string{projectPath}
+	} else {
+		// Otherwise, test all applicable services
+		allProjects, err := filepath.Glob(filepath.Join(easterCompanyPath, "*"))
+		if err != nil {
+			return err
+		}
+		for _, project := range allProjects {
+			projectName := filepath.Base(project)
+			if strings.HasPrefix(projectName, "dex-") || projectName == "easter.company" {
+				projects = append(projects, project)
+			}
+		}
 	}
 
 	var overallResults []ui.TableRow
 
 	for _, project := range projects {
 		projectName := filepath.Base(project)
-		if !strings.HasPrefix(projectName, "dex-") && projectName != "easter.company" {
-			continue
-		}
 
 		fmt.Printf("▼ %s\n", projectName)
 		log(fmt.Sprintf("Testing project: %s", projectName))
@@ -56,30 +79,40 @@ func Test(args []string) error {
 		lintResult := lintProject(project, log)
 		testResult := testProject(project, log)
 
-		printDetailedResults("Formatting", formatResult)
-		printDetailedResults("Linting", lintResult)
-		printDetailedResults("Testing", testResult)
+		isSingleService := len(projects) == 1
+		printDetailedResults("Formatting", formatResult, isSingleService)
+		printDetailedResults("Linting", lintResult, isSingleService)
+		printDetailedResults("Testing", testResult, isSingleService)
 
 		overallResults = append(overallResults, ui.TableRow{projectName, formatResult.Status, lintResult.Status, testResult.Status})
 	}
 
-	fmt.Println("\n--- Overall Results ---")
-	table := ui.NewTable([]string{"Project", "Format", "Lint", "Test"})
-	for _, row := range overallResults {
-		table.AddRow(row)
+	if len(projects) > 1 {
+		fmt.Println("\n--- Overall Results ---")
+		table := ui.NewTable([]string{"Project", "Format", "Lint", "Test"})
+		for _, row := range overallResults {
+			table.AddRow(row)
+		}
+		table.Render()
 	}
-	table.Render()
 
 	return nil
 }
 
-func printDetailedResults(category string, result Result) {
-	switch result.Status {
-	case "BAD":
-		fmt.Printf("  %s: %s\n", category, result.Status)
-		fmt.Printf("    └ %s\n", result.Message)
-	case "OK":
-		fmt.Printf("  %s: %s\n", category, result.Status)
+func printDetailedResults(category string, result Result, isSingleService bool) {
+	if isSingleService {
+		fmt.Printf("  %s: %s (%s)\n", category, result.Status, result.Tool)
+		if result.Message != "" {
+			fmt.Printf("    └ %s\n", result.Message)
+		}
+	} else {
+		switch result.Status {
+		case "BAD":
+			fmt.Printf("  %s: %s\n", category, result.Status)
+			fmt.Printf("    └ %s\n", result.Message)
+		case "OK":
+			fmt.Printf("  %s: %s\n", category, result.Status)
+		}
 	}
 }
 
@@ -223,4 +256,19 @@ func aggregateResults(results []Result) Result {
 	}
 
 	return finalResult
+}
+
+func resolveServiceName(shortName string) (string, error) {
+	for _, service := range config.GetAllServices() {
+		if service.ShortName == shortName {
+			return service.ID, nil
+		}
+	}
+	// Fallback to checking the full ID if no short name matches
+	for _, service := range config.GetAllServices() {
+		if service.ID == shortName {
+			return service.ID, nil
+		}
+	}
+	return "", fmt.Errorf("service with name '%s' not found", shortName)
 }
