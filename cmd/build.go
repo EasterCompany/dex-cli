@@ -122,6 +122,10 @@ func Build(args []string) error {
 	for _, serviceList := range serviceMap.Services {
 		for _, serviceEntry := range serviceList {
 			def := config.GetServiceDefinition(serviceEntry.ID)
+			// Skip services of type "os" as they don't have git repositories
+			if def.Type == "os" {
+				continue
+			}
 			if err := gitAddCommitPush(def); err != nil {
 				return err // Stop-on-failure
 			}
