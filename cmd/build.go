@@ -47,7 +47,7 @@ func Build(args []string) error {
 	// For dex-cli, we run 'make install' as it correctly handles all steps
 	sourcePath, _ := config.ExpandPath(dexCliDef.Source)
 	if !checkFileExists(sourcePath) {
-		return fmt.Errorf("dex-cli source code not found at %s. Run 'dex update' to clone it", sourcePath)
+		return fmt.Errorf("dex-cli source code not found at %s. Run 'dex add' to download & install it.", sourcePath)
 	}
 
 	installCmd := exec.Command("make", "install")
@@ -73,7 +73,7 @@ func Build(args []string) error {
 		// Check if source exists before trying to build
 		sourcePath, _ := config.ExpandPath(def.Source)
 		if !checkFileExists(sourcePath) {
-			ui.PrintWarning(fmt.Sprintf("Skipping %s: source code not found at %s. Run 'dex update' to clone it.", def.ShortName, sourcePath))
+			ui.PrintWarning(fmt.Sprintf("Skipping %s: source code not found at %s. Run 'dex add' to download & install it.", def.ShortName, sourcePath))
 			continue
 		}
 
