@@ -191,10 +191,8 @@ func checkCLIStatus(service config.ServiceDefinition, serviceID string) ui.Table
 		if len(parts) >= 3 {
 			// Find the first part that isn't just a number, or take 3 parts
 			versionParts := []string{}
-			for _, part := range parts[0:3] {
-				versionParts = append(versionParts, part)
-			}
-			version = strings.Join(versionParts, ".")[1:] // [1:] to remove 'v'
+			versionParts = append(versionParts, parts[0:3]...) // Fixed: Replaced loop with linter suggestion
+			version = strings.Join(versionParts, ".")[1:]      // [1:] to remove 'v'
 		}
 	} else if len(outputStr) > 0 {
 		// Fallback for non-standard version string
