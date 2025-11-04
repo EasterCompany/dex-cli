@@ -17,29 +17,20 @@ func Version(version, branch, commit, buildDate, buildYear, buildHash string) {
 	// Format the architecture: linux/amd64 -> linux_amd64
 	arch := fmt.Sprintf("%s_%s", runtime.GOOS, runtime.GOARCH)
 
-	// Split version string into components
-	versionParts := strings.Split(strings.TrimPrefix(version, "v"), "-")
-	tag := versionParts[0]
-	dev := ""
-	if len(versionParts) > 1 {
-		dev = fmt.Sprintf("-%s", versionParts[1])
-	}
+	// Create the full version string
+	fullVersion := fmt.Sprintf("%s.%s.%s.%s.%s.%s",
+		version,
+		branch,
+		commit,
+		formattedDate,
+		arch,
+		buildHash,
+	)
 
 	// Create the colored version string
-	coloredVersion := fmt.Sprintf("%s %s%s%s%s%s%s%s%s%s%s%s%s",
-		ui.Colorize(" v ", ui.ColorDarkGray),
-		ui.Colorize(tag, ui.ColorReset), // White
-		ui.Colorize(dev, ui.ColorDarkGray),
-		ui.Colorize(".", ui.ColorDarkGray),
-		ui.Colorize(branch, ui.ColorDarkGray),
-		ui.Colorize(".", ui.ColorDarkGray),
-		ui.Colorize(commit, ui.ColorReset), // White
-		ui.Colorize(".", ui.ColorDarkGray),
-		ui.Colorize(formattedDate, ui.ColorDarkGray),
-		ui.Colorize(".", ui.ColorDarkGray),
-		ui.Colorize(arch, ui.ColorReset), // White
-		ui.Colorize(".", ui.ColorDarkGray),
-		ui.Colorize(buildHash, ui.ColorDarkGray),
+	coloredVersion := fmt.Sprintf("%s%s",
+		ui.Colorize("v: ", ui.ColorDarkGray),
+		fullVersion,
 	)
 
 	// Print version
