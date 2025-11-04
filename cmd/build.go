@@ -44,7 +44,7 @@ func Build(args []string) error {
 	// ---
 	// 1. Process dex-cli FIRST
 	// ---
-	ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, "--- Building dex-cli ---", ui.ColorReset))
+	ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, "# Building dex-cli", ui.ColorReset))
 	// For dex-cli, we run 'make install' as it correctly handles all steps
 	sourcePath, _ := config.ExpandPath(dexCliDef.Source)
 	if !checkFileExists(sourcePath) {
@@ -79,7 +79,7 @@ func Build(args []string) error {
 		}
 
 		fmt.Println()
-		ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, fmt.Sprintf("--- Building %s ---", def.ShortName), ui.ColorReset))
+		ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, fmt.Sprintf("# Building %s", def.ShortName), ui.ColorReset))
 		log(fmt.Sprintf("Building %s from local source...", def.ShortName))
 
 		// 1. Format
