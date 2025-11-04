@@ -1,4 +1,3 @@
-// cmd/update.go
 package cmd
 
 import (
@@ -43,7 +42,7 @@ func Update(args []string, buildYear string) error {
 	}
 
 	// ---
-	// 2. Process dex-cli FIRST
+	// 2. Process dex-cli FIRST (always)
 	// ---
 	ui.PrintInfo(ui.Colorize("--- Updating dex-cli ---", ui.ColorCyan))
 	if err := gitUpdateService(dexCliDef); err != nil {
@@ -63,11 +62,30 @@ func Update(args []string, buildYear string) error {
 	}
 
 	// ---
-	// 3. Process all OTHER services
+	// 3. Process all OTHER services *that are in the service map*
 	// ---
+	serviceMap, err := config.LoadServiceMapConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load service-map.json: %w", err)
+	}
+
+	// Create a quick lookup map of installed services
+	installedServices := make(map[string]bool)
+	for _, serviceList := range serviceMap.Services {
+		for _, serviceEntry := range serviceList {
+			installedServices[serviceEntry.ID] = true
+		}
+	}
+
 	for _, def := range allServices {
 		// Skip os type and dex-cli (which we just did)
 		if !def.IsManageable() || def.ShortName == "cli" {
+			continue
+		}
+
+		// *** FIX: Only update services that are in the service-map.json ***
+		if _, isInstalled := installedServices[def.ID]; !isInstalled {
+			log(fmt.Sprintf("Skipping %s (not in service-map.json)", def.ShortName))
 			continue
 		}
 
@@ -119,7 +137,7 @@ func Update(args []string, buildYear string) error {
 	ui.PrintSuccess("All services are up to date.")
 	fmt.Println()
 
-	ui.PrintVersionComparison(currentVersionStr, newVersionStr, latestVersion, buildYear, currentSize, newSize, 0, 0)
+	ui.PrintVersionComparison(currentVersionStr, newVersionStr, latestVersion, buildYear, 0, 0, 0, 0)
 
 	return nil
 }
