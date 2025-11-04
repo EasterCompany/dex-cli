@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -118,29 +119,58 @@ func checkCLIStatus(service config.ServiceDefinition, serviceID string) ui.Table
 		colorizeNA("N/A"),
 		colorizeNA("N/A"),
 		colorizeNA("N/A"),
-		time.Now().Format("15:04:05"),
+		time.Now.Format("15:04:05"),
 	)
+}
+
+// isCloudDomain checks if the domain is a known cloud Redis provider requiring TLS.
+func isCloudDomain(domain string) bool {
+	return strings.Contains(domain, "redis-cloud.com") || strings.Contains(domain, "redns.redis-cloud.com")
 }
 
 // checkCacheStatus checks a cache/db service (Redis/Valkey) with an optional AUTH and a PING command.
 func checkCacheStatus(service config.ServiceDefinition, serviceID, address string) ui.TableRow {
-	conn, err := net.DialTimeout("tcp", service.GetHost(), 2*time.Second)
+	var conn net.Conn
+	var err error
+
+	// Set a 2-second timeout for the initial connection
+	dialer := &net.Dialer{Timeout: 2 * time.Second}
+
+	if isCloudDomain(service.Domain) {
+		// --- FIX 1: Use TLS for cloud domains ---
+		conn, err = tls.DialWithDialer(dialer, "tcp", service.GetHost(), &tls.Config{})
+	} else {
+		// Use plain TCP for local domains
+		conn, err = dialer.Dial("tcp", service.GetHost())
+	}
+
 	if err != nil {
 		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 	}
 	defer func() { _ = conn.Close() }()
 
+	// Set a deadline for all subsequent Read/Write operations
+	if err := conn.SetDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+	}
+
 	reader := bufio.NewReader(conn)
 
 	// 1. Authenticate if password is provided
 	if service.Credentials != nil && service.Credentials.Password != "" {
-		authCmd := fmt.Sprintf("AUTH %s\r\n", service.Credentials.Password)
+		// --- FIX 2: Use Username and Password for AUTH ---
+		authCmd := fmt.Sprintf("AUTH %s %s\r\n", service.Credentials.Username, service.Credentials.Password)
+
 		if _, err = conn.Write([]byte(authCmd)); err != nil {
 			return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Auth"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 		}
 		response, err := reader.ReadString('\n')
 		if err != nil || !strings.HasPrefix(response, "+OK") {
 			return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Auth"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+		}
+		// Reset deadline for the next operation
+		if err := conn.SetDeadline(time.Now().Add(2 * time.Second)); err != nil {
+			return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 		}
 	}
 
@@ -155,6 +185,11 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 
 	// 3. Get Version
 	version := "N/A"
+	// Reset deadline for the next operation
+	if err := conn.SetDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("OK"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+	}
+
 	if _, err = conn.Write([]byte("INFO server\r\n")); err == nil {
 		// Read the bulk string response
 		response, err = reader.ReadString('\n')
@@ -178,7 +213,12 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 // checkHTTPStatus checks a service via its HTTP /status endpoint
 func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string) ui.TableRow {
 	statusURL := service.GetHTTP("/status")
-	resp, err := http.Get(statusURL)
+
+	// Use a custom HTTP client with a 2-second timeout
+	client := http.Client{
+		Timeout: 2 * time.Second,
+	}
+	resp, err := client.Get(statusURL)
 	if err != nil {
 		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 	}
@@ -195,10 +235,6 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 	}
 
 	uptime := ui.Truncate(formatUptime(time.Duration(statusResp.Uptime)*time.Second), 10)
-
-	// This is the line that was causing the error.
-	// It was trying to assign two variables from one function call.
-	// Corrected to be two separate assignments.
 	goroutines := fmt.Sprintf("%d", statusResp.Metrics.Goroutines)
 	mem := fmt.Sprintf("%.2f", statusResp.Metrics.MemoryAllocMB)
 
@@ -227,3 +263,4 @@ func colorizeStatus(status string) string {
 		return status
 	}
 }
+
