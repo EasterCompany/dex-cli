@@ -307,43 +307,64 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 	return []string{serviceID, address, colorizeNA(ui.Truncate(version, 12)), colorizeStatus("OK"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 }
 
-// checkHTTPStatus checks a service via its HTTP /service endpoint
+// checkHTTPStatus checks a service via its HTTP /status endpoint
 func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string) ui.TableRow {
-	serviceURL := service.GetHTTP("/service")
+	versionURL := service.GetHTTP("/version")
+	statusURL := service.GetHTTP("/status")
 
 	// Use a custom HTTP client with a 2-second timeout
 	client := http.Client{
 		Timeout: 2 * time.Second,
 	}
-	resp, err := client.Get(serviceURL)
+
+	// Get Version
+	version := "N/A"
+	resp, err := client.Get(versionURL)
+	if err == nil {
+		defer func() { _ = resp.Body.Close() }()
+		body, err := io.ReadAll(resp.Body)
+		if err == nil {
+			var versionResp map[string]string
+			if err := json.Unmarshal(body, &versionResp); err == nil {
+				parsedVersion, err := git.Parse(versionResp["version"])
+				if err == nil {
+					version = parsedVersion.Short()
+				}
+			}
+		}
+	}
+
+	// Get Status
+	resp, err = client.Get(statusURL)
 	if err != nil {
-		return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
+		return []string{serviceID, address, colorizeNA(version), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
+		return []string{serviceID, address, colorizeNA(version), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 	}
 
-	var serviceReport health.ServiceReport
-	if err := json.Unmarshal(body, &serviceReport); err != nil {
-		return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
+	var statusResp health.StatusResponse
+	if err := json.Unmarshal(body, &statusResp); err != nil {
+		return []string{serviceID, address, colorizeNA(version), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 	}
 
-	uptime := ui.Truncate(formatUptime(time.Duration(serviceReport.Health.Uptime)*time.Second), 10)
-	goroutines := fmt.Sprintf("%d", serviceReport.Health.Metrics.Goroutines)
-	mem := fmt.Sprintf("%.2f", serviceReport.Health.Metrics.MemoryAllocMB)
+	uptime := ui.Truncate(formatUptime(time.Duration(statusResp.Uptime)*time.Second), 10)
+
+	goroutines := fmt.Sprintf("%d", statusResp.Metrics.Goroutines)
+	mem := fmt.Sprintf("%.2f", statusResp.Metrics.MemoryAllocMB)
 
 	return []string{
 		serviceID,
 		address,
-		colorizeNA(ui.Truncate(serviceReport.Version.Tag, 12)),
-		colorizeStatus(serviceReport.Status),
+		colorizeNA(ui.Truncate(version, 12)),
+		colorizeStatus(statusResp.Status),
 		colorizeNA(uptime),
 		colorizeNA(goroutines),
 		colorizeNA(mem),
-		time.Unix(serviceReport.Health.Timestamp, 0).Format("15:00:00"), // Shortened timestamp
+		time.Unix(statusResp.Timestamp, 0).Format("15:00:00"), // Shortened timestamp
 	}
 }
 

@@ -162,7 +162,7 @@ func printUsage() {
 		ui.PrintInfo("system     Show system info and manage packages")
 	}
 	if config.IsCommandAvailable("python") {
-		ui.PrintInfo("python     [<subcommand>] [args...] Manage Dexter's Python environment")
+		ui.PrintInfo("python     [<subcommand>] [args...] Proxy for Dexter's Python environment")
 	}
 	if config.IsCommandAvailable("bun") {
 		ui.PrintInfo("bun        [args...] Proxy for the system's bun executable")

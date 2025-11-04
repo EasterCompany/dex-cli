@@ -14,7 +14,7 @@ import (
 	"time"
 
 	"github.com/EasterCompany/dex-cli/config"
-	"github.com/EasterCompany/dex-cli/health"
+	"github.com/EasterCompany/dex-cli/git"
 )
 
 // getServiceVersion fetches the version of a service based on its type.
@@ -108,13 +108,13 @@ func getCacheVersion(service config.ServiceDefinition) string {
 	return "N/A"
 }
 
-// getHTTPVersion fetches the version from a service's /service endpoint.
+// getHTTPVersion fetches the version from a service's /version endpoint.
 func getHTTPVersion(service config.ServiceDefinition) string {
-	serviceURL := service.GetHTTP("/service")
+	versionURL := service.GetHTTP("/version")
 	client := http.Client{
 		Timeout: 2 * time.Second,
 	}
-	resp, err := client.Get(serviceURL)
+	resp, err := client.Get(versionURL)
 	if err != nil {
 		return "N/A"
 	}
@@ -125,10 +125,15 @@ func getHTTPVersion(service config.ServiceDefinition) string {
 		return "N/A"
 	}
 
-	var serviceReport health.ServiceReport
-	if err := json.Unmarshal(body, &serviceReport); err != nil {
+	var versionResp map[string]string
+	if err := json.Unmarshal(body, &versionResp); err != nil {
 		return "N/A"
 	}
 
-	return serviceReport.Version.Str
+	parsedVersion, err := git.Parse(versionResp["version"])
+	if err != nil {
+		return "N/A"
+	}
+
+	return parsedVersion.String()
 }
