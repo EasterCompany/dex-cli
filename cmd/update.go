@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/ui"
@@ -23,16 +22,20 @@ func Update(args []string, buildYear string) error {
 		_, _ = fmt.Fprintln(logFile, message)
 	}
 
-	// ---
-	// 1. Get current dex-cli version info (BEFORE update)
-	// ---
-	currentVersionStr, currentSize := getDexCliInfo()
 	log("Updating to latest version...")
-	ui.PrintSection("Downloading & Building")
 
+	// ---
+	// 1. Get initial versions
+	// ---
 	allServices := config.GetAllServices()
-	var dexCliDef config.ServiceDefinition
+	oldVersions := make(map[string]string)
+	for _, s := range allServices {
+		if s.IsBuildable() {
+			oldVersions[s.ID] = getServiceVersion(s)
+		}
+	}
 
+	var dexCliDef config.ServiceDefinition
 	// Find dex-cli definition
 	for _, s := range allServices {
 		if s.ShortName == "cli" {
@@ -128,33 +131,20 @@ func Update(args []string, buildYear string) error {
 	// ---
 	// 4. Final Summary
 	// ---
-	newVersionStr, newSize := getDexCliInfo()
-	latestVersion := ui.FetchLatestVersion()
-
-	log(fmt.Sprintf("Update complete. New version: %s", newVersionStr))
+	log("Update complete.")
 	fmt.Println()
-	ui.PrintSection("Complete")
+	ui.PrintHeader("Complete")
 	ui.PrintSuccess("All services are up to date.")
-	fmt.Println()
 
-	// ---
-	// FIX: Pass currentSize and newSize to the function
-	// ---
-	ui.PrintVersionComparison(currentVersionStr, newVersionStr, latestVersion, buildYear, currentSize, newSize, 0, 0)
-
-	return nil
-}
-
-// getDexCliInfo fetches the current version and binary size of dex-cli.
-func getDexCliInfo() (version string, size int64) {
-	currentVersion, _ := exec.Command("dex", "version").Output()
-	version = strings.TrimSpace(string(currentVersion))
-
-	currentBinaryPath, _ := exec.LookPath("dex")
-	if currentBinaryPath != "" {
-		if stat, err := os.Stat(currentBinaryPath); err == nil {
-			size = stat.Size()
+	// Get new versions and print changes
+	for _, s := range allServices {
+		if s.IsBuildable() {
+			newVersion := getServiceVersion(s)
+			if oldVersions[s.ID] != newVersion {
+				ui.PrintInfo(fmt.Sprintf("  %s version updated from %s to %s", s.ShortName, oldVersions[s.ID], newVersion))
+			}
 		}
 	}
-	return version, size
+
+	return nil
 }

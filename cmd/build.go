@@ -30,9 +30,18 @@ func Build(args []string) error {
 	log("Build command called...")
 	ui.PrintHeader("Building All Services from Local Source")
 
+	// ---
+	// 1. Get initial versions
+	// ---
 	allServices := config.GetAllServices()
-	var dexCliDef config.ServiceDefinition
+	oldVersions := make(map[string]string)
+	for _, s := range allServices {
+		if s.IsBuildable() {
+			oldVersions[s.ID] = getServiceVersion(s)
+		}
+	}
 
+	var dexCliDef config.ServiceDefinition
 	// Find dex-cli definition
 	for _, s := range allServices {
 		if s.ShortName == "cli" {
@@ -42,7 +51,7 @@ func Build(args []string) error {
 	}
 
 	// ---
-	// 1. Process dex-cli FIRST
+	// 2. Process dex-cli FIRST
 	// ---
 	ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, "# Building dex-cli", ui.ColorReset))
 	// For dex-cli, we run 'make install' as it correctly handles all steps
@@ -62,7 +71,7 @@ func Build(args []string) error {
 	}
 
 	// ---
-	// 2. Process all OTHER services
+	// 3. Process all OTHER services
 	// ---
 	servicesBuilt := 0
 	for _, def := range allServices {
@@ -112,7 +121,7 @@ func Build(args []string) error {
 	}
 
 	// ---
-	// 3. Git Add, Commit, Push
+	// 4. Git Add, Commit, Push
 	// ---
 	serviceMap, err := config.LoadServiceMapConfig()
 	if err != nil {
@@ -132,9 +141,23 @@ func Build(args []string) error {
 		}
 	}
 
+	// ---
+	// 5. Final Summary
+	// ---
 	fmt.Println()
 	ui.PrintHeader("Complete")
 	ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %d service(s).", servicesBuilt+1)) // +1 for dex-cli
+
+	// Get new versions and print changes
+	for _, s := range allServices {
+		if s.IsBuildable() {
+			newVersion := getServiceVersion(s)
+			if oldVersions[s.ID] != newVersion {
+				ui.PrintInfo(fmt.Sprintf("  %s version updated from %s to %s", s.ShortName, oldVersions[s.ID], newVersion))
+			}
+		}
+	}
+
 	return nil
 }
 
