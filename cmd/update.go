@@ -83,7 +83,7 @@ func Update(args []string, buildYear string) error {
 			continue
 		}
 
-		// *** FIX: Only update services that are in the service-map.json ***
+		// *** Only update services that are in the service-map.json ***
 		if _, isInstalled := installedServices[def.ID]; !isInstalled {
 			log(fmt.Sprintf("Skipping %s (not in service-map.json)", def.ShortName))
 			continue
@@ -137,7 +137,10 @@ func Update(args []string, buildYear string) error {
 	ui.PrintSuccess("All services are up to date.")
 	fmt.Println()
 
-	ui.PrintVersionComparison(currentVersionStr, newVersionStr, latestVersion, buildYear, 0, 0, 0, 0)
+	// ---
+	// FIX: Pass currentSize and newSize to the function
+	// ---
+	ui.PrintVersionComparison(currentVersionStr, newVersionStr, latestVersion, buildYear, currentSize, newSize, 0, 0)
 
 	return nil
 }
