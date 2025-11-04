@@ -179,11 +179,11 @@ var serviceDefinitions = []ServiceDefinition{
 		ID:        "cloud-cache-0",
 		ShortName: "cloud-cache",
 		Type:      "os",
-		Domain:    "redis-18309.c252.ap-southeast-1-1.ec2.cloud.redislabs.com",
+		Domain:    "redis-18309.c243.eu-west-1-3.ec2.redns.redis-cloud.com",
 		Port:      "18309",
 		Credentials: &ServiceCredentials{
 			Username: "default",
-			Password: "PASSWORD_HERE", // Replace with actual password
+			Password: "",
 			DB:       0,
 		},
 	},
@@ -411,5 +411,5 @@ func SaveServiceMapConfig(serviceMap *ServiceMapConfig) error {
 		return fmt.Errorf("failed to marshal service-map.json: %w", err)
 	}
 
-	return os.WriteFile(serviceMapPath, data, 0644)
+	return os.WriteFile(serviceMapPath, data, 0o644)
 }
