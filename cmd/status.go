@@ -263,4 +263,3 @@ func colorizeStatus(status string) string {
 		return status
 	}
 }
-
