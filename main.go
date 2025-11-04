@@ -162,19 +162,19 @@ func printUsage() {
 		ui.PrintInfo("system     Show system info and manage packages")
 	}
 	if config.IsCommandAvailable("python") {
-		ui.PrintInfo("python     [<subcommand>] [args...] Proxy for Dexter's Python environment")
+		ui.PrintInfo("python     [<subcommand>] [args...] Python virtual environment")
 	}
 	if config.IsCommandAvailable("bun") {
-		ui.PrintInfo("bun        [args...] Proxy for the system's bun executable")
+		ui.PrintInfo("bun        [args...] System's bun executable")
 	}
 	if config.IsCommandAvailable("bunx") {
-		ui.PrintInfo("bunx       [args...] Proxy for the system's bunx executable")
+		ui.PrintInfo("bunx       [args...] System's bunx executable")
 	}
 	if config.IsCommandAvailable("add") {
 		ui.PrintInfo("add        Add (clone, build, install) a new service")
 	}
 	if config.IsCommandAvailable("remove") {
-		ui.PrintInfo("remove     Uninstall and remove a service")
+		ui.PrintInfo("remove     Uninstall and delete a service")
 	}
 	if config.IsCommandAvailable("cache") {
 		ui.PrintInfo("cache      [clear|list] Manage the local cache")
