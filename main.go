@@ -183,7 +183,7 @@ func printUsage() {
 		ui.PrintInfo("event      Interact with the event service")
 	}
 	if config.IsCommandAvailable("config") {
-		ui.PrintInfo("config     <service> Show the service-map.json config for a service")
+		ui.PrintInfo("config     <service> [field...] Show service config or a specific field")
 	}
 	ui.PrintInfo("version    Show version information")
 	ui.PrintInfo("help       Show this help message")
