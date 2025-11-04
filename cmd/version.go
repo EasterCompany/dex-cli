@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
+
+	"github.com/EasterCompany/dex-cli/ui"
 )
 
 func Version(version, branch, commit, buildDate, buildYear, buildHash string) {
@@ -15,16 +17,22 @@ func Version(version, branch, commit, buildDate, buildYear, buildHash string) {
 	// Format the architecture: linux/amd64 -> linux_amd64
 	arch := fmt.Sprintf("%s_%s", runtime.GOOS, runtime.GOARCH)
 
-	// Create the full version string
-	fullVersion := fmt.Sprintf("v%s.%s.%s.%s.%s.%s",
-		strings.TrimPrefix(version, "v"),
-		branch,
-		commit,
-		formattedDate,
-		arch,
-		buildHash,
+	// Create the colored version string
+	coloredVersion := fmt.Sprintf("%s %s%s%s%s%s%s%s%s%s%s%s",
+		ui.Colorize(" v ", ui.ColorDarkGray),
+		ui.Colorize(strings.TrimPrefix(version, "v"), ui.ColorReset), // White
+		ui.Colorize(".", ui.ColorDarkGray),
+		ui.Colorize(branch, ui.ColorDarkGray),
+		ui.Colorize(".", ui.ColorDarkGray),
+		ui.Colorize(commit, ui.ColorReset), // White
+		ui.Colorize(".", ui.ColorDarkGray),
+		ui.Colorize(formattedDate, ui.ColorDarkGray),
+		ui.Colorize(".", ui.ColorDarkGray),
+		ui.Colorize(arch, ui.ColorReset), // White
+		ui.Colorize(".", ui.ColorDarkGray),
+		ui.Colorize(buildHash, ui.ColorDarkGray),
 	)
 
 	// Print version
-	fmt.Println(fullVersion)
+	fmt.Println(coloredVersion)
 }
