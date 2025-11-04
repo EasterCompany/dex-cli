@@ -20,11 +20,17 @@ EXECUTABLE_PATH := $(HOME)/Dexter/bin/dex
 # Linker flags
 LDFLAGS = -ldflags "-X main.version=$(VERSION) -X main.branch=$(BRANCH) -X main.commit=$(COMMIT) -X main.buildDate=$(BUILD_DATE) -X main.buildYear=$(BUILD_YEAR) -X main.buildHash=$(BUILD_HASH)"
 
-.PHONY: all build clean test lint format check
+.PHONY: all build clean test lint format check deps
 
 all: build
 
-check: format lint test
+# New target to ensure modules are downloaded and go.sum is correct
+deps:
+	@echo "Ensuring Go modules are tidy..."
+	@$(GOCMD) mod tidy
+
+# Check now depends on 'deps'
+check: deps format lint test
 
 format:
 	@echo "Formatting..."
@@ -38,6 +44,7 @@ test:
 	@echo "Testing..."
 	@$(GOTEST) -v ./...
 
+# Build depends on check (which now depends on deps)
 build: check
 	@echo "Building..."
 	@$(GOBUILD) $(LDFLAGS) -o $(EXECUTABLE_PATH) .
