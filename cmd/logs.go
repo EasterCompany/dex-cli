@@ -4,10 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 
 	"github.com/EasterCompany/dex-cli/config"
-	"github.com/EasterCompany/dex-cli/ui"
 )
 
 // Logs displays logs for a given service
@@ -30,33 +28,28 @@ func Logs(args []string, follow bool) error {
 		servicesToShow = config.GetManageableServices()
 	} else {
 		for _, arg := range args {
-			serviceDef, err := config.Resolve(arg)
+			def, err := config.Resolve(arg)
 			if err != nil {
 				return fmt.Errorf("failed to resolve service '%s': %w", arg, err)
 			}
-			if !serviceDef.IsManageable() {
-				ui.PrintWarning(fmt.Sprintf("Skipping logs for non-manageable service: %s", serviceDef.ShortName))
-				continue
+			if !def.IsManageable() {
+				return fmt.Errorf("cannot show logs for non-manageable service '%s'", arg)
 			}
-			servicesToShow = append(servicesToShow, *serviceDef)
+			servicesToShow = append(servicesToShow, *def)
 		}
 	}
 
 	// Show logs for the selected services
 	logFiles := []string{}
 	for _, serviceDef := range servicesToShow {
-		logPath, err := serviceDef.GetLogPath()
+		logPathStr := serviceDef.GetLogPath() // This line is now a single assignment
+		logPath, err := config.ExpandPath(logPathStr)
 		if err != nil {
-			return fmt.Errorf("failed to get log path for %s: %w", serviceDef.ShortName, err)
+			return fmt.Errorf("failed to expand log path: %w", err)
 		}
 
 		if _, err := os.Stat(logPath); os.IsNotExist(err) {
-			log(fmt.Sprintf("Log file for service '%s' not found at %s, creating it.", serviceDef.ID, logPath))
-			// Create the directory
-			if err := os.MkdirAll(filepath.Dir(logPath), 0755); err != nil {
-				return fmt.Errorf("failed to create log directory: %w", err)
-			}
-			// Create the file
+			log(fmt.Sprintf("Log file for service '%s' not found at %s, creating it.", serviceDef.ShortName, logPath))
 			if _, err := os.Create(logPath); err != nil {
 				return fmt.Errorf("failed to create log file: %w", err)
 			}
@@ -65,7 +58,7 @@ func Logs(args []string, follow bool) error {
 	}
 
 	if len(logFiles) == 0 {
-		ui.PrintInfo("No services selected or no manageable services found.")
+		fmt.Println("No logs found for specified services.")
 		return nil
 	}
 

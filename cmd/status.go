@@ -1,4 +1,3 @@
-// cmd/status.go
 package cmd
 
 import (
@@ -10,7 +9,6 @@ import (
 	"net/http"
 	"os/exec"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -33,20 +31,14 @@ func Status(serviceShortName string) error {
 
 	log(fmt.Sprintf("Checking status for service: %s", serviceShortName))
 
-	serviceMap, err := config.LoadServiceMapConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load service map: %w", err)
-	}
-
 	var rows []ui.TableRow
+	allServices := config.GetAllServices()
 
 	if serviceShortName == "all" || serviceShortName == "" {
-		// Iterate in the desired order for consistent output
-		allServices := config.GetAllServices()
-		for _, service := range allServices {
-			row := checkServiceStatus(service, serviceMap)
+		for _, serviceDef := range allServices {
+			row := checkServiceStatus(serviceDef)
 			rows = append(rows, row)
-			log(fmt.Sprintf("Service: %s, Type: %s, Status: %s", service.ID, service.Type, row[3]))
+			log(fmt.Sprintf("Service: %s, Type: %s, Status: %s", serviceDef.ID, serviceDef.Type, row[3]))
 		}
 	} else {
 		def, err := config.Resolve(serviceShortName)
@@ -54,7 +46,7 @@ func Status(serviceShortName string) error {
 			return fmt.Errorf("failed to resolve service '%s': %w", serviceShortName, err)
 		}
 
-		row := checkServiceStatus(*def, serviceMap)
+		row := checkServiceStatus(*def)
 		rows = append(rows, row)
 		log(fmt.Sprintf("Service: %s, Type: %s, Status: %s", def.ID, def.Type, row[3]))
 	}
@@ -67,7 +59,7 @@ func Status(serviceShortName string) error {
 }
 
 // checkServiceStatus acts as a dispatcher, routing to the correct status checker based on service type.
-func checkServiceStatus(service config.ServiceDefinition, serviceMap *config.ServiceMapConfig) ui.TableRow {
+func checkServiceStatus(service config.ServiceDefinition) ui.TableRow {
 	// Define max lengths for columns
 	const (
 		maxServiceLen = 19
@@ -79,29 +71,23 @@ func checkServiceStatus(service config.ServiceDefinition, serviceMap *config.Ser
 	serviceID := ui.Truncate(service.ID, maxServiceLen)
 	address := ui.Truncate(service.GetHost(), maxAddressLen)
 
-	// Check if service is installed by checking service-map.json
-	isInstalled := isServiceInMap(service, serviceMap)
-
 	switch service.Type {
 	case "cli":
 		return checkCLIStatus(service, serviceID)
 	case "os":
 		return checkCacheStatus(service, serviceID, address)
 	default:
-		if !isInstalled {
-			return ui.FormatTableRow(
-				serviceID,
-				colorizeNA(address),
-				colorizeNA("N/A"),
-				colorizeStatus("N/A"),
-				colorizeNA("N/A"),
-				colorizeNA("N/A"),
-				colorizeNA("N/A"),
-				time.Now().Format("15:04:05"),
-			)
-		}
+		// All other types (cs, be, th) are HTTP services
 		return checkHTTPStatus(service, serviceID, address)
 	}
+}
+
+// colorizeNA colors "N/A" values dark gray, and leaves other values as-is.
+func colorizeNA(value string) string {
+	if value == "N/A" {
+		return ui.Colorize(value, ui.ColorDarkGray)
+	}
+	return value
 }
 
 // checkCLIStatus checks if a CLI tool is installed and working
@@ -114,19 +100,19 @@ func checkCLIStatus(service config.ServiceDefinition, serviceID string) ui.Table
 		status = "BAD"
 	}
 
+	// Parse version: v0.3.0.main.5241102.2025-11-03-20-20-30... -> 0.3.0
 	version := "N/A"
 	outputStr := strings.TrimSpace(string(output))
-	// Example: v0.3.0.main.5241102.2025-11-03-20-20-30.linux_amd64.lcr4rk
-	re := regexp.MustCompile(`v([0-9]+\.[0-9]+\.[0-9]+)`)
-	matches := re.FindStringSubmatch(outputStr)
-
-	if len(matches) > 1 {
-		version = matches[1] // Get the captured group
+	if strings.HasPrefix(outputStr, "v") {
+		parts := strings.Split(outputStr, ".")
+		if len(parts) >= 3 {
+			version = strings.Join(parts[0:3], ".")[1:] // [1:] to remove 'v'
+		}
 	}
 
 	return ui.FormatTableRow(
 		serviceID,
-		colorizeNA("N/A"),
+		colorizeNA("N/A"), // Address is N/A for CLI
 		colorizeNA(ui.Truncate(version, 12)),
 		colorizeStatus(status),
 		colorizeNA("N/A"),
@@ -134,14 +120,6 @@ func checkCLIStatus(service config.ServiceDefinition, serviceID string) ui.Table
 		colorizeNA("N/A"),
 		time.Now().Format("15:04:05"),
 	)
-}
-
-// colorizeNA colors "N/A" values dark gray, and leaves other values as-is.
-func colorizeNA(value string) string {
-	if value == "N/A" {
-		return ui.Colorize(value, ui.ColorDarkGray)
-	}
-	return value
 }
 
 // checkCacheStatus checks a cache/db service (Redis/Valkey) with an optional AUTH and a PING command.
@@ -153,75 +131,48 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 	defer func() { _ = conn.Close() }()
 
 	reader := bufio.NewReader(conn)
-	writer := bufio.NewWriter(conn)
 
-	// Handle AUTH
+	// 1. Authenticate if password is provided
 	if service.Credentials != nil && service.Credentials.Password != "" {
 		authCmd := fmt.Sprintf("AUTH %s\r\n", service.Credentials.Password)
-		if _, err = writer.WriteString(authCmd); err != nil {
-			return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
+		if _, err = conn.Write([]byte(authCmd)); err != nil {
+			return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Auth"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 		}
-		writer.Flush()
 		response, err := reader.ReadString('\n')
 		if err != nil || !strings.HasPrefix(response, "+OK") {
 			return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Auth"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 		}
 	}
 
-	// Send PING
-	if _, err = writer.WriteString("PING\r\n"); err != nil {
+	// 2. Ping
+	if _, err = conn.Write([]byte("PING\r\n")); err != nil {
 		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Ping"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 	}
-	writer.Flush()
 	response, err := reader.ReadString('\n')
 	if err != nil || !strings.HasPrefix(response, "+PONG") {
 		return ui.FormatTableRow(serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Ping"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
 	}
 
-	// Send INFO to get version
+	// 3. Get Version
 	version := "N/A"
-	if _, err = writer.WriteString("INFO server\r\n"); err == nil {
-		writer.Flush()
-		infoSizeStr, err := reader.ReadString('\n') // Read bulk string header, e.g., "$1234"
-		if err == nil && strings.HasPrefix(infoSizeStr, "$") {
-			infoSize, _ := Atoi(strings.TrimSpace(infoSizeStr[1:]))
-			if infoSize > 0 {
-				buf := make([]byte, infoSize+2) // +2 for \r\n
-				if _, err := io.ReadFull(reader, buf); err == nil {
-					infoStr := string(buf)
-					version = parseRedisInfo(infoStr, "redis_version")
-					if version == "N/A" {
-						version = parseRedisInfo(infoStr, "valkey_version")
-					}
-				}
+	if _, err = conn.Write([]byte("INFO server\r\n")); err == nil {
+		// Read the bulk string response
+		response, err = reader.ReadString('\n')
+		if err == nil && strings.HasPrefix(response, "$") {
+			// Read the info string itself
+			infoData, _ := io.ReadAll(io.LimitReader(reader, 4096))
+			infoStr := string(infoData)
+
+			// Try to find redis_version or valkey_version
+			re := regexp.MustCompile(`(redis_version|valkey_version):([0-9]+\.[0-9]+\.[0-9]+)`)
+			matches := re.FindStringSubmatch(infoStr)
+			if len(matches) >= 3 {
+				version = matches[2]
 			}
 		}
 	}
 
 	return ui.FormatTableRow(serviceID, address, colorizeNA(ui.Truncate(version, 12)), colorizeStatus("OK"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05"))
-}
-
-// Atoi converts string to int, returns 0 on error
-func Atoi(s string) int {
-	i, err := strconv.Atoi(s)
-	if err != nil {
-		return 0
-	}
-	return i
-}
-
-// parseRedisInfo extracts a specific key from the INFO command response.
-func parseRedisInfo(info, key string) string {
-	lines := strings.Split(info, "\r\n")
-	for _, line := range lines {
-		if strings.HasPrefix(line, key+":") {
-			parts := strings.Split(line, ":")
-			if len(parts) == 2 {
-				return parts[1]
-			}
-		}
-	}
-	return "N/A"
 }
 
 // checkHTTPStatus checks a service via its HTTP /status endpoint
@@ -244,6 +195,10 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 	}
 
 	uptime := ui.Truncate(formatUptime(time.Duration(statusResp.Uptime)*time.Second), 10)
+
+	// This is the line that was causing the error.
+	// It was trying to assign two variables from one function call.
+	// Corrected to be two separate assignments.
 	goroutines := fmt.Sprintf("%d", statusResp.Metrics.Goroutines)
 	mem := fmt.Sprintf("%.2f", statusResp.Metrics.MemoryAllocMB)
 
