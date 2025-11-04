@@ -151,31 +151,48 @@ func Update(args []string, buildYear string) error {
 			oldVersion, errOld := git.Parse(oldVersionStr)
 			newVersion, errNew := git.Parse(newVersionStr)
 
-			var oldTag, newTag string
+			var oldVersionDisplay, newVersionDisplay string
 
-			// Colorize old version
+			// Format old version
 			if errOld != nil {
-				oldTag = ui.Colorize("N/A", ui.ColorDarkGray)
+				oldVersionDisplay = ui.Colorize("N/A", ui.ColorDarkGray)
 			} else {
+				shortTag := oldVersion.Short()
 				if errNew == nil && oldVersion.Compare(newVersion) < 0 {
-					oldTag = ui.Colorize(oldVersion.Short(), ui.ColorBrightRed)
+					shortTag = ui.Colorize(shortTag, ui.ColorBrightRed)
 				} else {
-					oldTag = ui.Colorize(oldVersion.Short(), ui.ColorReset)
+					shortTag = ui.Colorize(shortTag, ui.ColorReset) // White
 				}
+
+				var branchAndCommit string
+				if oldVersion.Branch != "" && oldVersion.Commit != "" {
+					branchAndCommit = fmt.Sprintf(".%s.%s", oldVersion.Branch, oldVersion.Commit)
+					branchAndCommit = ui.Colorize(branchAndCommit, ui.ColorDarkGray)
+				}
+				oldVersionDisplay = fmt.Sprintf("%s%s", shortTag, branchAndCommit)
 			}
 
-			// Colorize new version
+			// Format new version
 			if errNew != nil {
-				newTag = ui.Colorize("N/A", ui.ColorDarkGray)
+				newVersionDisplay = ui.Colorize("N/A", ui.ColorDarkGray)
 			} else {
+				shortTag := newVersion.Short()
 				if errOld == nil && newVersion.Compare(oldVersion) > 0 {
-					newTag = ui.Colorize(newVersion.Short(), ui.ColorGreen)
+					shortTag = ui.Colorize(shortTag, ui.ColorGreen)
 				} else {
-					newTag = ui.Colorize(newVersion.Short(), ui.ColorReset)
+					shortTag = ui.Colorize(shortTag, ui.ColorReset) // White
 				}
+
+				var branchAndCommit string
+				if newVersion.Branch != "" && newVersion.Commit != "" {
+					branchAndCommit = fmt.Sprintf(".%s.%s", newVersion.Branch, newVersion.Commit)
+					branchAndCommit = ui.Colorize(branchAndCommit, ui.ColorDarkGray)
+				}
+				newVersionDisplay = fmt.Sprintf("%s%s", shortTag, branchAndCommit)
 			}
 
-			ui.PrintInfo(fmt.Sprintf("%s %s -> %s", s.ShortName, oldTag, newTag))
+			greyV := ui.Colorize("v", ui.ColorDarkGray)
+			ui.PrintInfo(fmt.Sprintf("[%s] %s %s -> %s", s.ShortName, greyV, oldVersionDisplay, newVersionDisplay))
 		}
 	}
 
