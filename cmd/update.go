@@ -96,7 +96,7 @@ func Update(args []string, buildYear string) error {
 
 		fmt.Println()
 		ui.PrintInfo(ui.Colorize(fmt.Sprintf("# Updating %s", def.ShortName), ui.ColorCyan))
-		ui.PrintInfo(fmt.Sprintf("  Version: %s", oldVersions[def.ID]))
+		ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorCyan, oldVersions[def.ID], ui.ColorReset))
 
 		// 1. Download
 		if err := gitUpdateService(def); err != nil {
@@ -129,7 +129,7 @@ func Update(args []string, buildYear string) error {
 		}
 
 		ui.PrintSuccess(fmt.Sprintf("Successfully updated and installed %s!", def.ShortName))
-		ui.PrintInfo(fmt.Sprintf("  New Version: %s", getServiceVersion(def)))
+		ui.PrintInfo(fmt.Sprintf("%s  Current Version: %s%s", ui.ColorCyan, getServiceVersion(def), ui.ColorReset))
 	}
 
 	// ---
@@ -148,16 +148,14 @@ func Update(args []string, buildYear string) error {
 			newVersionStr := getServiceVersion(s)
 			oldVersionStr := oldVersions[s.ID]
 
-			if oldVersionStr != newVersionStr {
-				oldVersion, errOld := git.Parse(oldVersionStr)
-				newVersion, errNew := git.Parse(newVersionStr)
+			oldVersion, errOld := git.Parse(oldVersionStr)
+			newVersion, errNew := git.Parse(newVersionStr)
 
-				if errOld == nil && errNew == nil {
-					ui.PrintInfo(fmt.Sprintf("%s %s -> %s", s.ShortName, oldVersion.Short(), newVersion.Short()))
-				} else {
-					// Fallback for non-standard versions
-					ui.PrintInfo(fmt.Sprintf("%s version updated", s.ShortName))
-				}
+			if errOld == nil && errNew == nil {
+				ui.PrintInfo(fmt.Sprintf("%s %s -> %s", s.ShortName, oldVersion.Short(), newVersion.Short()))
+			} else {
+				// Fallback for non-standard versions
+				ui.PrintInfo(fmt.Sprintf("%s version: %s -> %s", s.ShortName, oldVersionStr, newVersionStr))
 			}
 		}
 	}
