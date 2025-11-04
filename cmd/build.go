@@ -47,7 +47,7 @@ func Build(args []string) error {
 	// For dex-cli, we run 'make install' as it correctly handles all steps
 	sourcePath, _ := config.ExpandPath(dexCliDef.Source)
 	if !checkFileExists(sourcePath) {
-		return fmt.Errorf("dex-cli source code not found at %s. Run 'dex add' to download & install it.", sourcePath)
+		return fmt.Errorf("dex-cli source code not found at %s. Run 'dex add' to download & install it", sourcePath)
 	}
 
 	installCmd := exec.Command("make", "install")
