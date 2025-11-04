@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/EasterCompany/dex-cli/config"
+	"github.com/EasterCompany/dex-cli/git"
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
@@ -137,7 +138,6 @@ func Update(args []string, buildYear string) error {
 	log("Update complete.")
 	fmt.Println()
 	ui.PrintHeader("Complete")
-	ui.PrintSuccess("All services are up to date.")
 
 	// Add a small delay to allow services to restart
 	time.Sleep(2 * time.Second)
@@ -145,12 +145,24 @@ func Update(args []string, buildYear string) error {
 	// Get new versions and print changes
 	for _, s := range allServices {
 		if s.IsBuildable() {
-			newVersion := getServiceVersion(s)
-			if oldVersions[s.ID] != newVersion {
-				ui.PrintInfo(fmt.Sprintf("  %s version updated from %s to %s", s.ShortName, oldVersions[s.ID], newVersion))
+			newVersionStr := getServiceVersion(s)
+			oldVersionStr := oldVersions[s.ID]
+
+			if oldVersionStr != newVersionStr {
+				oldVersion, errOld := git.Parse(oldVersionStr)
+				newVersion, errNew := git.Parse(newVersionStr)
+
+				if errOld == nil && errNew == nil {
+					ui.PrintInfo(fmt.Sprintf("%s %s -> %s", s.ShortName, oldVersion.Short(), newVersion.Short()))
+				} else {
+					// Fallback for non-standard versions
+					ui.PrintInfo(fmt.Sprintf("%s version updated", s.ShortName))
+				}
 			}
 		}
 	}
+
+	ui.PrintSuccess("All services are up to date.")
 
 	return nil
 }

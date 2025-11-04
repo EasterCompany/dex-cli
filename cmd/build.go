@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/EasterCompany/dex-cli/config"
+	"github.com/EasterCompany/dex-cli/git"
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
@@ -149,7 +150,6 @@ func Build(args []string) error {
 	// ---
 	fmt.Println()
 	ui.PrintHeader("Complete")
-	ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %d service(s).", servicesBuilt+1)) // +1 for dex-cli
 
 	// Add a small delay to allow services to restart
 	time.Sleep(2 * time.Second)
@@ -157,12 +157,24 @@ func Build(args []string) error {
 	// Get new versions and print changes
 	for _, s := range allServices {
 		if s.IsBuildable() {
-			newVersion := getServiceVersion(s)
-			if oldVersions[s.ID] != newVersion {
-				ui.PrintInfo(fmt.Sprintf("  %s version updated from %s to %s", s.ShortName, oldVersions[s.ID], newVersion))
+			newVersionStr := getServiceVersion(s)
+			oldVersionStr := oldVersions[s.ID]
+
+			if oldVersionStr != newVersionStr {
+				oldVersion, errOld := git.Parse(oldVersionStr)
+				newVersion, errNew := git.Parse(newVersionStr)
+
+				if errOld == nil && errNew == nil {
+					ui.PrintInfo(fmt.Sprintf("%s %s -> %s", s.ShortName, oldVersion.Short(), newVersion.Short()))
+				} else {
+					// Fallback for non-standard versions
+					ui.PrintInfo(fmt.Sprintf("%s version updated", s.ShortName))
+				}
 			}
 		}
 	}
+
+	ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %d service(s).", servicesBuilt+1)) // +1 for dex-cli
 
 	return nil
 }
