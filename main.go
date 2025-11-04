@@ -20,16 +20,21 @@ var (
 
 func main() {
 	if err := cmd.EnsurePythonVenv(version); err != nil {
+		fmt.Println() // Add padding on error
 		ui.PrintError(fmt.Sprintf("Error ensuring Python environment: %v", err))
+		fmt.Println()
 		os.Exit(1)
 	}
 
 	if err := config.EnsureDirectoryStructure(); err != nil {
+		fmt.Println() // Add padding on error
 		ui.PrintError(fmt.Sprintf("Error ensuring directory structure: %v", err))
+		fmt.Println()
 		os.Exit(1)
 	}
 
 	if len(os.Args) < 2 {
+		fmt.Println() // Add padding
 		printUsage()
 		os.Exit(1)
 	}
@@ -38,6 +43,7 @@ func main() {
 
 	// Check if command is available based on requirements
 	if !config.IsCommandAvailable(command) {
+		fmt.Println() // Add padding
 		ui.PrintError(fmt.Sprintf("Command '%s' is not available", command))
 		ui.PrintInfo("This command requires certain conditions to be met.")
 		printUsage()
@@ -52,14 +58,18 @@ func main() {
 		runCommand(func() error { return cmd.System(os.Args[2:]) })
 
 	case "version", "-v", "--version":
+		fmt.Println() // Add padding at the start
 		cmd.Version(version, branch, commit, buildDate, buildYear, buildHash)
+		fmt.Println() // Add padding at the end
 
 	case "build":
 		runCommand(func() error { return cmd.Build(os.Args[2:]) })
 
 	case "start", "stop", "restart":
 		if len(os.Args) < 3 {
+			fmt.Println() // Add padding
 			ui.PrintError(fmt.Sprintf("Error: service name required for '%s' command", command))
+			fmt.Println()
 			os.Exit(1)
 		}
 		service := os.Args[2]
@@ -112,18 +122,21 @@ func main() {
 		runCommand(func() error { return cmd.Config(os.Args[2:]) })
 
 	case "help", "-h", "--help":
-		printUsage()
+		fmt.Println() // Add padding at the start
+		printUsage()  // This function already adds a blank line at the end
 
 	default:
+		fmt.Println() // Add padding at the start
 		ui.PrintError(fmt.Sprintf("Unknown command: %s", command))
-		printUsage()
+		printUsage() // This function already adds a blank line at the end
 		os.Exit(1)
 	}
 }
 
 // runCommand is a universal wrapper for all commands.
-// It executes the command function and prints a blank line at the end.
+// It executes the command function and prints a blank line at the start and end.
 func runCommand(commandFunc func() error) {
+	fmt.Println() // Add padding at the start
 	if err := commandFunc(); err != nil {
 		ui.PrintError(fmt.Sprintf("Error: %v", err))
 		os.Exit(1)
