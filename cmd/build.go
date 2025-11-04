@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/ui"
@@ -110,8 +111,61 @@ func Build(args []string) error {
 		servicesBuilt++
 	}
 
+	// ---
+	// 3. Git Add, Commit, Push
+	// ---
+	serviceMap, err := config.LoadServiceMapConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load service-map.json: %w", err)
+	}
+
+	for _, serviceList := range serviceMap.Services {
+		for _, serviceEntry := range serviceList {
+			def := config.GetServiceDefinition(serviceEntry.ID)
+			if err := gitAddCommitPush(def); err != nil {
+				return err // Stop-on-failure
+			}
+		}
+	}
+
 	fmt.Println()
 	ui.PrintHeader("Complete")
 	ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %d service(s).", servicesBuilt+1)) // +1 for dex-cli
+	return nil
+}
+
+func gitAddCommitPush(def config.ServiceDefinition) error {
+	sourcePath, err := config.ExpandPath(def.Source)
+	if err != nil {
+		return fmt.Errorf("failed to expand source path: %w", err)
+	}
+
+	ui.PrintInfo(fmt.Sprintf("[%s] Adding, committing, and pushing changes...", def.ShortName))
+
+	// Git Add
+	addCmd := exec.Command("git", "add", ".")
+	addCmd.Dir = sourcePath
+	if output, err := addCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git add failed for %s:\n%s", def.ShortName, string(output))
+	}
+
+	// Git Commit
+	commitMsg := "dex build: successful build"
+	commitCmd := exec.Command("git", "commit", "-m", commitMsg)
+	commitCmd.Dir = sourcePath
+	if output, err := commitCmd.CombinedOutput(); err != nil {
+		// It's possible there are no changes to commit, so we can ignore this error
+		if !strings.Contains(string(output), "nothing to commit") {
+			return fmt.Errorf("git commit failed for %s:\n%s", def.ShortName, string(output))
+		}
+	}
+
+	// Git Push
+	pushCmd := exec.Command("git", "push")
+	pushCmd.Dir = sourcePath
+	if output, err := pushCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git push failed for %s:\n%s", def.ShortName, string(output))
+	}
+
 	return nil
 }

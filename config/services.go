@@ -219,6 +219,16 @@ func GetBuildableServices() []ServiceDefinition {
 	return defs
 }
 
+// GetServiceDefinition returns a service definition by its ID.
+func GetServiceDefinition(id string) ServiceDefinition {
+	for _, def := range serviceDefinitions {
+		if def.ID == id {
+			return def
+		}
+	}
+	return ServiceDefinition{}
+}
+
 //
 // service-map.json struct definitions and helpers
 //
