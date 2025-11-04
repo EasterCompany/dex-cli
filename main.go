@@ -102,6 +102,9 @@ func main() {
 	case "remove":
 		runCommand(func() error { return cmd.Remove(os.Args[2:]) })
 
+	case "cache":
+		runCommand(func() error { return cmd.Cache(os.Args[2:]) })
+
 	case "help", "-h", "--help":
 		printUsage()
 
@@ -166,6 +169,9 @@ func printUsage() {
 	}
 	if config.IsCommandAvailable("remove") {
 		ui.PrintInfo("remove     Uninstall and remove a service")
+	}
+	if config.IsCommandAvailable("cache") {
+		ui.PrintInfo("cache      <clear|list> Interact with the local cache")
 	}
 	ui.PrintInfo("version    Show version information")
 	ui.PrintInfo("help       Show this help message")

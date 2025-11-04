@@ -98,6 +98,11 @@ func GetCommandRequirements() map[string]CommandRequirement {
 			Description: "Uninstall and remove a service",
 			Check:       func() bool { return true }, // Always available
 		},
+		"cache": {
+			Name:        "cache",
+			Description: "Interact with the local cache",
+			Check:       func() bool { return true }, // Always available
+		},
 	}
 }
 
