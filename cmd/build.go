@@ -91,7 +91,7 @@ func Build(args []string) error {
 
 		fmt.Println()
 		ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, fmt.Sprintf("# Building %s", def.ShortName), ui.ColorReset))
-		ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorCyan, oldVersions[def.ID], ui.ColorReset))
+		ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, oldVersions[def.ID], ui.ColorReset))
 		log(fmt.Sprintf("Building %s from local source...", def.ShortName))
 
 		// 1. Format
@@ -120,7 +120,7 @@ func Build(args []string) error {
 		}
 
 		ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %s!", def.ShortName))
-		ui.PrintInfo(fmt.Sprintf("%s  Current Version: %s%s", ui.ColorCyan, getServiceVersion(def), ui.ColorReset))
+		ui.PrintInfo(fmt.Sprintf("%s  Current Version: %s%s", ui.ColorDarkGray, getServiceVersion(def), ui.ColorReset))
 		servicesBuilt++
 	}
 
@@ -157,23 +157,37 @@ func Build(args []string) error {
 	// Get new versions and print changes
 	for _, s := range allServices {
 		if s.IsBuildable() {
-			newVersionStr := getServiceVersion(s)
 			oldVersionStr := oldVersions[s.ID]
+			newVersionStr := getServiceVersion(s)
 
 			oldVersion, errOld := git.Parse(oldVersionStr)
 			newVersion, errNew := git.Parse(newVersionStr)
 
-			finalOldVersion := oldVersionStr
-			finalNewVersion := newVersionStr
+			var oldTag, newTag string
 
-			if errOld == nil {
-				finalOldVersion = oldVersion.Short()
-			}
-			if errNew == nil {
-				finalNewVersion = newVersion.Short()
+			// Colorize old version
+			if errOld != nil {
+				oldTag = ui.Colorize("N/A", ui.ColorDarkGray)
+			} else {
+				if errNew == nil && oldVersion.Compare(newVersion) < 0 {
+					oldTag = ui.Colorize(oldVersion.Short(), ui.ColorBrightRed)
+				} else {
+					oldTag = ui.Colorize(oldVersion.Short(), ui.ColorReset)
+				}
 			}
 
-			ui.PrintInfo(fmt.Sprintf("%s %s -> %s", s.ShortName, finalOldVersion, finalNewVersion))
+			// Colorize new version
+			if errNew != nil {
+				newTag = ui.Colorize("N/A", ui.ColorDarkGray)
+			} else {
+				if errOld == nil && newVersion.Compare(oldVersion) > 0 {
+					newTag = ui.Colorize(newVersion.Short(), ui.ColorGreen)
+				} else {
+					newTag = ui.Colorize(newVersion.Short(), ui.ColorReset)
+				}
+			}
+
+			ui.PrintInfo(fmt.Sprintf("%s %s -> %s", s.ShortName, oldTag, newTag))
 		}
 	}
 
