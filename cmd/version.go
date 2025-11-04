@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"runtime"
 	"strings"
-
-	"github.com/EasterCompany/dex-cli/ui"
 )
 
 func Version(version, branch, commit, buildDate, buildYear, buildHash string) {
@@ -27,6 +25,6 @@ func Version(version, branch, commit, buildDate, buildYear, buildHash string) {
 		buildHash,
 	)
 
-	// Print version with trademark if it's an official release
-	fmt.Println(ui.FormatVersionWithTrademark(fullVersion, buildYear))
+	// Print version
+	fmt.Println(fullVersion)
 }

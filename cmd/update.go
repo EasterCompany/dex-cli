@@ -129,7 +129,7 @@ func Update(args []string, buildYear string) error {
 	// 4. Final Summary
 	// ---
 	newVersionStr, newSize := getDexCliInfo()
-	latestVersion := ui.FetchLatestVersion() // For trademark logic
+	latestVersion := ui.FetchLatestVersion()
 
 	log(fmt.Sprintf("Update complete. New version: %s", newVersionStr))
 	fmt.Println()

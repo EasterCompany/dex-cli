@@ -190,4 +190,5 @@ func printUsage() {
 	ui.PrintInfo("Dexter root:        ~/Dexter")
 	ui.PrintInfo("EasterCompany root: ~/EasterCompany")
 	fmt.Println()
+	fmt.Println("™ © 2024 The Easter Company. All rights reserved.")
 }

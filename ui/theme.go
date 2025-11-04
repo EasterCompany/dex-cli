@@ -103,7 +103,7 @@ func PrintSection(title string) {
 
 // PrintInfo prints a standard informational message.
 func PrintInfo(message string) {
-	PrintRaw(fmt.Sprintf("%s%s %s%s\n", ColorCyan, "i", message, ColorReset))
+	PrintRaw(fmt.Sprintf("%s%s%s\n", ColorCyan, message, ColorReset))
 }
 
 // PrintSuccess prints a standard success message.
@@ -119,9 +119,4 @@ func PrintError(message string) {
 // PrintWarning prints a standard warning message.
 func PrintWarning(message string) {
 	PrintRaw(fmt.Sprintf("%s! %s%s\n", ColorYellow, message, ColorReset))
-}
-
-// FormatVersionWithTrademark formats the version string with a trademark symbol and the build year.
-func FormatVersionWithTrademark(version, buildYear string) string {
-	return fmt.Sprintf("%s %s © %s The Easter Company. All rights reserved.", version, "™", buildYear)
 }
