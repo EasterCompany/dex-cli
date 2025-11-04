@@ -156,7 +156,6 @@ func Build(args []string) error {
 	for _, s := range allServices {
 		if s.IsBuildable() {
 			newVersion := getServiceVersion(s)
-			fmt.Printf("Service: %s, Old Version: %s, New Version: %s\n", s.ShortName, oldVersions[s.ID], newVersion)
 			if oldVersions[s.ID] != newVersion {
 				ui.PrintInfo(fmt.Sprintf("  %s version updated from %s to %s", s.ShortName, oldVersions[s.ID], newVersion))
 			}
