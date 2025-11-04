@@ -119,7 +119,7 @@ func checkCLIStatus(service config.ServiceDefinition, serviceID string) ui.Table
 		colorizeNA("N/A"),
 		colorizeNA("N/A"),
 		colorizeNA("N/A"),
-		time.Now.Format("15:04:05"),
+		time.Now().Format("15:04:05"),
 	)
 }
 
