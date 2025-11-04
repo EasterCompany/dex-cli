@@ -100,8 +100,13 @@ func GetCommandRequirements() map[string]CommandRequirement {
 		},
 		"cache": {
 			Name:        "cache",
-			Description: "Interact with the local cache",
+			Description: "Manage the local cache (local-cache-0)",
 			Check:       func() bool { return true }, // Always available
+		},
+		"event": {
+			Name:        "event",
+			Description: "Interact with the event service",
+			Check:       HasEventService,
 		},
 	}
 }
@@ -193,6 +198,26 @@ func HasEasterCompanyRoot() bool {
 	}
 	_, err = os.Stat(path)
 	return err == nil
+}
+
+// HasEventService checks if dex-event-service is in service-map.json
+func HasEventService() bool {
+	serviceMap, err := LoadServiceMapConfig()
+	if err != nil {
+		return false // If we can't load the map, don't show the command
+	}
+
+	coreServices, ok := serviceMap.Services["cs"]
+	if !ok {
+		return false
+	}
+
+	for _, service := range coreServices {
+		if service.ID == "dex-event-service" {
+			return true
+		}
+	}
+	return false
 }
 
 // GetDexServices returns a list of all dex-*-service directories in ~/EasterCompany
