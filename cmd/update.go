@@ -196,6 +196,7 @@ func Update(args []string, buildYear string) error {
 		}
 	}
 
+	fmt.Println() // Add a blank line for spacing
 	ui.PrintSuccess("All services are up to date.")
 
 	return nil

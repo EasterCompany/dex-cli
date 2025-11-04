@@ -211,11 +211,11 @@ func Build(args []string) error {
 		}
 	}
 
+	fmt.Println()                                                                                    // Add a blank line for spacing
 	ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %d service(s).", servicesBuilt+1)) // +1 for dex-cli
 
 	return nil
 }
-
 func gitAddCommitPush(def config.ServiceDefinition) error {
 	sourcePath, err := config.ExpandPath(def.Source)
 	if err != nil {

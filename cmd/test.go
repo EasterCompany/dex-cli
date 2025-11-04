@@ -172,10 +172,7 @@ func runCheck(projectPath, toolName, filePattern string, configFiles []string, a
 		if toolName == "prettier" && strings.Contains(string(output), "No files matching") {
 			return Result{Status: "OK", Tool: toolName}
 		}
-		msg := fmt.Sprintf("%s failed: %s", toolName, strings.Split(string(output), "\n")[0])
-		if len(msg) > 120 {
-			msg = msg[:120] + "..."
-		}
+		msg := fmt.Sprintf("%s failed: %s", toolName, string(output))
 		return Result{Status: "BAD", Tool: toolName, Message: msg}
 	}
 
@@ -226,7 +223,7 @@ func testProject(projectPath string, log func(string)) Result {
 	var results []Result
 	if strings.HasPrefix(projectName, "dex-") {
 		results = []Result{
-			runCheck(projectPath, "go", "go.mod", nil, "test", "./..."),
+			runCheck(projectPath, "go", "go.mod", nil, "test", "-v", "./..."),
 		}
 	}
 	return aggregateResults(results)
