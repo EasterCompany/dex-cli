@@ -82,6 +82,9 @@ func Build(args []string) error {
 			continue
 		}
 
+		fmt.Println()
+		ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, fmt.Sprintf("# Building %s", def.ShortName), ui.ColorReset))
+
 		// Check if source exists before trying to build
 		sourcePath, _ := config.ExpandPath(def.Source)
 		if !checkFileExists(sourcePath) {
@@ -89,8 +92,6 @@ func Build(args []string) error {
 			continue
 		}
 
-		fmt.Println()
-		ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, fmt.Sprintf("# Building %s", def.ShortName), ui.ColorReset))
 		ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, oldVersions[def.ID], ui.ColorReset))
 		log(fmt.Sprintf("Building %s from local source...", def.ShortName))
 
@@ -127,6 +128,8 @@ func Build(args []string) error {
 	// ---
 	// 4. Git Add, Commit, Push
 	// ---
+	fmt.Println()
+	ui.PrintInfo(ui.Colorize("# Git version control", ui.ColorCyan))
 	serviceMap, err := config.LoadServiceMapConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load service-map.json: %w", err)
