@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"time"
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/ui"
@@ -135,6 +136,9 @@ func Update(args []string, buildYear string) error {
 	fmt.Println()
 	ui.PrintHeader("Complete")
 	ui.PrintSuccess("All services are up to date.")
+
+	// Add a small delay to allow services to restart
+	time.Sleep(2 * time.Second)
 
 	// Get new versions and print changes
 	for _, s := range allServices {

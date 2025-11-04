@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/ui"
@@ -147,6 +148,9 @@ func Build(args []string) error {
 	fmt.Println()
 	ui.PrintHeader("Complete")
 	ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %d service(s).", servicesBuilt+1)) // +1 for dex-cli
+
+	// Add a small delay to allow services to restart
+	time.Sleep(2 * time.Second)
 
 	// Get new versions and print changes
 	for _, s := range allServices {
