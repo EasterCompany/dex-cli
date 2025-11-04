@@ -108,6 +108,11 @@ func GetCommandRequirements() map[string]CommandRequirement {
 			Description: "Interact with the event service",
 			Check:       HasEventService,
 		},
+		"config": {
+			Name:        "config",
+			Description: "Show the service-map.json config for a service",
+			Check:       func() bool { return true }, // Always available
+		},
 	}
 }
 

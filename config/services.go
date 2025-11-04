@@ -165,10 +165,22 @@ var serviceDefinitions = []ServiceDefinition{
 	// OS Services (os)
 	{
 		ID:        "local-cache-0",
-		ShortName: "local-cache",
+		ShortName: "cache", // Changed from "local-cache"
 		Type:      "os",
 		Domain:    "localhost",
 		Port:      "6379",
+		Credentials: &ServiceCredentials{
+			Username: "default",
+			Password: "",
+			DB:       0,
+		},
+	},
+	{
+		ID:        "cloud-cache-0",
+		ShortName: "cloud-cache",
+		Type:      "os",
+		Domain:    "redis-18309.c243.eu-west-1-3.ec2.redns.redis-cloud.com",
+		Port:      "18309",
 		Credentials: &ServiceCredentials{
 			Username: "default",
 			Password: "",

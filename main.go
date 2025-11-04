@@ -108,6 +108,9 @@ func main() {
 	case "event":
 		runCommand(func() error { return cmd.Event(os.Args[2:]) })
 
+	case "config":
+		runCommand(func() error { return cmd.Config(os.Args[2:]) })
+
 	case "help", "-h", "--help":
 		printUsage()
 
@@ -178,6 +181,9 @@ func printUsage() {
 	}
 	if config.IsCommandAvailable("event") {
 		ui.PrintInfo("event      Interact with the event service")
+	}
+	if config.IsCommandAvailable("config") {
+		ui.PrintInfo("config     <service> Show the service-map.json config for a service")
 	}
 	ui.PrintInfo("version    Show version information")
 	ui.PrintInfo("help       Show this help message")
