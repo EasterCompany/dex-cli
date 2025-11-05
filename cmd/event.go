@@ -26,12 +26,21 @@ func Event(args []string) error {
 	ui.PrintRaw(string(status) + "\n")
 
 	// --- Debugging Step 2: Print Formatted Response ---
+	var formatted []byte
 	var v interface{}
 	if err := json.Unmarshal(status, &v); err == nil {
-		if formatted, err := json.MarshalIndent(v, "", "  "); err == nil {
+		if formattedJSON, err := json.MarshalIndent(v, "", "  "); err == nil {
+			formatted = formattedJSON
 			ui.PrintHeader("2. Formatted Response")
 			ui.PrintRaw(string(formatted) + "\n")
 		}
+	}
+
+	// --- Debugging Step 3: Print Formatted and Color-Coded Response ---
+	if formatted != nil {
+		ui.PrintHeader("3. Formatted and Color-Coded Response")
+		colorized := ui.HighlightAndColor(string(formatted), "json")
+		ui.PrintRaw(colorized)
 	}
 
 	return nil
