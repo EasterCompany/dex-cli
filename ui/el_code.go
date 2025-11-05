@@ -132,11 +132,11 @@ func highlightSyntax(line, language string) string {
 
 	switch lang {
 	case "json":
-		// Multi-stage placeholder replacement to ensure no regex interference.
+		// Isolate key highlighting for debugging.
 		placeholders := make(map[string]string)
 		placeholderID := 0
 
-		// 1. Find and replace keys first.
+		// 1. Find and replace keys only.
 		keyPattern := regexp.MustCompile(`("([^"]+)")\s*:`)
 		highlighted = keyPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
 			matches := keyPattern.FindStringSubmatch(s)
@@ -147,32 +147,7 @@ func highlightSyntax(line, language string) string {
 			return placeholder + strings.TrimPrefix(s, quotedKey)
 		})
 
-		// 2. Find and replace all remaining strings (values).
-		valueStringPattern := regexp.MustCompile(`"(.*?)"`)
-		highlighted = valueStringPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-			placeholder := fmt.Sprintf("__PH_%d__", placeholderID)
-			placeholders[placeholder] = Colorize(s, ColorGreen)
-			placeholderID++
-			return placeholder
-		})
-
-		// 3. Highlight primitives.
-		primitivesPattern := regexp.MustCompile(`\b(-?\d+(\.\d+)?([eE][+-]?\d+)?|true|false|null)\b`)
-		highlighted = primitivesPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-			color := ColorPurple // Default for numbers
-			if s == "true" || s == "false" || s == "null" {
-				color = ColorYellow
-			}
-			return Colorize(s, color)
-		})
-
-		// 4. Highlight structural elements.
-		structPattern := regexp.MustCompile(`[{}[\],:]`)
-		highlighted = structPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-			return Colorize(s, ColorCyan)
-		})
-
-		// 5. Restore all placeholders.
+		// Restore placeholders.
 		for p, v := range placeholders {
 			highlighted = strings.ReplaceAll(highlighted, p, v)
 		}
