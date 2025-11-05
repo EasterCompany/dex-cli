@@ -18,6 +18,13 @@ import (
 	"github.com/EasterCompany/dex-cli/utils"
 )
 
+const (
+	maxServiceLen = 19
+	maxAddressLen = 17
+	maxVersionLen = 10
+	maxUptimeLen  = 10
+)
+
 // Status checks the health of one or all services
 func Status(serviceShortName string) error {
 	logFile, err := config.LogFile()
@@ -76,13 +83,6 @@ func Status(serviceShortName string) error {
 
 // checkServiceStatus acts as a dispatcher, routing to the correct status checker based on service type.
 func checkServiceStatus(service config.ServiceDefinition) ui.TableRow {
-	// Define max lengths for columns
-	const (
-		maxServiceLen = 19
-		maxAddressLen = 17
-		maxVersionLen = 12
-		maxUptimeLen  = 10
-	)
 
 	// Use the ShortName from the definition for the table
 	serviceID := ui.Truncate(service.ShortName, maxServiceLen)
@@ -126,7 +126,7 @@ func checkCLIStatus(service config.ServiceDefinition, serviceID string) ui.Table
 	return []string{
 		serviceID,
 		colorizeNA("N/A"), // Address is N/A for CLI
-		colorizeNA(ui.Truncate(version, 12)),
+		colorizeNA(ui.Truncate(version, maxVersionLen)),
 		colorizeStatus(status),
 		colorizeNA("N/A"),
 		colorizeNA("N/A"),
@@ -237,7 +237,7 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 		}
 	}
 
-	return []string{serviceID, address, colorizeNA(ui.Truncate(version, 12)), colorizeStatus("OK"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
+	return []string{serviceID, address, colorizeNA(ui.Truncate(version, maxVersionLen)), colorizeStatus("OK"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 }
 
 // checkHTTPStatus checks a service via its new, unified /service endpoint
@@ -284,10 +284,11 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 	}
 
 	// Use the parsed data for the table
+	shortVersion := utils.ParseToShortVersion(report.Version.Str)
 	return []string{
 		serviceID,
 		address,
-		colorizeNA(ui.Truncate(report.Version.Str, 12)),
+		colorizeNA(ui.Truncate(shortVersion, maxVersionLen)),
 		colorizeStatus(strings.ToUpper(report.Health.Status)),
 		colorizeNA(ui.Truncate(report.Health.Uptime, 10)),
 		colorizeNA("N/A"), // Placeholder for future metrics
