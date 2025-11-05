@@ -8,12 +8,9 @@ import (
 
 // ... (existing code) ...
 
-// ParseVersionTag parses a git tag string (e.g., "v1.2.3") into its major, minor, and patch components.
+// ParseVersionTag parses a git tag string (e.g., "1.2.3") into its major, minor, and patch components.
 func ParseVersionTag(tag string) (int, int, int, error) {
-	if !strings.HasPrefix(tag, "v") {
-		return 0, 0, 0, fmt.Errorf("tag does not start with 'v'")
-	}
-	trimmedTag := strings.TrimPrefix(tag, "v")
+	trimmedTag := strings.TrimPrefix(tag, "v") // Still trim just in case, but don't expect it.
 	parts := strings.Split(trimmedTag, ".")
 	if len(parts) != 3 {
 		return 0, 0, 0, fmt.Errorf("tag does not have 3 parts separated by '.'")
@@ -49,7 +46,7 @@ type Version struct {
 
 // Parse takes a version string and returns a Version object.
 func Parse(versionStr string) (*Version, error) {
-	versionStr = strings.TrimPrefix(versionStr, "v")
+	versionStr = strings.TrimPrefix(versionStr, "v") // Always trim 'v' if present
 	parts := strings.Split(versionStr, ".")
 
 	// Handle simple "M.m.p" versions, common for cache services or initial states.

@@ -223,7 +223,7 @@ func runUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), isC
 		}
 		major, minor, patch, err := git.ParseVersionTag(latestTag)
 		if err != nil {
-			ui.PrintWarning(fmt.Sprintf("Could not parse tag '%s', defaulting to v0.0.0. Error: %v", latestTag, err))
+			ui.PrintWarning(fmt.Sprintf("Could not parse tag '%s', defaulting to 0.0.0. Error: %v", latestTag, err))
 			major, minor, patch = 0, 0, 0
 		}
 
