@@ -57,10 +57,14 @@ func Build(args []string) error {
 	// ---
 	// 2. Process cli FIRST
 	// ---
+	oldCliVersion := getServiceVersion(dexCliDef)
 	ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, "# Building cli", ui.ColorReset))
 	if _, err := runUnifiedBuildPipeline(dexCliDef, log, true); err != nil {
 		return err
 	}
+	ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %s!", dexCliDef.ShortName))
+	ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, oldCliVersion, ui.ColorReset))
+	ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, getServiceVersion(dexCliDef), ui.ColorReset))
 
 	// ---
 	// 3. Process all OTHER services
@@ -122,7 +126,7 @@ func Build(args []string) error {
 	ui.PrintHeader("Complete")
 
 	// Add a small delay to allow services to restart
-	time.Sleep(5 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	// Get new versions and print changes for ALL services
 	for _, s := range allServices {

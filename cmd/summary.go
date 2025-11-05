@@ -13,22 +13,26 @@ func formatSummaryLine(def config.ServiceDefinition, oldVersionStr, newVersionSt
 	// --- 1. Format Version Change ---
 	oldVersion, errOld := git.Parse(oldVersionStr)
 	newVersion, errNew := git.Parse(newVersionStr)
-	oldVersionDisplay := formatVersionDisplay(oldVersion, errOld, newVersion, errNew, false)
-	newVersionDisplay := formatVersionDisplay(newVersion, errNew, oldVersion, errOld, true)
+	oldVersionDisplay := formatVersionDisplay(oldVersion, errOld)
+	newVersionDisplay := formatVersionDisplay(newVersion, errNew)
 
 	// --- 2. Format Git Diff and Size Summary ---
-	diffDisplay := ""
+	summaryDisplay := ""
+	summaryParts := []string{}
+	hasError := false
+
 	// Only attempt a diff if both versions are valid and have different commits.
 	if errOld == nil && errNew == nil && oldVersion.Commit != "" && newVersion.Commit != "" && oldVersion.Commit != newVersion.Commit {
-		var summaryParts []string
 		sourcePath, err := config.ExpandPath(def.Source)
 		if err != nil {
-			summaryParts = append(summaryParts, fmt.Sprintf("err: %v", err))
+			summaryParts = append(summaryParts, ui.Colorize(fmt.Sprintf("err: %v", err), ui.ColorBrightRed))
+			hasError = true
 		} else {
 			// Git Diff
 			stats, err := git.GetDiffSummaryBetween(sourcePath, oldVersion.Commit, newVersion.Commit)
 			if err != nil {
-				summaryParts = append(summaryParts, fmt.Sprintf("diff err: %v", err))
+				summaryParts = append(summaryParts, ui.Colorize(fmt.Sprintf("diff err: %v", err), ui.ColorBrightRed))
+				hasError = true
 			} else {
 				if stats.FilesChanged > 0 {
 					summaryParts = append(summaryParts, fmt.Sprintf("files:%d", stats.FilesChanged))
@@ -41,54 +45,57 @@ func formatSummaryLine(def config.ServiceDefinition, oldVersionStr, newVersionSt
 				}
 			}
 		}
-		// Binary Size Change
+	}
+
+	// Binary Size Change
+	if oldSize > 0 && newSize > 0 {
 		sizeDiff := newSize - oldSize
 		if sizeDiff != 0 {
 			sign := "+"
+			color := ui.ColorGreen
 			if sizeDiff < 0 {
 				sign = "" // The negative sign is already part of the number
+				color = ui.ColorBrightRed
 			}
-			summaryParts = append(summaryParts, fmt.Sprintf("%s%.2fkb", sign, float64(sizeDiff)/1024.0))
+			summaryParts = append(summaryParts, ui.Colorize(fmt.Sprintf("%s%.2fkb", sign, float64(sizeDiff)/1024.0), color))
 		}
+	}
 
-		if len(summaryParts) > 0 {
-			diffDisplay = ui.Colorize(fmt.Sprintf(" [%s]", ui.Join(summaryParts, "|")), ui.ColorDarkGray)
+	// Assemble the final summary string
+	if len(summaryParts) > 0 {
+		joiner := "|"
+		if hasError {
+			joiner = " "
 		}
+		summaryDisplay = ui.Colorize(fmt.Sprintf(" [%s]", ui.Join(summaryParts, joiner)), ui.ColorDarkGray)
+	} else if errOld == nil && errNew == nil && oldVersion.Commit == newVersion.Commit {
+		// If commits are the same, just show that there's no change.
+		summaryDisplay = ui.Colorize(" [no changes]", ui.ColorDarkGray)
 	}
 
 	// --- 3. Combine and Return ---
-	greyV := ui.Colorize("v", ui.ColorDarkGray)
-	return fmt.Sprintf("[%s] %s %s -> %s%s", def.ShortName, greyV, oldVersionDisplay, newVersionDisplay, diffDisplay)
+	return fmt.Sprintf("[%s] %s -> %s%s", def.ShortName, oldVersionDisplay, newVersionDisplay, summaryDisplay)
 }
 
 // formatVersionDisplay creates the colored string for one side of the version arrow (->).
-func formatVersionDisplay(v *git.Version, vErr error, other *git.Version, otherErr error, isNewVersion bool) string {
-	if vErr != nil {
+func formatVersionDisplay(v *git.Version, err error) string {
+	if err != nil {
 		return ui.Colorize("N/A", ui.ColorDarkGray)
 	}
 
-	shortTag := v.Short()
-	// Colorize based on comparison, only if both versions are valid.
-	if otherErr == nil {
-		comparison := v.Compare(other)
-		if isNewVersion && comparison > 0 {
-			shortTag = ui.Colorize(shortTag, ui.ColorGreen) // New version is greater
-		} else if !isNewVersion && comparison < 0 {
-			shortTag = ui.Colorize(shortTag, ui.ColorBrightRed) // Old version is less
-		}
+	// Shorten commit hash for display
+	commit := v.Commit
+	if len(commit) > 7 {
+		commit = commit[:7]
 	}
 
-	// Append branch and commit, grayed out.
-	var branchAndCommit string
-	if v.Branch != "" && v.Commit != "" {
-		// Shorten commit hash for display
-		commit := v.Commit
-		if len(commit) > 7 {
-			commit = commit[:7]
-		}
-		branchAndCommit = fmt.Sprintf(".%s.%s", v.Branch, commit)
-		branchAndCommit = ui.Colorize(branchAndCommit, ui.ColorDarkGray)
+	versionParts := []string{v.Short()}
+	if v.Branch != "" {
+		versionParts = append(versionParts, v.Branch)
+	}
+	if commit != "" {
+		versionParts = append(versionParts, commit)
 	}
 
-	return fmt.Sprintf("%s%s", shortTag, branchAndCommit)
+	return ui.Join(versionParts, ".")
 }
