@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 )
@@ -59,7 +60,7 @@ func Colorize(s string, color string) string {
 
 // PrintRaw is the lowest-level printing function, used by all other functions.
 func PrintRaw(s string) {
-	fmt.Println(s)
+	_, _ = os.Stdout.WriteString(s)
 }
 
 // --- Custom Header and Sub-Header Logic ---
