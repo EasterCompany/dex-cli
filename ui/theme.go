@@ -59,7 +59,7 @@ func Colorize(s string, color string) string {
 
 // PrintRaw is the lowest-level printing function, used by all other functions.
 func PrintRaw(s string) {
-	fmt.Print(s)
+	fmt.Println(s)
 }
 
 // --- Custom Header and Sub-Header Logic ---
