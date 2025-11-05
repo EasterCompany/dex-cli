@@ -19,7 +19,7 @@ func Version(version, branch, commit, buildDate, buildYear, buildHash string) {
 
 	// Create the full version string
 	fullVersion := fmt.Sprintf("%s.%s.%s.%s.%s.%s",
-		version,
+		strings.TrimPrefix(version, "v"),
 		branch,
 		commit,
 		formattedDate,
