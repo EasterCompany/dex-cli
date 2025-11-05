@@ -23,12 +23,16 @@ func main() {
 	cmd.RunningVersion = cmd.FormatVersion(version, branch, commit, buildDate, buildHash)
 
 	if err := cmd.EnsurePythonVenv(version); err != nil {
+		fmt.Println() // Add padding at the start
 		ui.PrintError(fmt.Sprintf("Error ensuring Python environment: %v", err))
+		fmt.Println() // Add padding at the end
 		os.Exit(1)
 	}
 
 	if err := config.EnsureDirectoryStructure(); err != nil {
+		fmt.Println() // Add padding at the start
 		ui.PrintError(fmt.Sprintf("Error ensuring directory structure: %v", err))
+		fmt.Println() // Add padding at the end
 		os.Exit(1)
 	}
 
@@ -40,6 +44,7 @@ func main() {
 	command := os.Args[1]
 
 	if !config.IsCommandAvailable(command) {
+		fmt.Println() // Add padding at the start
 		ui.PrintError(fmt.Sprintf("Command '%s' is not available", command))
 		ui.PrintInfo("This command requires certain conditions to be met.")
 		printUsage()
@@ -70,7 +75,9 @@ func main() {
 
 	case "start", "stop", "restart":
 		if len(os.Args) < 3 {
+			fmt.Println() // Add padding at the start
 			ui.PrintError(fmt.Sprintf("Error: service name required for '%s' command", command))
+			fmt.Println() // Add padding at the end
 			os.Exit(1)
 		}
 		service := os.Args[2]
@@ -126,6 +133,7 @@ func main() {
 		printUsage()
 
 	default:
+		fmt.Println() // Add padding at the start
 		ui.PrintError(fmt.Sprintf("Unknown command: %s", command))
 		printUsage()
 		os.Exit(1)
@@ -136,12 +144,14 @@ func runCommand(commandFunc func() error) {
 	fmt.Println()
 	if err := commandFunc(); err != nil {
 		ui.PrintError(fmt.Sprintf("Error: %v", err))
+		fmt.Println() // Add padding at the end
 		os.Exit(1)
 	}
 	fmt.Println()
 }
 
 func printUsage() {
+	fmt.Println() // Add padding at the start
 	ui.PrintInfo("dex <command> [options]")
 
 	if config.IsCommandAvailable("update") {
@@ -201,4 +211,5 @@ func printUsage() {
 	ui.PrintInfo("EasterCompany root: ~/EasterCompany")
 	fmt.Println()
 	fmt.Println("™ © 2024 The Easter Company. All rights reserved.")
+	fmt.Println() // Add padding at the end
 }
