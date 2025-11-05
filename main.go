@@ -154,32 +154,44 @@ func printUsage() {
 	fmt.Println() // Add padding at the start
 	ui.PrintInfo("<command>  [options]")
 
-	if config.IsCommandAvailable("update") {
-		ui.PrintInfo("update     Update dex-cli and all services")
+	if config.IsCommandAvailable("system") {
+		ui.PrintInfo("system     Show system info and manage packages")
 	}
-	if config.IsCommandAvailable("build") {
-		ui.PrintInfo("build      Build and install all services from local source")
+	if config.IsCommandAvailable("config") {
+		ui.PrintInfo("config     <service> [field...] Show service config or a specific field")
+	}
+	if config.IsCommandAvailable("cache") {
+		ui.PrintInfo("cache      [clear|list] Manage the local cache")
 	}
 	if config.IsCommandAvailable("status") {
-		ui.PrintInfo("status     [service] Check the health of one or all services")
+		ui.PrintInfo("status     Checks the status of cli and services")
 	}
 	if config.IsCommandAvailable("start") {
-		ui.PrintInfo("start      <service> Start a service")
+		ui.PrintInfo("start      Start services")
 	}
 	if config.IsCommandAvailable("stop") {
-		ui.PrintInfo("stop       <service> Stop a service")
+		ui.PrintInfo("stop       Stop services")
 	}
 	if config.IsCommandAvailable("restart") {
-		ui.PrintInfo("restart    <service> Restart a service")
+		ui.PrintInfo("restart    Restart services")
 	}
 	if config.IsCommandAvailable("logs") {
 		ui.PrintInfo("logs       <service> [-f] View service logs")
 	}
 	if config.IsCommandAvailable("test") {
-		ui.PrintInfo("test       Run all tests")
+		ui.PrintInfo("test       Test services")
 	}
-	if config.IsCommandAvailable("system") {
-		ui.PrintInfo("system     Show system info and manage packages")
+	if config.IsCommandAvailable("build") {
+		ui.PrintInfo("build      Build and install cli and services")
+	}
+	if config.IsCommandAvailable("update") {
+		ui.PrintInfo("update     Update cli and services")
+	}
+	if config.IsCommandAvailable("add") {
+		ui.PrintInfo("add        Add (install) a service")
+	}
+	if config.IsCommandAvailable("remove") {
+		ui.PrintInfo("remove     Remove (uninstall) a service")
 	}
 	if config.IsCommandAvailable("python") {
 		ui.PrintInfo("python     [<subcommand>] [args...] Python virtual environment")
@@ -190,20 +202,8 @@ func printUsage() {
 	if config.IsCommandAvailable("bunx") {
 		ui.PrintInfo("bunx       [args...] System's bunx executable")
 	}
-	if config.IsCommandAvailable("add") {
-		ui.PrintInfo("add        Add (clone, build, install) a new service")
-	}
-	if config.IsCommandAvailable("remove") {
-		ui.PrintInfo("remove     Uninstall and delete a service")
-	}
-	if config.IsCommandAvailable("cache") {
-		ui.PrintInfo("cache      [clear|list] Manage the local cache")
-	}
 	if config.IsCommandAvailable("event") {
 		ui.PrintInfo("event      Interact with the event service")
-	}
-	if config.IsCommandAvailable("config") {
-		ui.PrintInfo("config     <service> [field...] Show service config or a specific field")
 	}
 	ui.PrintInfo("version    Show version information")
 	ui.PrintInfo("help       Show this help message")
