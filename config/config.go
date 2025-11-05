@@ -25,6 +25,11 @@ var RequiredDexterDirs = []string{
 	"run",
 }
 
+// GetDexterPath returns the absolute path to the ~/Dexter directory.
+func GetDexterPath() (string, error) {
+	return ExpandPath(DexterRoot)
+}
+
 // ExpandPath expands ~ to the user's home directory
 func ExpandPath(path string) (string, error) {
 	if !strings.HasPrefix(path, "~") {

@@ -1,5 +1,5 @@
 // cmd/pipeline.go
-package cmd
+package utils
 
 import (
 	"fmt"
@@ -13,15 +13,14 @@ import (
 )
 
 // gitUpdateService clones or force-pulls a service repository.
-func gitUpdateService(def config.ServiceDefinition) error {
+func GitUpdateService(def config.ServiceDefinition) error {
 	sourcePath, err := config.ExpandPath(def.Source)
 	if err != nil {
 		return fmt.Errorf("failed to expand source path: %w", err)
 	}
 
-	if !checkFileExists(sourcePath) {
-		// Source doesn't exist, so let's clone it
-		return gitCloneService(def)
+	if !CheckFileExists(sourcePath) {
+		return fmt.Errorf("source directory not found for %s: %s", def.ShortName, sourcePath)
 	}
 
 	// Source exists, force-pull latest changes
@@ -43,36 +42,14 @@ func gitUpdateService(def config.ServiceDefinition) error {
 	return nil
 }
 
-// gitCloneService clones a service repository from its definition.
-func gitCloneService(def config.ServiceDefinition) error {
-	sourcePath, err := config.ExpandPath(def.Source)
-	if err != nil {
-		return fmt.Errorf("failed to expand source path: %w", err)
-	}
-
-	if checkFileExists(sourcePath) {
-		return fmt.Errorf("source directory %s already exists", sourcePath)
-	}
-
-	ui.PrintInfo(fmt.Sprintf("Source for %s not found, cloning from %s...", def.ShortName, def.Repo))
-	// Clone with --depth 1 to save space, only main branch
-	cmd := exec.Command("git", "clone", "--depth", "1", "--branch", "main", def.Repo, sourcePath)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to clone %s: %w", def.ShortName, err)
-	}
-	return nil
-}
-
 // runServicePipelineStep executes a single step (format, lint, test, build)
-func runServicePipelineStep(def config.ServiceDefinition, step string) error {
+func RunServicePipelineStep(def config.ServiceDefinition, step string) error {
 	sourcePath, err := config.ExpandPath(def.Source)
 	if err != nil {
 		return fmt.Errorf("failed to expand source path: %w", err)
 	}
 
-	if !checkFileExists(filepath.Join(sourcePath, "go.mod")) {
+	if !CheckFileExists(filepath.Join(sourcePath, "go.mod")) {
 		return fmt.Errorf("skipping %s: not a Go project (no go.mod)", step)
 	}
 
@@ -105,8 +82,8 @@ func runServicePipelineStep(def config.ServiceDefinition, step string) error {
 	return nil
 }
 
-// installSystemdService creates and enables the systemd service file.
-func installSystemdService(def config.ServiceDefinition) error {
+// InstallSystemdService creates and enables the systemd service file.
+func InstallSystemdService(def config.ServiceDefinition) error {
 	if !def.IsManageable() {
 		return nil // Skip for cli, os
 	}
@@ -171,77 +148,4 @@ WantedBy=default.target
 		}
 	}
 	return nil
-}
-
-// fullServiceUninstall stops, disables, and removes all artifacts for a service.
-func fullServiceUninstall(def config.ServiceDefinition, serviceMap *config.ServiceMapConfig) error {
-	ui.PrintInfo(fmt.Sprintf("Uninstalling all artifacts for %s...", def.ShortName))
-	var lastErr error
-
-	// 1. Stop and disable systemd service
-	if def.IsManageable() {
-		servicePath, _ := config.ExpandPath(def.GetSystemdPath())
-		if checkFileExists(servicePath) {
-			ui.PrintInfo(fmt.Sprintf("  Stopping and disabling %s...", def.SystemdName))
-			_ = exec.Command("systemctl", "--user", "stop", def.SystemdName).Run()
-			_ = exec.Command("systemctl", "--user", "disable", def.SystemdName).Run()
-
-			if err := os.Remove(servicePath); err != nil {
-				ui.PrintWarning(fmt.Sprintf("Failed to remove systemd file: %v", err))
-				lastErr = err
-			}
-		}
-	}
-
-	// 2. Remove log file
-	logPath, _ := config.ExpandPath(def.GetLogPath())
-	if checkFileExists(logPath) {
-		ui.PrintInfo(fmt.Sprintf("  Removing log file: %s", def.GetLogPath()))
-		if err := os.Remove(logPath); err != nil {
-			ui.PrintWarning(fmt.Sprintf("Failed to remove log file: %v", err))
-			lastErr = err
-		}
-	}
-
-	// 3. Remove binary
-	binPath, _ := config.ExpandPath(def.GetBinaryPath())
-	if checkFileExists(binPath) {
-		ui.PrintInfo(fmt.Sprintf("  Removing binary: %s", def.GetBinaryPath()))
-		if err := os.Remove(binPath); err != nil {
-			ui.PrintWarning(fmt.Sprintf("Failed to remove binary: %v", err))
-			lastErr = err
-		}
-	}
-
-	// 4. Remove from service-map.json
-	found := false
-	if s, ok := serviceMap.Services[def.Type]; ok {
-		for i, entry := range s {
-			if entry.ID == def.ID {
-				serviceMap.Services[def.Type] = append(s[:i], s[i+1:]...)
-				found = true
-				break
-			}
-		}
-	}
-	if found {
-		ui.PrintInfo("  Removing from service-map.json...")
-		if err := config.SaveServiceMapConfig(serviceMap); err != nil {
-			ui.PrintWarning(fmt.Sprintf("Failed to save service map: %v", err))
-			lastErr = err
-		}
-	}
-
-	// 5. Remove source code (optional? for now, let's leave it, as it's the user's dev dir)
-	// sourcePath, _ := config.ExpandPath(def.Source)
-	// if checkFileExists(sourcePath) {
-	// 	ui.PrintInfo(fmt.Sprintf("  Removing source directory: %s", def.Source))
-	// 	if err := os.RemoveAll(sourcePath); err != nil {
-	// 		ui.PrintWarning(fmt.Sprintf("Failed to remove source: %v", err))
-	// 		lastErr = err
-	// 	}
-	// }
-
-	_ = exec.Command("systemctl", "--user", "daemon-reload").Run()
-	return lastErr
 }

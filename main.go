@@ -7,6 +7,7 @@ import (
 	"github.com/EasterCompany/dex-cli/cmd"
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/ui"
+	"github.com/EasterCompany/dex-cli/utils"
 )
 
 var (
@@ -24,7 +25,7 @@ func main() {
 
 	// Skip Python check for version command to prevent output pollution
 	if len(os.Args) > 1 && os.Args[1] != "version" {
-		if err := cmd.EnsurePythonVenv(cmd.RunningVersion); err != nil {
+		if err := utils.EnsurePythonVenv(); err != nil {
 			fmt.Println() // Add padding at the start
 			ui.PrintError(fmt.Sprintf("Error ensuring Python environment: %v", err))
 			fmt.Println() // Add padding at the end
@@ -77,14 +78,7 @@ func main() {
 		runCommand(func() error { return cmd.Build(os.Args[2:]) })
 
 	case "start", "stop", "restart":
-		if len(os.Args) < 3 {
-			fmt.Println() // Add padding at the start
-			ui.PrintError(fmt.Sprintf("Error: service name required for '%s' command", command))
-			fmt.Println() // Add padding at the end
-			os.Exit(1)
-		}
-		service := os.Args[2]
-		runCommand(func() error { return cmd.Service(command, service) })
+		runCommand(func() error { return cmd.Service(command) })
 
 	case "status":
 		service := "all"
@@ -109,7 +103,7 @@ func main() {
 		runCommand(func() error { return cmd.Test(os.Args[2:]) })
 
 	case "python":
-		runCommand(func() error { return cmd.Python(os.Args[2:]) })
+		runCommand(func() error { return utils.Python(os.Args[2:]) })
 
 	case "bun":
 		runCommand(func() error { return cmd.Bun(os.Args[2:]) })
@@ -170,13 +164,13 @@ func printUsage() {
 		ui.PrintInfo("status     Checks the status of cli and services")
 	}
 	if config.IsCommandAvailable("start") {
-		ui.PrintInfo("start      Start service(s)")
+		ui.PrintInfo("start      Start all manageable services")
 	}
 	if config.IsCommandAvailable("stop") {
-		ui.PrintInfo("stop       Stop service(s)")
+		ui.PrintInfo("stop       Stop all manageable services")
 	}
 	if config.IsCommandAvailable("restart") {
-		ui.PrintInfo("restart    Restart service(s)")
+		ui.PrintInfo("restart    Restart all manageable services")
 	}
 	if config.IsCommandAvailable("logs") {
 		ui.PrintInfo("logs       <service> [-f] View service logs")

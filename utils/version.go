@@ -1,4 +1,4 @@
-package cmd
+package utils
 
 import (
 	"bufio"
@@ -14,38 +14,32 @@ import (
 	"github.com/EasterCompany/dex-cli/config"
 )
 
-// getServiceVersion fetches the version of a service based on its type.
-func getServiceVersion(service config.ServiceDefinition) string {
-	switch service.Type {
-	case "cli":
-		return getCLIVersion()
-	case "os":
-		return getCacheVersion(service)
-	default:
-		return getHTTPVersion(service)
-	}
-}
-
-// getCLIVersion executes `dex version` to get the CLI's version.
-func getCLIVersion() string {
-	// Use the direct path to the newly built binary to ensure we get the new version.
-	dexPath, err := config.ExpandPath("~/Dexter/bin/dex")
+// GetServiceVersion determines the version of a service.
+func GetServiceVersion(service config.ServiceDefinition) string {
+	version, err := GetHTTPVersion(service)
 	if err != nil {
 		return "N/A"
 	}
+	return version
+}
 
-	cmd := exec.Command(dexPath, "version")
-	output, err := cmd.CombinedOutput()
+// GetCLIVersion returns the version of the running dex-cli binary.
+func GetCLIVersion() string {
+	cmd := exec.Command("dex", "version", "--short")
+	output, err := cmd.Output()
 	if err != nil {
 		return "N/A"
 	}
-	// The `version` command now outputs "v: <version>", so we strip the prefix.
-	versionStr := strings.TrimSpace(string(output))
-	return versionStr
+	return strings.TrimSpace(string(output))
 }
 
-// getCacheVersion connects to a cache service to get its version.
-func getCacheVersion(service config.ServiceDefinition) string {
+// isCloudDomain checks if a domain is a cloud domain.
+func isCloudDomain(domain string) bool {
+	return strings.HasSuffix(domain, ".redns.redis-cloud.com")
+}
+
+// GetCacheVersion connects to a cache service to get its version.
+func GetCacheVersion(service config.ServiceDefinition) string {
 	var conn net.Conn
 	var err error
 
@@ -111,13 +105,4 @@ func getCacheVersion(service config.ServiceDefinition) string {
 	}
 
 	return "N/A"
-}
-
-// getHTTPVersion fetches the version from a service's /service endpoint.
-func getHTTPVersion(service config.ServiceDefinition) string {
-	report, err := GetServiceReport(service)
-	if err != nil {
-		return "N/A"
-	}
-	return report.Version.Str
 }

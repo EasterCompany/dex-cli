@@ -3,103 +3,65 @@ package cmd
 import (
 	"fmt"
 	"os/exec"
+	"sync"
 
 	"github.com/EasterCompany/dex-cli/config"
+	"github.com/EasterCompany/dex-cli/ui"
 )
 
-// Service manages start, stop, and restart operations for Dexter services.
-func Service(action, serviceShortName string) error {
-	logFile, err := config.LogFile()
+// Service handles start, stop, and restart commands for all manageable services.
+func Service(command string) error {
+	ui.PrintInfo(fmt.Sprintf("Attempting to %s all services...", command))
+
+	serviceMap, err := config.LoadServiceMapConfig()
 	if err != nil {
-		return fmt.Errorf("failed to get log file: %w", err)
-	}
-	defer func() { _ = logFile.Close() }()
-
-	log := func(message string) {
-		_, _ = fmt.Fprintln(logFile, message)
+		return fmt.Errorf("failed to load service-map.json: %w", err)
 	}
 
-	log(fmt.Sprintf("Service command called with action '%s' for service '%s'", action, serviceShortName))
-
-	def, err := config.Resolve(serviceShortName)
-	if err != nil {
-		return err
+	var servicesToManage []config.ServiceDefinition
+	for _, serviceList := range serviceMap.Services {
+		for _, serviceEntry := range serviceList {
+			def := config.GetServiceDefinition(serviceEntry.ID)
+			// Only manage services that are not "cli" or "os" and have a systemd name
+			if def.ID != "" && def.Type != "cli" && def.Type != "os" && def.SystemdName != "" {
+				servicesToManage = append(servicesToManage, def)
+			}
+		}
 	}
 
-	if !def.IsManageable() {
-		return fmt.Errorf("service '%s' is not manageable (must be cs, be, or th type)", serviceShortName)
+	if len(servicesToManage) == 0 {
+		ui.PrintInfo("No manageable services found in service-map.json.")
+		return nil
 	}
 
-	systemdServiceName := def.SystemdName
+	var wg sync.WaitGroup
+	errors := make(chan error, len(servicesToManage))
 
-	// Check if the service file exists
-	systemdPath, err := config.ExpandPath(def.GetSystemdPath())
-	if err != nil {
-		return err
-	}
-	// Use the correct helper function 'checkFileExists' from cmd/utils.go (via cmd/pipeline.go)
-	if !checkFileExists(systemdPath) {
-		return fmt.Errorf("systemd service '%s' not found. Run 'dex build' or 'dex update' to install it", systemdServiceName)
-	}
-
-	// Perform the action using systemctl --user
-	switch action {
-	case "start":
-		return startService(systemdServiceName, log)
-	case "stop":
-		return stopService(systemdServiceName, log)
-	case "restart":
-		return restartService(systemdServiceName, log)
-	default:
-		log(fmt.Sprintf("Unknown service action: %s", action))
-		return fmt.Errorf("unknown service action: %s", action)
-	}
-}
-
-func startService(systemdServiceName string, log func(string)) error {
-	fmt.Printf("Starting %s...\n", systemdServiceName)
-	log(fmt.Sprintf("Starting %s...", systemdServiceName))
-
-	cmd := exec.Command("systemctl", "--user", "start", systemdServiceName)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		log(fmt.Sprintf("Failed to start %s: %v\n%s", systemdServiceName, err, string(output)))
-		return fmt.Errorf("failed to start %s: %w\n%s", systemdServiceName, err, string(output))
+	for _, s := range servicesToManage {
+		wg.Add(1)
+		go func(service config.ServiceDefinition) {
+			defer wg.Done()
+			ui.PrintInfo(fmt.Sprintf("Executing '%s' for %s...", command, service.ShortName))
+			cmd := exec.Command("systemctl", "--user", command, service.SystemdName)
+			if output, err := cmd.CombinedOutput(); err != nil {
+				errors <- fmt.Errorf("failed to %s %s: %s", command, service.ShortName, string(output))
+			}
+		}(s)
 	}
 
-	fmt.Printf("%s started successfully\n", systemdServiceName)
-	log(fmt.Sprintf("%s started successfully", systemdServiceName))
-	return nil
-}
+	wg.Wait()
+	close(errors)
 
-func stopService(systemdServiceName string, log func(string)) error {
-	fmt.Printf("Stopping %s...\n", systemdServiceName)
-	log(fmt.Sprintf("Stopping %s...", systemdServiceName))
-
-	cmd := exec.Command("systemctl", "--user", "stop", systemdServiceName)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		log(fmt.Sprintf("Failed to stop %s: %v\n%s", systemdServiceName, err, string(output)))
-		return fmt.Errorf("failed to stop %s: %w\n%s", systemdServiceName, err, string(output))
+	hasErrors := false
+	for err := range errors {
+		hasErrors = true
+		ui.PrintError(err.Error())
 	}
 
-	fmt.Printf("%s stopped successfully\n", systemdServiceName)
-	log(fmt.Sprintf("%s stopped successfully", systemdServiceName))
-	return nil
-}
-
-func restartService(systemdServiceName string, log func(string)) error {
-	fmt.Printf("Restarting %s...\n", systemdServiceName)
-	log(fmt.Sprintf("Restarting %s...", systemdServiceName))
-
-	cmd := exec.Command("systemctl", "--user", "restart", systemdServiceName)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		log(fmt.Sprintf("Failed to restart %s: %v\n%s", systemdServiceName, err, string(output)))
-		return fmt.Errorf("failed to restart %s: %w\n%s", systemdServiceName, err, string(output))
+	if hasErrors {
+		return fmt.Errorf("one or more services failed to %s", command)
 	}
 
-	fmt.Printf("%s restarted successfully\n", systemdServiceName)
-	log(fmt.Sprintf("%s restarted successfully", systemdServiceName))
+	ui.PrintSuccess(fmt.Sprintf("Successfully executed '%s' for all services.", command))
 	return nil
 }

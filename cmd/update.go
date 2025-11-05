@@ -9,6 +9,7 @@ import (
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/git"
 	"github.com/EasterCompany/dex-cli/ui"
+	"github.com/EasterCompany/dex-cli/utils"
 )
 
 // Update manages the unified update process for dex-cli and all other services.
@@ -34,8 +35,8 @@ func Update(args []string, buildYear string) error {
 	oldSizes := make(map[string]int64)
 	for _, s := range allServices {
 		if s.IsBuildable() {
-			oldVersions[s.ID] = getServiceVersion(s)
-			oldSizes[s.ID] = getBinarySize(s)
+			oldVersions[s.ID] = utils.GetServiceVersion(s)
+			oldSizes[s.ID] = utils.GetBinarySize(s)
 		}
 	}
 
@@ -52,7 +53,7 @@ func Update(args []string, buildYear string) error {
 	// 2. Process dex-cli FIRST (always)
 	// ---
 	ui.PrintInfo(ui.Colorize(fmt.Sprintf("# Updating %s", dexCliDef.ShortName), ui.ColorCyan))
-	if err := gitUpdateService(dexCliDef); err != nil {
+	if err := utils.GitUpdateService(dexCliDef); err != nil {
 		return fmt.Errorf("failed to update dex-cli source: %w", err)
 	}
 
@@ -111,42 +112,41 @@ func Update(args []string, buildYear string) error {
 			continue
 		}
 
-		fmt.Println()
 		ui.PrintInfo(ui.Colorize(fmt.Sprintf("# Updating %s", def.ShortName), ui.ColorCyan))
 
 		// 1. Download
-		if err := gitUpdateService(def); err != nil {
+		if err := utils.GitUpdateService(def); err != nil {
 			return err // Stop-on-failure
 		}
 
 		// 2. Format
-		if err := runServicePipelineStep(def, "format"); err != nil {
+		if err := utils.RunServicePipelineStep(def, "format"); err != nil {
 			return err // Stop-on-failure
 		}
 
 		// 3. Lint
-		if err := runServicePipelineStep(def, "lint"); err != nil {
+		if err := utils.RunServicePipelineStep(def, "lint"); err != nil {
 			return err // Stop-on-failure
 		}
 
 		// 4. Test
-		if err := runServicePipelineStep(def, "test"); err != nil {
+		if err := utils.RunServicePipelineStep(def, "test"); err != nil {
 			return err // Stop-on-failure
 		}
 
 		// 5. Build
-		if err := runServicePipelineStep(def, "build"); err != nil {
+		if err := utils.RunServicePipelineStep(def, "build"); err != nil {
 			return err // Stop-on-failure
 		}
 
 		// 6. Install
-		if err := installSystemdService(def); err != nil {
+		if err := utils.InstallSystemdService(def); err != nil {
 			return err // Stop-on-failure
 		}
 
 		ui.PrintSuccess(fmt.Sprintf("Successfully updated and installed %s!", def.ShortName))
 		ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, oldVersions[def.ID], ui.ColorReset))
-		ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, getServiceVersion(def), ui.ColorReset))
+		ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.GetServiceVersion(def), ui.ColorReset))
 	}
 
 	// ---
@@ -160,7 +160,7 @@ func Update(args []string, buildYear string) error {
 	time.Sleep(2 * time.Second)
 
 	// Get new versions and print changes, but ONLY for services in the service map
-	configuredServices, err := getConfiguredServices()
+	configuredServices, err := utils.GetConfiguredServices()
 	if err != nil {
 		// Don't fail the whole command, just warn.
 		ui.PrintWarning(fmt.Sprintf("Could not load configured services for final summary: %v", err))
@@ -168,10 +168,10 @@ func Update(args []string, buildYear string) error {
 		for _, s := range configuredServices {
 			if s.IsBuildable() {
 				oldVersionStr := oldVersions[s.ID]
-				newVersionStr := getServiceVersion(s)
+				newVersionStr := utils.GetServiceVersion(s)
 				oldSize := oldSizes[s.ID]
-				newSize := getBinarySize(s)
-				ui.PrintInfo(formatSummaryLine(s, oldVersionStr, newVersionStr, oldSize, newSize))
+				newSize := utils.GetBinarySize(s)
+				ui.PrintInfo(utils.FormatSummaryLine(s, oldVersionStr, newVersionStr, oldSize, newSize))
 			}
 		}
 	}

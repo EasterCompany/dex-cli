@@ -10,6 +10,7 @@ import (
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/git"
 	"github.com/EasterCompany/dex-cli/ui"
+	"github.com/EasterCompany/dex-cli/utils"
 )
 
 // Build compiles all services from their local source.
@@ -31,22 +32,10 @@ func Build(args []string) error {
 
 	log("Build command called...")
 	ui.PrintHeader("Building All Services from Local Source")
-
-	// ---
-	// 1. Get initial versions and sizes
-	// ---
 	allServices := config.GetAllServices()
-	oldVersions := make(map[string]string)
-	oldSizes := make(map[string]int64)
-	for _, s := range allServices {
-		if s.IsBuildable() {
-			oldVersions[s.ID] = getServiceVersion(s)
-			oldSizes[s.ID] = getBinarySize(s)
-		}
-	}
 
-	var dexCliDef config.ServiceDefinition
 	// Find dex-cli definition
+	var dexCliDef config.ServiceDefinition
 	for _, s := range allServices {
 		if s.ShortName == "cli" {
 			dexCliDef = s
@@ -55,16 +44,32 @@ func Build(args []string) error {
 	}
 
 	// ---
+	// 1. Get initial versions and sizes (after finding cli def to get RunningVersion)
+	// ---
+	oldVersions := make(map[string]string)
+	oldSizes := make(map[string]int64)
+	for _, s := range allServices {
+		if s.IsBuildable() {
+			if s.ShortName == "cli" {
+				oldVersions[s.ID] = RunningVersion
+			} else {
+				oldVersions[s.ID] = utils.GetServiceVersion(s)
+			}
+			oldSizes[s.ID] = utils.GetBinarySize(s)
+		}
+	}
+
+	// ---
 	// 2. Process cli FIRST
 	// ---
-	oldCliVersion := getServiceVersion(dexCliDef)
+	oldCliVersion := utils.GetServiceVersion(dexCliDef)
 	ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, "# Building cli", ui.ColorReset))
 	if _, err := runUnifiedBuildPipeline(dexCliDef, log, true); err != nil {
 		return err
 	}
 	ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %s!", dexCliDef.ShortName))
 	ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, oldCliVersion, ui.ColorReset))
-	ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, getServiceVersion(dexCliDef), ui.ColorReset))
+	ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.GetServiceVersion(dexCliDef), ui.ColorReset))
 
 	// ---
 	// 3. Process all OTHER services
@@ -85,13 +90,12 @@ func Build(args []string) error {
 
 		if built {
 			// After a successful build, install the systemd service
-			if err := installSystemdService(def); err != nil {
+			if err := utils.InstallSystemdService(def); err != nil {
 				return err
 			}
-
 			ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %s!", def.ShortName))
 			ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, oldVersions[def.ID], ui.ColorReset))
-			ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, getServiceVersion(def), ui.ColorReset))
+			ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.GetServiceVersion(def), ui.ColorReset))
 			servicesBuilt++
 		}
 	}
@@ -132,14 +136,15 @@ func Build(args []string) error {
 	for _, s := range allServices {
 		if s.IsBuildable() {
 			oldVersionStr := oldVersions[s.ID]
-			newVersionStr := getServiceVersion(s)
+			newVersionStr := utils.GetServiceVersion(s)
 			oldSize := oldSizes[s.ID]
-			newSize := getBinarySize(s)
-			ui.PrintInfo(formatSummaryLine(s, oldVersionStr, newVersionStr, oldSize, newSize))
+			newSize := utils.GetBinarySize(s)
+			ui.PrintInfo(utils.FormatSummaryLine(s, oldVersionStr, newVersionStr, oldSize, newSize))
 		}
 	}
 
-	ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %d service(s).", servicesBuilt+1)) // +1 for dex-cli
+	fmt.Println() // Add a blank line for spacing
+	ui.PrintSuccess("All services are built.")
 
 	return nil
 }
@@ -150,7 +155,7 @@ func runUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), isC
 		return false, fmt.Errorf("failed to expand source path for %s: %w", def.ShortName, err)
 	}
 
-	if !checkFileExists(sourcePath) {
+	if !utils.CheckFileExists(sourcePath) {
 		ui.PrintWarning(fmt.Sprintf("Skipping %s: source code not found at %s. Run 'dex add' to download & install it.", def.ShortName, sourcePath))
 		return false, nil
 	}
@@ -219,36 +224,30 @@ func runUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), isC
 	}
 
 	var buildCmd *exec.Cmd
-	if isCli {
-		// Special handling for dex-cli to embed version info
-		latestTag, err := git.GetLatestTag(sourcePath)
-		if err != nil {
-			return false, fmt.Errorf("failed to get latest git tag for cli: %w", err)
-		}
-		major, minor, patch, err := git.ParseVersionTag(latestTag)
-		if err != nil {
-			ui.PrintWarning(fmt.Sprintf("Could not parse tag '%s', defaulting to 0.0.0. Error: %v", latestTag, err))
-			major, minor, patch = 0, 0, 0
-		}
-
-		branch, commit := git.GetVersionInfo(sourcePath)
-		buildDate := time.Now().UTC().Format("2006-01-02T15:04:05Z")
-		buildYear := time.Now().UTC().Format("2006")
-		buildArch := "linux/amd64"
-		buildHash := "local" // Placeholder for build hash
-
-		// Format the version string to match the new parsing logic (M.m.p.branch.commit.date.arch.hash)
-		fullVersionStr := fmt.Sprintf("%d.%d.%d.%s.%s.%s.%s.%s",
-			major, minor, patch+1, branch, commit, buildDate, buildArch, buildHash)
-
-		ldflags := fmt.Sprintf("-X main.version=%s -X main.branch=%s -X main.commit=%s -X main.buildDate=%s -X main.buildYear=%s -X main.buildHash=%s -X main.arch=%s",
-			fullVersionStr, branch, commit, buildDate, buildYear, buildHash, buildArch)
-		buildCmd = exec.Command("go", "build", "-ldflags", ldflags, "-o", outputPath, ".")
-	} else {
-		// Standard build for other services
-		buildCmd = exec.Command("go", "build", "-o", outputPath, ".")
+	// Embed version info for all buildable services
+	latestTag, err := git.GetLatestTag(sourcePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to get latest git tag for %s: %w", def.ShortName, err)
+	}
+	major, minor, patch, err := git.ParseVersionTag(latestTag)
+	if err != nil {
+		ui.PrintWarning(fmt.Sprintf("Could not parse tag '%s' for %s, defaulting to 0.0.0. Error: %v", latestTag, def.ShortName, err))
+		major, minor, patch = 0, 0, 0
 	}
 
+	branch, commit := git.GetVersionInfo(sourcePath)
+	buildDate := time.Now().UTC().Format("2006-01-02-15-04-05") // Hyphenated format
+	buildYear := time.Now().UTC().Format("2006")
+	buildArch := "linux-amd64"               // Hyphenated format
+	buildHash := utils.GenerateRandomHash(8) // Generate an 8-character random hash
+
+	// Format the version string to match the new parsing logic (M.m.p.branch.commit.date.arch.hash)
+	fullVersionStr := fmt.Sprintf("%d.%d.%d.%s.%s.%s.%s.%s",
+		major, minor, patch+1, branch, commit, buildDate, buildArch, buildHash)
+
+	ldflags := fmt.Sprintf("-X main.version=%s -X main.branch=%s -X main.commit=%s -X main.buildDate=%s -X main.buildYear=%s -X main.buildHash=%s -X main.arch=%s",
+		fullVersionStr, branch, commit, buildDate, buildYear, buildHash, buildArch)
+	buildCmd = exec.Command("go", "build", "-ldflags", ldflags, "-o", outputPath, ".")
 	buildCmd.Dir = sourcePath
 	buildCmd.Stdout = os.Stdout
 	buildCmd.Stderr = os.Stderr

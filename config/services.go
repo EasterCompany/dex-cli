@@ -30,6 +30,14 @@ type ServiceDefinition struct {
 	Port string
 	// Credentials for OS services like Redis
 	Credentials *ServiceCredentials
+	// Backup configuration
+	Backup *BackupConfig
+}
+
+// BackupConfig defines the backup settings for a service.
+type BackupConfig struct {
+	// Artifacts is a list of paths to back up.
+	Artifacts []string
 }
 
 // ToServiceEntry converts a hardcoded Definition to a ServiceEntry for saving.

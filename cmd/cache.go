@@ -1,187 +1,115 @@
-// cmd/cache.go
 package cmd
 
 import (
 	"context"
 	"fmt"
 	"sort"
-	"strings"
+	"time"
 
 	"github.com/EasterCompany/dex-cli/cache"
-	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/ui"
-	"github.com/redis/go-redis/v9"
+	"github.com/EasterCompany/dex-cli/utils"
 )
 
-// Cache manages interaction with the local-cache-0 service.
+// Cache manages the local cache.
 func Cache(args []string) error {
 	if len(args) == 0 {
-		return printCacheUsage()
+		return fmt.Errorf("cache command requires a subcommand (clear, list)")
 	}
 
 	subcommand := args[0]
 	switch subcommand {
 	case "clear":
-		return cacheClear()
+		return clearCache()
 	case "list":
-		return cacheList()
-	case "help":
-		return printCacheUsage()
+		return listCache()
 	default:
 		return fmt.Errorf("unknown cache subcommand: %s", subcommand)
 	}
 }
 
-func printCacheUsage() error {
-	ui.PrintInfo("dex cache <subcommand>")
-	ui.PrintInfo("  clear    Clear all keys from the local cache")
-	ui.PrintInfo("  list     List all keys grouped by service, with size")
-	return nil
-}
-
-// cacheClear connects to local-cache-0 and runs FLUSHDB.
-func cacheClear() error {
-	ui.PrintInfo("Connecting to local-cache-0...")
-	client, err := cache.GetLocalClient(context.Background())
+func clearCache() error {
+	ctx := context.Background()
+	client, err := cache.GetLocalClient(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to connect to local cache: %w", err)
+		return fmt.Errorf("failed to get local cache client: %w", err)
 	}
 	defer func() { _ = client.Close() }()
 
-	ui.PrintInfo("Clearing all keys from database...")
-	if err := client.FlushDB(context.Background()).Err(); err != nil {
+	if err := client.FlushDB(ctx).Err(); err != nil {
 		return fmt.Errorf("failed to clear cache: %w", err)
 	}
 
-	ui.PrintSuccess("Local cache cleared successfully.")
+	ui.PrintSuccess("Local cache cleared.")
 	return nil
 }
 
-// cacheList scans all keys, groups them by service prefix, and reports size.
-func cacheList() error {
-	ui.PrintInfo("Connecting to local-cache-0 to scan keys...")
-	client, err := cache.GetLocalClient(context.Background())
+type CacheEntry struct {
+	Key    string
+	Size   int64
+	Expiry time.Time
+}
+
+func listCache() error {
+	ctx := context.Background()
+	client, err := cache.GetLocalClient(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to connect to local cache: %w", err)
+		return fmt.Errorf("failed to get local cache client: %w", err)
 	}
 	defer func() { _ = client.Close() }()
 
-	// 1. Get all services to use as prefixes
-	allServices := config.GetAllServices()
-
-	// 2. Scan all keys in the database
-	ui.PrintInfo("Scanning all keys (this may take a moment)...")
-	allKeys, err := scanAllKeys(client, "*")
+	keys, err := client.Keys(ctx, "*").Result()
 	if err != nil {
-		return err
-	}
-	ui.PrintInfo(fmt.Sprintf("Found %d total keys.", len(allKeys)))
-
-	// 3. Group keys by service
-	serviceMap := make(map[string][]string)
-	otherKeys := []string{}
-	for _, key := range allKeys {
-		found := false
-		for _, service := range allServices {
-			prefix := service.ID + ":"
-			if strings.HasPrefix(key, prefix) {
-				serviceMap[service.ID] = append(serviceMap[service.ID], key)
-				found = true
-				break
-			}
-		}
-		if !found {
-			otherKeys = append(otherKeys, key)
-		}
+		return fmt.Errorf("failed to list cache keys: %w", err)
 	}
 
-	// 4. Create table and get memory usage
-	table := ui.NewTable([]string{"SERVICE", "KEY COUNT", "TOTAL SIZE"})
-	ctx := context.Background()
-
-	// Process services, sorted by ID
-	serviceIDs := make([]string, 0, len(serviceMap))
-	for id := range serviceMap {
-		serviceIDs = append(serviceIDs, id)
-	}
-	sort.Strings(serviceIDs)
-
-	for _, serviceID := range serviceIDs {
-		keys := serviceMap[serviceID]
-		totalBytes, err := getMemoryForKeys(client, ctx, keys)
-		if err != nil {
-			return err
-		}
-		// Resolve ID to ShortName for display
-		def, err := config.ResolveByID(serviceID)
-		if err != nil {
-			continue // Should not happen
-		}
-		table.AddRow([]string{
-			def.ShortName,
-			fmt.Sprintf("%d", len(keys)),
-			FormatBytes(totalBytes),
-		})
-	}
-
-	// 5. Add "other" keys
-	if len(otherKeys) > 0 {
-		totalBytes, err := getMemoryForKeys(client, ctx, otherKeys)
-		if err != nil {
-			return err
-		}
-		table.AddRow([]string{
-			fmt.Sprintf("%s%s%s", ui.ColorDarkGray, "(other)", ui.ColorReset),
-			fmt.Sprintf("%d", len(otherKeys)),
-			FormatBytes(totalBytes),
-		})
-	}
-
-	if len(allKeys) == 0 {
-		ui.PrintInfo("Cache is empty.")
+	if len(keys) == 0 {
+		ui.PrintInfo("Local cache is empty.")
 		return nil
 	}
 
-	table.Render()
-	return nil
-}
+	var entries []CacheEntry
+	var totalSize int64
 
-// scanAllKeys uses SCAN to safely iterate over all keys.
-func scanAllKeys(client *redis.Client, match string) ([]string, error) {
-	var cursor uint64
-	var keys []string
-	ctx := context.Background()
-
-	for {
-		var scanKeys []string
-		var err error
-		scanKeys, cursor, err = client.Scan(ctx, cursor, match, 1000).Result()
-		if err != nil {
-			return nil, fmt.Errorf("redis scan failed: %w", err)
-		}
-		keys = append(keys, scanKeys...)
-		if cursor == 0 {
-			break
-		}
-	}
-	return keys, nil
-}
-
-// getMemoryForKeys iterates a list of keys and sums their MEMORY USAGE.
-func getMemoryForKeys(client *redis.Client, ctx context.Context, keys []string) (int64, error) {
-	var totalBytes int64
-	// We can't use a simple pipeline, as MEMORY USAGE might fail (e.g., key expired)
 	for _, key := range keys {
-		bytes, err := client.MemoryUsage(ctx, key).Result()
+		size, err := client.MemoryUsage(ctx, key).Result()
 		if err != nil {
-			// Key might have expired between SCAN and MEMORY USAGE, just skip it
-			if err == redis.Nil {
-				continue
-			}
-			ui.PrintWarning(fmt.Sprintf("Could not get memory for key %s: %v", key, err))
-			continue
+			size = 0 // Default to 0 if size can't be fetched
 		}
-		totalBytes += bytes
+		totalSize += size
+
+		ttl, err := client.TTL(ctx, key).Result()
+		if err != nil {
+			ttl = -1 // No expiry
+		}
+		expiry := time.Now().Add(ttl)
+		if ttl == -1 {
+			expiry = time.Time{} // Zero time for no expiry
+		}
+
+		entries = append(entries, CacheEntry{
+			Key:    key,
+			Size:   size,
+			Expiry: expiry,
+		})
 	}
-	return totalBytes, nil
+
+	// Sort entries by key
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Key < entries[j].Key
+	})
+
+	ui.PrintHeader("Local Cache Entries")
+	for _, entry := range entries {
+		ui.PrintInfo(fmt.Sprintf("Key: %s", entry.Key))
+		ui.PrintInfo(fmt.Sprintf("  Size: %s", utils.FormatBytes(entry.Size)))
+		if !entry.Expiry.IsZero() {
+			ui.PrintInfo(fmt.Sprintf("  Expires: %s", entry.Expiry.Format(time.RFC3339)))
+		} else {
+			ui.PrintInfo("  Expires: (no expiry)")
+		}
+	}
+	ui.PrintInfo(fmt.Sprintf("Total cache size: %s", utils.FormatBytes(totalSize)))
+
+	return nil
 }

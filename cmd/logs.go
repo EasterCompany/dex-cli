@@ -42,8 +42,7 @@ func Logs(args []string, follow bool) error {
 	// Show logs for the selected services
 	logFiles := []string{}
 	for _, serviceDef := range servicesToShow {
-		fmt.Printf("# Logs for %s (Version: %s)\n", serviceDef.ShortName, getServiceVersion(serviceDef))
-		logPathStr := serviceDef.GetLogPath() // This line is now a single assignment
+		logPathStr := serviceDef.GetLogPath()
 		logPath, err := config.ExpandPath(logPathStr)
 		if err != nil {
 			return fmt.Errorf("failed to expand log path: %w", err)

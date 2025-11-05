@@ -6,81 +6,16 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
 	"os/exec"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/git"
 	"github.com/EasterCompany/dex-cli/ui"
+	"github.com/EasterCompany/dex-cli/utils"
 )
-
-// getConfiguredServices loads the service-map.json and merges its values
-// with the master service definitions. This ensures user-configured
-// domains, ports, and credentials are used.
-func getConfiguredServices() ([]config.ServiceDefinition, error) {
-	// 1. Load the user's service-map.json
-	serviceMap, err := config.LoadServiceMapConfig()
-	if err != nil {
-		if os.IsNotExist(err) {
-			// If it doesn't exist, use the default map
-			serviceMap = config.DefaultServiceMapConfig()
-		} else {
-			// Other error
-			return nil, fmt.Errorf("failed to load service-map.json: %w", err)
-		}
-	}
-
-	// 2. Get the hardcoded master list of all *possible* services
-	// This master list knows the ShortName, Type, ID, etc.
-	masterList := config.GetAllServices()
-	masterDefs := make(map[string]config.ServiceDefinition)
-	for _, def := range masterList {
-		masterDefs[def.ID] = def
-	}
-
-	// 3. Create the final list by merging the service map values
-	var configuredServices []config.ServiceDefinition
-
-	for serviceType, serviceEntries := range serviceMap.Services {
-		for _, entry := range serviceEntries {
-			// Find the master definition for this service ID
-			masterDef, ok := masterDefs[entry.ID]
-			if !ok {
-				// This service is in service-map.json but not in the hardcoded master list
-				// We can't check it if we don't know its type, shortname etc.
-				// For now, we'll just use the entry data directly, but 'Type' and 'ShortName' might be incomplete.
-				// A better approach: The masterDef *must* exist.
-				// Let's assume for status, we only check services known to the CLI.
-				continue
-			}
-
-			// Merge: Use master def as base, but override with user's config
-			masterDef.Type = serviceType // Ensure type is from the map key
-			if entry.Domain != "" {
-				masterDef.Domain = entry.Domain
-			}
-			if entry.Port != "" {
-				masterDef.Port = entry.Port
-			}
-			if entry.Credentials != nil {
-				masterDef.Credentials = entry.Credentials
-			}
-
-			configuredServices = append(configuredServices, masterDef)
-		}
-	}
-
-	// Sort by port to maintain a consistent order
-	sort.Slice(configuredServices, func(i, j int) bool {
-		return configuredServices[i].Port < configuredServices[j].Port
-	})
-
-	return configuredServices, nil
-}
 
 // Status checks the health of one or all services
 func Status(serviceShortName string) error {
@@ -97,7 +32,7 @@ func Status(serviceShortName string) error {
 	log(fmt.Sprintf("Checking status for service: %s", serviceShortName))
 
 	// Get the list of services *from the service-map.json*
-	allServices, err := getConfiguredServices()
+	allServices, err := utils.GetConfiguredServices()
 	if err != nil {
 		return fmt.Errorf("failed to get configured services: %w", err)
 	}
@@ -306,7 +241,7 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 
 // checkHTTPStatus checks a service via its new, unified /service endpoint
 func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string) ui.TableRow {
-	report, err := GetServiceReport(service)
+	status, err := utils.GetHTTPVersion(service)
 	if err != nil {
 		// If the endpoint fails, we return a BAD status with N/A for all other fields.
 		return []string{
@@ -321,22 +256,16 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 		}
 	}
 
-	// Format values from the report for table display
-	version := ui.Truncate(report.Version.Tag, 12)
-	uptime := ui.Truncate(formatUptime(time.Duration(report.Health.Uptime)*time.Second), 10)
-	goroutines := fmt.Sprintf("%d", report.Health.Metrics.Goroutines)
-	mem := fmt.Sprintf("%.2f", report.Health.Metrics.MemoryAllocMB)
-	timestamp := time.Unix(report.Health.Timestamp, 0).Format("15:04:05")
-
+	// For simplified endpoint, version is the status itself, other metrics are N/A
 	return []string{
 		serviceID,
 		address,
-		colorizeNA(version),
-		colorizeStatus(report.Status),
-		colorizeNA(uptime),
-		colorizeNA(goroutines),
-		colorizeNA(mem),
-		timestamp,
+		colorizeNA(ui.Truncate(status, 12)), // Version is now the status string
+		colorizeStatus(status),
+		colorizeNA("N/A"),
+		colorizeNA("N/A"),
+		colorizeNA("N/A"),
+		time.Now().Format("15:04:05"),
 	}
 }
 
@@ -352,22 +281,4 @@ func colorizeStatus(status string) string {
 	default:
 		return status
 	}
-}
-
-// formatUptime converts a duration into a compact string like "1d 2h 3m".
-func formatUptime(d time.Duration) string {
-	if d < time.Minute {
-		return fmt.Sprintf("%ds", int(d.Seconds()))
-	}
-	if d < time.Hour {
-		return fmt.Sprintf("%dm", int(d.Minutes()))
-	}
-	if d < 24*time.Hour {
-		h := int(d.Hours())
-		m := int(d.Minutes()) % 60
-		return fmt.Sprintf("%dh %dm", h, m)
-	}
-	days := int(d.Hours()) / 24
-	h := int(d.Hours()) % 24
-	return fmt.Sprintf("%dd %dh", days, h)
 }
