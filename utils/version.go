@@ -17,11 +17,16 @@ import (
 
 // GetServiceVersion determines the version of a service.
 func GetServiceVersion(service config.ServiceDefinition) string {
-	version, err := GetHTTPVersion(service)
-	if err != nil {
-		return "N/A"
+	switch service.Type {
+	case "cli":
+		return GetCLIVersion()
+	default:
+		version, err := GetHTTPVersion(service)
+		if err != nil {
+			return "N/A"
+		}
+		return version
 	}
-	return version
 }
 
 // GetFullServiceVersion returns the full, untruncated version of a service.
