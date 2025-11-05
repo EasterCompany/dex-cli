@@ -46,12 +46,13 @@ func formatSummaryLine(def config.ServiceDefinition, oldVersionStr, newVersionSt
 	if err == nil {
 		stats, err := git.GetDiffSummary(sourcePath)
 		if err == nil {
-			branch := newVersion.Branch
-			if branch == "" {
+			var branch string
+			if newVersion != nil && newVersion.Branch != "" {
+				branch = newVersion.Branch
+			} else if oldVersion != nil && oldVersion.Branch != "" {
 				branch = oldVersion.Branch
-			}
-			if branch == "" {
-				branch = "main" // Fallback
+			} else {
+				branch = "main" // Fallback if no branch info is available
 			}
 
 			var insertions, deletions string
