@@ -78,11 +78,15 @@ func GetFullServiceVersion(service config.ServiceDefinition) string {
 		return GetCacheVersion(service)
 	default:
 		// For HTTP services, the version is the full version string.
-		version, err := GetHTTPVersion(service)
-		if err != nil {
-			return "N/A"
+		const maxRetries = 5
+		for i := 0; i < maxRetries; i++ {
+			version, err := GetHTTPVersion(service)
+			if err == nil {
+				return version
+			}
+			time.Sleep(1 * time.Second)
 		}
-		return version
+		return "N/A"
 	}
 }
 
