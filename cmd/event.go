@@ -43,5 +43,9 @@ func Event(args []string) error {
 		ui.PrintRaw(colorized)
 	}
 
+	// --- Debugging Step 4: Print Final Code Block ---
+	ui.PrintHeader("4. Final Code Block")
+	ui.PrintCodeBlockFromBytes(status, "event-service", "json")
+
 	return nil
 }
