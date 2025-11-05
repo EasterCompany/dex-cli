@@ -61,7 +61,7 @@ func Build(args []string) error {
 	// 2. Process cli FIRST
 	// ---
 	ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, "# Building cli", ui.ColorReset))
-	if err := runUnifiedBuildPipeline(dexCliDef, log, true); err != nil {
+	if _, err := runUnifiedBuildPipeline(dexCliDef, log, true); err != nil {
 		return err
 	}
 
@@ -77,19 +77,22 @@ func Build(args []string) error {
 		fmt.Println()
 		ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, fmt.Sprintf("# Building %s", def.ShortName), ui.ColorReset))
 
-		if err := runUnifiedBuildPipeline(def, log, false); err != nil {
+		built, err := runUnifiedBuildPipeline(def, log, false)
+		if err != nil {
 			return err
 		}
 
-		// After a successful build, install the systemd service
-		if err := installSystemdService(def); err != nil {
-			return err
-		}
+		if built {
+			// After a successful build, install the systemd service
+			if err := installSystemdService(def); err != nil {
+				return err
+			}
 
-		ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %s!", def.ShortName))
-		ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, oldVersions[def.ID], ui.ColorReset))
-		ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, getServiceVersion(def), ui.ColorReset))
-		servicesBuilt++
+			ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %s!", def.ShortName))
+			ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, oldVersions[def.ID], ui.ColorReset))
+			ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, getServiceVersion(def), ui.ColorReset))
+			servicesBuilt++
+		}
 	}
 
 	// ---
@@ -182,15 +185,15 @@ func Build(args []string) error {
 
 	return nil
 }
-func runUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), isCli bool) error {
+func runUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), isCli bool) (bool, error) {
 	sourcePath, err := config.ExpandPath(def.Source)
 	if err != nil {
-		return fmt.Errorf("failed to expand source path for %s: %w", def.ShortName, err)
+		return false, fmt.Errorf("failed to expand source path for %s: %w", def.ShortName, err)
 	}
 
 	if !checkFileExists(sourcePath) {
 		ui.PrintWarning(fmt.Sprintf("Skipping %s: source code not found at %s. Run 'dex add' to download & install it.", def.ShortName, sourcePath))
-		return nil
+		return false, nil
 	}
 
 	log(fmt.Sprintf("Building %s from local source...", def.ShortName))
@@ -205,7 +208,7 @@ func runUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), isC
 	tidyCmd.Stderr = os.Stderr
 	if err := tidyCmd.Run(); err != nil {
 		log(fmt.Sprintf("%s 'go mod tidy' failed: %v", def.ShortName, err))
-		return fmt.Errorf("%s 'go mod tidy' failed: %w", def.ShortName, err)
+		return false, fmt.Errorf("%s 'go mod tidy' failed: %w", def.ShortName, err)
 	}
 
 	// ---
@@ -218,7 +221,7 @@ func runUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), isC
 	formatCmd.Stderr = os.Stderr
 	if err := formatCmd.Run(); err != nil {
 		log(fmt.Sprintf("%s 'go fmt' failed: %v", def.ShortName, err))
-		return fmt.Errorf("%s 'go fmt' failed: %w", def.ShortName, err)
+		return false, fmt.Errorf("%s 'go fmt' failed: %w", def.ShortName, err)
 	}
 
 	// ---
@@ -231,7 +234,7 @@ func runUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), isC
 	lintCmd.Stderr = os.Stderr
 	if err := lintCmd.Run(); err != nil {
 		log(fmt.Sprintf("%s 'golangci-lint run' failed: %v", def.ShortName, err))
-		return fmt.Errorf("%s 'golangci-lint run' failed: %w", def.ShortName, err)
+		return false, fmt.Errorf("%s 'golangci-lint run' failed: %w", def.ShortName, err)
 	}
 
 	// ---
@@ -244,7 +247,7 @@ func runUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), isC
 	testCmd.Stderr = os.Stderr
 	if err := testCmd.Run(); err != nil {
 		log(fmt.Sprintf("%s 'go test' failed: %v", def.ShortName, err))
-		return fmt.Errorf("%s 'go test' failed: %w", def.ShortName, err)
+		return false, fmt.Errorf("%s 'go test' failed: %w", def.ShortName, err)
 	}
 
 	// ---
@@ -253,7 +256,7 @@ func runUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), isC
 	ui.PrintInfo("Building...")
 	outputPath, err := config.ExpandPath(def.GetBinaryPath())
 	if err != nil {
-		return fmt.Errorf("could not expand binary path for %s: %w", def.ShortName, err)
+		return false, fmt.Errorf("could not expand binary path for %s: %w", def.ShortName, err)
 	}
 
 	var buildCmd *exec.Cmd
@@ -261,7 +264,7 @@ func runUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), isC
 		// Special handling for dex-cli to embed version info
 		latestTag, err := git.GetLatestTag(sourcePath)
 		if err != nil {
-			return fmt.Errorf("failed to get latest git tag for cli: %w", err)
+			return false, fmt.Errorf("failed to get latest git tag for cli: %w", err)
 		}
 		major, minor, patch, err := git.ParseVersionTag(latestTag)
 		if err != nil {
@@ -289,10 +292,10 @@ func runUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), isC
 	buildCmd.Stderr = os.Stderr
 	if err := buildCmd.Run(); err != nil {
 		log(fmt.Sprintf("%s 'go build' failed: %v", def.ShortName, err))
-		return fmt.Errorf("%s 'go build' failed: %w", def.ShortName, err)
+		return false, fmt.Errorf("%s 'go build' failed: %w", def.ShortName, err)
 	}
 
-	return nil
+	return true, nil
 }
 
 func gitAddCommitPush(def config.ServiceDefinition) error {
