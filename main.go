@@ -123,7 +123,9 @@ func main() {
 		runCommand(func() error { return cmd.Config(os.Args[2:]) })
 
 	case "help", "-h", "--help":
+		fmt.Println() // Add padding at the start
 		printUsage()
+		fmt.Println() // Add padding at the end
 
 	default:
 		ui.PrintError(fmt.Sprintf("Unknown command: %s", command))
