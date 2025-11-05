@@ -7,6 +7,35 @@ import (
 	"strings"
 )
 
+// ... (existing code) ...
+
+// ParseVersionTag parses a git tag string (e.g., "v1.2.3") into its major, minor, and patch components.
+func ParseVersionTag(tag string) (int, int, int, error) {
+	if !strings.HasPrefix(tag, "v") {
+		return 0, 0, 0, fmt.Errorf("tag does not start with 'v'")
+	}
+	trimmedTag := strings.TrimPrefix(tag, "v")
+	parts := strings.Split(trimmedTag, ".")
+	if len(parts) != 3 {
+		return 0, 0, 0, fmt.Errorf("tag does not have 3 parts separated by '.'")
+	}
+
+	major, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("failed to parse major version '%s': %w", parts[0], err)
+	}
+	minor, err := strconv.Atoi(parts[1])
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("failed to parse minor version '%s': %w", parts[1], err)
+	}
+	patch, err := strconv.Atoi(parts[2])
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("failed to parse patch version '%s': %w", parts[2], err)
+	}
+
+	return major, minor, patch, nil
+}
+
 // Version holds the components of a parsed version string.
 type Version struct {
 	Major      string
