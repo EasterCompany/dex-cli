@@ -15,11 +15,11 @@ func Event(args []string) error {
 		return err
 	}
 
-	status, err := utils.GetHTTPVersion(*def)
+	status, _, err := utils.GetHTTPBody(def.GetHTTP("/service"))
 	if err != nil {
 		return fmt.Errorf("failed to get event service status: %w", err)
 	}
 
-	ui.PrintInfo(status)
+	ui.PrintCodeBlockFromBytes(status, "event-service", "json")
 	return nil
 }
