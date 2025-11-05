@@ -132,48 +132,53 @@ func highlightSyntax(line, language string) string {
 
 	switch lang {
 	case "json":
-		// Order of operations is critical here to avoid double-coloring.
-		// 1. Keys (most specific string match)
-		keyPattern := regexp.MustCompile(`("([^"]+)"):(\s*)`)
-		highlighted = keyPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-			parts := keyPattern.FindStringSubmatch(s)
-			// parts[0] is full match, parts[1] is quoted key, parts[2] is key content, parts[3] is space
-			return Colorize(parts[1], ColorBlue) + ":" + parts[3]
-		})
+		// Placeholder-based replacement to prevent regex interference.
+		placeholders := make(map[string]string)
+		placeholderID := 0
 
-		// 2. All other strings (values)
-		// We must ensure we don't re-match keys. The check for ColorReset should prevent this.
+		// 1. Replace all strings with placeholders
 		highlighted = stringPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-			if strings.Contains(s, ColorReset) {
-				return s // Already colored, so skip
-			}
-			return Colorize(s, ColorGreen)
+			placeholder := fmt.Sprintf("__STRING_%d__", placeholderID)
+			placeholders[placeholder] = Colorize(s, ColorGreen) // Default to green (value)
+			placeholderID++
+			return placeholder
 		})
 
-		// 3. Primitives
-		numPattern := regexp.MustCompile(`\b-?\d+(\.\d+)?([eE][+-]?\d+)?\b`)
-		highlighted = numPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-			if strings.Contains(s, ColorReset) {
-				return s
-			}
-			return Colorize(s, ColorPurple)
+		// 2. Identify which placeholders are keys and color them blue
+		keyPattern := regexp.MustCompile(`(__STRING_\d__):`)
+		highlighted = keyPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
+			placeholder := strings.TrimRight(s, ":")
+			// Overwrite the map entry with the blue key color
+			placeholders[placeholder] = Colorize(StripANSI(placeholders[placeholder]), ColorBlue)
+			return s // Return the placeholder with the colon
 		})
-		primitivesPattern := regexp.MustCompile(`\b(true|false|null)\b`)
+
+		// 3. Highlight primitives (numbers, bools, null)
+		primitivesPattern := regexp.MustCompile(`\b(-?\d+(\.\d+)?|true|false|null)\b`)
 		highlighted = primitivesPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
 			if strings.Contains(s, ColorReset) {
 				return s
 			}
-			return Colorize(s, ColorYellow)
+			color := ColorPurple // Default for numbers
+			if s == "true" || s == "false" || s == "null" {
+				color = ColorYellow
+			}
+			return Colorize(s, color)
 		})
 
-		// 4. Structural elements
-		structPattern := regexp.MustCompile(`[{}[\],]`)
+		// 4. Highlight structural elements
+		structPattern := regexp.MustCompile(`[{}[\],:]`)
 		highlighted = structPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
 			if strings.Contains(s, ColorReset) {
 				return s
 			}
 			return Colorize(s, ColorCyan)
 		})
+
+		// 5. Restore all placeholders
+		for p, v := range placeholders {
+			highlighted = strings.ReplaceAll(highlighted, p, v)
+		}
 
 	case "go", "js", "ts", "python", "bash", "sh":
 		// Keywords - Yellow
