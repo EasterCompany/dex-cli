@@ -231,8 +231,10 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 			// Try to find redis_version or valkey_version
 			re := regexp.MustCompile(`(redis_version|valkey_version):([0-9]+\.[0-9]+\.[0-9]+)`)
 			matches := re.FindStringSubmatch(infoStr)
-			if len(matches) >= 3 {
+			if len(matches) >= 3 && matches[2] != "" {
 				version = matches[2]
+			} else {
+				version = "N/A"
 			}
 		}
 	}

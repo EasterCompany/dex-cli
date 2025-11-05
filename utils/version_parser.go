@@ -10,5 +10,9 @@ func ParseToShortVersion(versionStr string) string {
 	if err != nil {
 		return "N/A"
 	}
-	return parsedVersion.Short()
+	shortVersion := parsedVersion.Short()
+	if shortVersion == "" {
+		return "N/A"
+	}
+	return shortVersion
 }
