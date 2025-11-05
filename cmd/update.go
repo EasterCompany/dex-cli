@@ -2,12 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
 	"time"
 
 	"github.com/EasterCompany/dex-cli/config"
-	"github.com/EasterCompany/dex-cli/git"
 	"github.com/EasterCompany/dex-cli/ui"
 	"github.com/EasterCompany/dex-cli/utils"
 )
@@ -56,34 +53,9 @@ func Update(args []string, buildYear string) error {
 	if err := utils.GitUpdateService(dexCliDef); err != nil {
 		return fmt.Errorf("failed to update dex-cli source: %w", err)
 	}
-
-	// For dex-cli, we run 'make install' as it correctly handles all steps
-	sourcePath, _ := config.ExpandPath(dexCliDef.Source)
-
-	// Automatically bump the patch version for the build
-	latestTag, err := git.GetLatestTag(sourcePath)
-	if err != nil {
-		return fmt.Errorf("failed to get latest git tag for dex-cli: %w", err)
+	if _, err := utils.RunUnifiedBuildPipeline(dexCliDef, log); err != nil {
+		return err
 	}
-
-	major, minor, patch, err := git.ParseVersionTag(latestTag)
-	if err != nil {
-		// Fallback to a default if the tag is malformed
-		ui.PrintWarning(fmt.Sprintf("Could not parse tag '%s', defaulting to 0.0.0. Error: %v", latestTag, err))
-		major, minor, patch = 0, 0, 0
-	}
-
-	newVersion := fmt.Sprintf("%d.%d.%d", major, minor, patch+1)
-	installCmd := exec.Command("make", "install", fmt.Sprintf("VERSION=%s", newVersion))
-	installCmd.Dir = sourcePath
-	installCmd.Stdout = os.Stdout
-	installCmd.Stderr = os.Stderr
-
-	if err := installCmd.Run(); err != nil {
-		log(fmt.Sprintf("dex-cli 'make install' failed: %v", err))
-		return fmt.Errorf("dex-cli 'make install' failed: %w", err)
-	}
-
 	ui.PrintSuccess(fmt.Sprintf("Successfully updated and installed %s!", dexCliDef.ShortName))
 	ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, oldVersions[dexCliDef.ID], ui.ColorReset))
 	ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.GetFullServiceVersion(dexCliDef), ui.ColorReset))
