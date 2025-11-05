@@ -25,7 +25,7 @@ func getPythonPaths() (envDir, pythonExecutable, pipExecutable, poetryExecutable
 }
 
 // bootstrapPythonEnvironment sets up the initial python environment managed by dex-cli.
-func bootstrapPythonEnvironment() error {
+func bootstrapPythonEnvironment(silent bool) error {
 	envDir, pythonExecutable, pipExecutable, _, err := getPythonPaths()
 	if err != nil {
 		return err
@@ -33,7 +33,9 @@ func bootstrapPythonEnvironment() error {
 
 	// 1. Check if the environment already exists.
 	if _, err := os.Stat(pythonExecutable); err == nil {
-		ui.PrintInfo("Python environment already configured.")
+		if !silent {
+			ui.PrintInfo("Python environment already configured.")
+		}
 		return nil
 	}
 
@@ -110,24 +112,34 @@ func CheckPoetryInstalled() error {
 }
 
 // EnsurePythonVenv ensures the entire dexter-managed python environment is correctly set up.
-func EnsurePythonVenv() error {
-	if err := bootstrapPythonEnvironment(); err != nil {
+func EnsurePythonVenv(silent bool) error {
+	if err := bootstrapPythonEnvironment(silent); err != nil {
 		return err
 	}
 
-	ui.PrintHeader("Verifying Python Environment")
+	if !silent {
+		ui.PrintHeader("Verifying Python Environment")
+	}
 
-	ui.PrintInfo("Checking Python 3.13...")
+	if !silent {
+		ui.PrintInfo("Checking Python 3.13...")
+	}
 	if err := CheckPythonVersion(); err != nil {
 		return err
 	}
-	ui.PrintSuccess("Python 3.13 found.")
+	if !silent {
+		ui.PrintSuccess("Python 3.13 found.")
+	}
 
-	ui.PrintInfo("Checking Poetry installation...")
+	if !silent {
+		ui.PrintInfo("Checking Poetry installation...")
+	}
 	if err := CheckPoetryInstalled(); err != nil {
 		return err
 	}
-	ui.PrintSuccess("Poetry installed.")
+	if !silent {
+		ui.PrintSuccess("Poetry installed.")
+	}
 
 	return nil
 }

@@ -25,7 +25,10 @@ func main() {
 
 	// Skip Python check for version command to prevent output pollution
 	if len(os.Args) > 1 && os.Args[1] != "version" {
-		if err := utils.EnsurePythonVenv(); err != nil {
+		command := os.Args[1]
+		// Only show the Python check for specific commands
+		isVerboseCommand := command == "build" || command == "update" || command == "test"
+		if err := utils.EnsurePythonVenv(!isVerboseCommand); err != nil {
 			fmt.Println() // Add padding at the start
 			ui.PrintError(fmt.Sprintf("Error ensuring Python environment: %v", err))
 			fmt.Println() // Add padding at the end
