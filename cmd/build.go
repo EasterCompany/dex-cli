@@ -251,6 +251,11 @@ func runUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), isC
 	// 5. Build
 	// ---
 	ui.PrintInfo("Building...")
+	outputPath, err := config.ExpandPath(def.GetBinaryPath())
+	if err != nil {
+		return fmt.Errorf("could not expand binary path for %s: %w", def.ShortName, err)
+	}
+
 	var buildCmd *exec.Cmd
 	if isCli {
 		// Special handling for dex-cli to embed version info
@@ -273,11 +278,10 @@ func runUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), isC
 		ldflags := fmt.Sprintf("-X main.version=%s -X main.branch=%s -X main.commit=%s -X main.buildDate=%s -X main.buildYear=%s -X main.buildHash=%s",
 			newVersion, branch, commit, buildDate, buildYear, buildHash)
 
-		outputPath, _ := config.ExpandPath("~/Dexter/bin/dex")
 		buildCmd = exec.Command("go", "build", "-ldflags", ldflags, "-o", outputPath, ".")
 	} else {
 		// Standard build for other services
-		buildCmd = exec.Command("go", "build", "-o", fmt.Sprintf("/usr/local/bin/%s", def.ShortName), ".")
+		buildCmd = exec.Command("go", "build", "-o", outputPath, ".")
 	}
 
 	buildCmd.Dir = sourcePath

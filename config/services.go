@@ -74,6 +74,9 @@ func (def *ServiceDefinition) GetLogPath() string {
 
 // GetBinaryPath returns the full path to the service's compiled binary.
 func (def *ServiceDefinition) GetBinaryPath() string {
+	if def.ShortName == "cli" {
+		return "~/Dexter/bin/dex"
+	}
 	return fmt.Sprintf("~/Dexter/bin/%s", def.ID)
 }
 
