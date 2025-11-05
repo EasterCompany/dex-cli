@@ -69,10 +69,14 @@ func PrintSummaryTable(summaries []SummaryInfo) {
 
 		// --- Format Change Summary ---
 		summary := s.ChangeSummary
-		if summary == "" {
-			summary = "Not a git repository."
+		color := ui.ColorWhite // Default color for actual commit logs
+
+		switch summary {
+		case "", "No changes.", "Not a git repository.":
+			summary = "N/A"
+			color = ui.ColorDarkGray
 		}
-		summary = ui.Colorize(summary, ui.ColorDarkGray)
+		summary = ui.Colorize(summary, color)
 
 		table.AddRow(ui.TableRow{
 			s.Service.ShortName,

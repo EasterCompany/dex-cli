@@ -142,8 +142,12 @@ func Build(args []string) error {
 
 			var changeLog string
 			if oldVer != nil && newVer != nil && oldVer.Commit != "" && newVer.Commit != "" {
-				repoPath, _ := config.ExpandPath(s.Source)
-				changeLog, _ = git.GetCommitLogBetween(repoPath, oldVer.Commit, newVer.Commit)
+				if oldVer.Commit == newVer.Commit {
+					changeLog = "N/A"
+				} else {
+					repoPath, _ := config.ExpandPath(s.Source)
+					changeLog, _ = git.GetCommitLogBetween(repoPath, oldVer.Commit, newVer.Commit)
+				}
 			}
 
 			summaryData = append(summaryData, utils.SummaryInfo{
