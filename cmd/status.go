@@ -3,6 +3,7 @@ package cmd
 import (
 	"bufio"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -241,9 +242,20 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 
 // checkHTTPStatus checks a service via its new, unified /service endpoint
 func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string) ui.TableRow {
-	status, err := utils.GetHTTPVersion(service)
+	// A minimal struct to unmarshal only what we need for the status table
+	type serviceReport struct {
+		Version struct {
+			Str string `json:"str"`
+		} `json:"version"`
+		Health struct {
+			Status string `json:"status"`
+			Uptime string `json:"uptime"`
+		} `json:"health"`
+	}
+
+	// Get the raw JSON response from the service
+	jsonResponse, err := utils.GetHTTPVersion(service)
 	if err != nil {
-		// If the endpoint fails, we return a BAD status with N/A for all other fields.
 		return []string{
 			serviceID,
 			address,
@@ -256,17 +268,30 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 		}
 	}
 
-	version := utils.GetServiceVersion(service)
+	var report serviceReport
+	if err := json.Unmarshal([]byte(jsonResponse), &report); err != nil {
+		// If parsing fails, the service might be returning a non-JSON error
+		return []string{
+			serviceID,
+			address,
+			colorizeNA("N/A"),
+			colorizeStatus("BAD"),
+			colorizeNA("N/A"),
+			colorizeNA("N/A"),
+			colorizeNA("N/A"),
+			time.Now().Format("15:04:05"),
+		}
+	}
 
-	// For simplified endpoint, version is the status itself, other metrics are N/A
+	// Use the parsed data for the table
 	return []string{
 		serviceID,
 		address,
-		colorizeNA(ui.Truncate(version, 12)), // Version is now the status string
-		colorizeStatus(status),
-		colorizeNA("N/A"),
-		colorizeNA("N/A"),
-		colorizeNA("N/A"),
+		colorizeNA(ui.Truncate(report.Version.Str, 12)),
+		colorizeStatus(strings.ToUpper(report.Health.Status)),
+		colorizeNA(ui.Truncate(report.Health.Uptime, 10)),
+		colorizeNA("N/A"), // Placeholder for future metrics
+		colorizeNA("N/A"), // Placeholder for future metrics
 		time.Now().Format("15:04:05"),
 	}
 }
