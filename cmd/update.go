@@ -170,6 +170,13 @@ func Update(args []string, buildYear string) error {
 			if s.IsBuildable() {
 				oldVersionStr := oldVersions[s.ID]
 				newVersionStr := utils.GetServiceVersion(s)
+
+				// Parse versions if they are JSON
+				if s.Type != "cli" {
+					oldVersionStr = utils.ParseServiceVersionFromJSON(oldVersionStr)
+					newVersionStr = utils.ParseServiceVersionFromJSON(newVersionStr)
+				}
+
 				oldSize := oldSizes[s.ID]
 				newSize := utils.GetBinarySize(s)
 				ui.PrintInfo(utils.FormatSummaryLine(s, oldVersionStr, newVersionStr, oldSize, newSize))
