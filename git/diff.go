@@ -17,13 +17,17 @@ type DiffStats struct {
 
 // GetDiffSummary calculates the diff between the current HEAD and the previous commit.
 func GetDiffSummary(repoPath string) (*DiffStats, error) {
+	return GetDiffSummaryBetween(repoPath, "HEAD~1", "HEAD")
+}
+
+// GetDiffSummaryBetween calculates the diff between two git refs (e.g., commit hashes, tags).
+func GetDiffSummaryBetween(repoPath, oldRef, newRef string) (*DiffStats, error) {
 	// --shortstat shows only the summary line of a diff
-	// HEAD~1 references the commit before HEAD
-	cmd := exec.Command("git", "diff", "--shortstat", "HEAD~1", "HEAD")
+	cmd := exec.Command("git", "diff", "--shortstat", oldRef, newRef)
 	cmd.Dir = repoPath
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		// This can happen if there's only one commit in the repo.
+		// This can happen if one of the refs is invalid or doesn't exist.
 		// We'll treat it as no changes.
 		if strings.Contains(string(output), "bad revision") {
 			return &DiffStats{}, nil

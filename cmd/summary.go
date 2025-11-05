@@ -42,39 +42,40 @@ func formatSummaryLine(def config.ServiceDefinition, oldVersionStr, newVersionSt
 
 	// --- 2. Format Git Diff Summary ---
 	diffDisplay := ""
-	sourcePath, err := config.ExpandPath(def.Source)
-	if err == nil {
-		stats, err := git.GetDiffSummary(sourcePath)
+	// Only show a diff if both versions were parsed correctly and the commits are different.
+	if errOld == nil && errNew == nil && oldVersion.Commit != newVersion.Commit {
+		sourcePath, err := config.ExpandPath(def.Source)
 		if err == nil {
-			var branch string
-			if newVersion != nil && newVersion.Branch != "" {
-				branch = newVersion.Branch
-			} else if oldVersion != nil && oldVersion.Branch != "" {
-				branch = oldVersion.Branch
-			} else {
-				branch = "main" // Fallback if no branch info is available
-			}
+			stats, err := git.GetDiffSummaryBetween(sourcePath, oldVersion.Commit, newVersion.Commit)
+			if err == nil && (stats.FilesChanged > 0 || stats.Insertions > 0 || stats.Deletions > 0) {
+				var branch string
+				if newVersion.Branch != "" {
+					branch = newVersion.Branch
+				} else {
+					branch = oldVersion.Branch
+				}
 
-			var insertions, deletions string
-			if stats.Insertions > 0 {
-				insertions = ui.Colorize(fmt.Sprintf("+%d", stats.Insertions), ui.ColorGreen)
-			}
-			if stats.Deletions > 0 {
-				deletions = ui.Colorize(fmt.Sprintf("-%d", stats.Deletions), ui.ColorBrightRed)
-			}
+				var insertions, deletions string
+				if stats.Insertions > 0 {
+					insertions = ui.Colorize(fmt.Sprintf("+%d", stats.Insertions), ui.ColorGreen)
+				}
+				if stats.Deletions > 0 {
+					deletions = ui.Colorize(fmt.Sprintf("-%d", stats.Deletions), ui.ColorBrightRed)
+				}
 
-			// Build the final diff string, omitting zero values
-			diffParts := []string{branch}
-			if stats.FilesChanged > 0 {
-				diffParts = append(diffParts, fmt.Sprintf("files:%d", stats.FilesChanged))
+				// Build the final diff string, omitting zero values
+				diffParts := []string{branch}
+				if stats.FilesChanged > 0 {
+					diffParts = append(diffParts, fmt.Sprintf("files:%d", stats.FilesChanged))
+				}
+				if insertions != "" {
+					diffParts = append(diffParts, insertions)
+				}
+				if deletions != "" {
+					diffParts = append(diffParts, deletions)
+				}
+				diffDisplay = ui.Colorize(fmt.Sprintf(" [%s]", ui.Join(diffParts, "|")), ui.ColorDarkGray)
 			}
-			if insertions != "" {
-				diffParts = append(diffParts, insertions)
-			}
-			if deletions != "" {
-				diffParts = append(diffParts, deletions)
-			}
-			diffDisplay = ui.Colorize(fmt.Sprintf(" [%s]", ui.Join(diffParts, "|")), ui.ColorDarkGray)
 		}
 	}
 
