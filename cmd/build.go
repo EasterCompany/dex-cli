@@ -81,6 +81,7 @@ func Build(args []string) error {
 		if err != nil {
 			return err
 		}
+		fmt.Printf("DEBUG: Service: %s, Built: %v\n", def.ShortName, built) // DEBUG LINE
 
 		if built {
 			// After a successful build, install the systemd service
