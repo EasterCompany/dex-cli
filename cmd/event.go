@@ -20,13 +20,9 @@ func Event(args []string) error {
 		return fmt.Errorf("failed to get event service status: %w", err)
 	}
 
-	// --- Debugging: Print Raw and Formatted ---
-	ui.PrintHeader("Raw Response")
+	// --- Debugging Step 1: Print Raw Response ---
+	ui.PrintHeader("1. Raw Response")
 	ui.PrintRaw(string(status) + "\n")
-
-	ui.PrintHeader("Formatted Code Block")
-	ui.PrintCodeBlockFromBytes(status, "event-service", "json")
-	// --- End Debugging ---
 
 	return nil
 }
