@@ -62,14 +62,14 @@ func Build(args []string) error {
 	// ---
 	// 2. Process cli FIRST
 	// ---
-	oldCliVersion := utils.GetServiceVersion(dexCliDef)
+	oldCliVersion := utils.GetFullServiceVersion(dexCliDef)
 	ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, "# Building cli", ui.ColorReset))
 	if _, err := runUnifiedBuildPipeline(dexCliDef, log, true); err != nil {
 		return err
 	}
 	ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %s!", dexCliDef.ShortName))
 	ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, oldCliVersion, ui.ColorReset))
-	ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.GetServiceVersion(dexCliDef), ui.ColorReset))
+	ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.GetFullServiceVersion(dexCliDef), ui.ColorReset))
 
 	// ---
 	// 3. Process all OTHER services
@@ -95,7 +95,7 @@ func Build(args []string) error {
 			}
 			ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %s!", def.ShortName))
 			ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, oldVersions[def.ID], ui.ColorReset))
-			ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.GetServiceVersion(def), ui.ColorReset))
+			ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.GetFullServiceVersion(def), ui.ColorReset))
 			servicesBuilt++
 		}
 	}

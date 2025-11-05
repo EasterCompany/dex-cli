@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/EasterCompany/dex-cli/config"
+	"github.com/EasterCompany/dex-cli/git"
 )
 
 // GetServiceVersion determines the version of a service.
@@ -21,6 +22,41 @@ func GetServiceVersion(service config.ServiceDefinition) string {
 		return "N/A"
 	}
 	return version
+}
+
+// GetFullServiceVersion returns the full, untruncated version of a service.
+func GetFullServiceVersion(service config.ServiceDefinition) string {
+	switch service.Type {
+	case "cli":
+		cmd := exec.Command("dex", "version")
+		output, err := cmd.Output()
+		if err != nil {
+			return "N/A"
+		}
+		parsedVersion, err := git.Parse(strings.TrimSpace(string(output)))
+		if err != nil {
+			return "N/A"
+		}
+		return fmt.Sprintf("%s.%s.%s.%s.%s.%s.%s.%s",
+			parsedVersion.Major,
+			parsedVersion.Minor,
+			parsedVersion.Patch,
+			parsedVersion.Branch,
+			parsedVersion.Commit,
+			parsedVersion.BuildDate,
+			parsedVersion.Arch,
+			parsedVersion.BuildHash,
+		)
+	case "os":
+		return GetCacheVersion(service)
+	default:
+		// For HTTP services, the version is the full version string.
+		version, err := GetHTTPVersion(service)
+		if err != nil {
+			return "N/A"
+		}
+		return version
+	}
 }
 
 // GetCLIVersion returns the version of the running dex-cli binary.
