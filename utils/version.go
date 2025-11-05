@@ -3,6 +3,7 @@ package utils
 import (
 	"bufio"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -14,6 +15,27 @@ import (
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/git"
 )
+
+// ServiceReportMinimal is a minimal struct to unmarshal only the version from the service endpoint.
+type ServiceReportMinimal struct {
+	Version struct {
+		Str string `json:"str"`
+	} `json:"version"`
+}
+
+// ParseServiceVersionFromJSON extracts the version.str from a JSON service report.
+func ParseServiceVersionFromJSON(jsonString string) string {
+	var report ServiceReportMinimal
+	if err := json.Unmarshal([]byte(jsonString), &report); err != nil {
+		// If unmarshaling fails, it's likely not a JSON response or malformed.
+		// In this case, we return the original string if it's not too long, or "N/A".
+		if len(jsonString) > 50 {
+			return "N/A"
+		}
+		return jsonString // Return original string if it's short and not JSON
+	}
+	return report.Version.Str
+}
 
 // GetServiceVersion determines the version of a service.
 func GetServiceVersion(service config.ServiceDefinition) string {

@@ -145,7 +145,8 @@ func Update(args []string, buildYear string) error {
 		}
 
 		ui.PrintSuccess(fmt.Sprintf("Successfully updated and installed %s!", def.ShortName))
-		ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, oldVersions[def.ID], ui.ColorReset))
+		parsedOldVersion := utils.ParseServiceVersionFromJSON(oldVersions[def.ID])
+		ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, parsedOldVersion, ui.ColorReset))
 		ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.GetFullServiceVersion(def), ui.ColorReset))
 	}
 
