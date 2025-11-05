@@ -128,18 +128,53 @@ func highlightSyntax(line, language string) string {
 		}
 	}
 
-	// Strings (quoted text) - Green
-	highlighted = stringPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-		// Do not re-color if already part of a comment (contains DarkGray)
-		if strings.Contains(s, ColorDarkGray) {
-			return s
-		}
-		return Colorize(s, ColorGreen)
-	})
-
 	// --- Language Specific Highlights ---
 
 	switch lang {
+	case "json":
+		// Order of operations is critical here to avoid double-coloring.
+		// 1. Keys (most specific string match)
+		keyPattern := regexp.MustCompile(`("([^"]+)"):(\s*)`)
+		highlighted = keyPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
+			parts := keyPattern.FindStringSubmatch(s)
+			// parts[0] is full match, parts[1] is quoted key, parts[2] is key content, parts[3] is space
+			return Colorize(parts[1], ColorBlue) + ":" + parts[3]
+		})
+
+		// 2. All other strings (values)
+		// We must ensure we don't re-match keys. The check for ColorReset should prevent this.
+		highlighted = stringPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
+			if strings.Contains(s, ColorReset) {
+				return s // Already colored, so skip
+			}
+			return Colorize(s, ColorGreen)
+		})
+
+		// 3. Primitives
+		numPattern := regexp.MustCompile(`\b-?\d+(\.\d+)?([eE][+-]?\d+)?\b`)
+		highlighted = numPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
+			if strings.Contains(s, ColorReset) {
+				return s
+			}
+			return Colorize(s, ColorPurple)
+		})
+		primitivesPattern := regexp.MustCompile(`\b(true|false|null)\b`)
+		highlighted = primitivesPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
+			if strings.Contains(s, ColorReset) {
+				return s
+			}
+			return Colorize(s, ColorYellow)
+		})
+
+		// 4. Structural elements
+		structPattern := regexp.MustCompile(`[{}[\],]`)
+		highlighted = structPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
+			if strings.Contains(s, ColorReset) {
+				return s
+			}
+			return Colorize(s, ColorCyan)
+		})
+
 	case "go", "js", "ts", "python", "bash", "sh":
 		// Keywords - Yellow
 		keywords := map[string][]string{
@@ -228,52 +263,6 @@ func highlightSyntax(line, language string) string {
 			return s
 		})
 
-	case "json":
-		// JSON Highlighting
-
-		// Keys: quoted string followed by colon (already handles strings in Green, override to Blue for keys)
-		// We use a lookahead (not fully supported in Go's native regex, so we'll use a post-processing approach)
-		// Simpler approach: find any quoted string immediately followed by a colon
-		keyPattern := regexp.MustCompile(`("([^"]+)"):(\s*)`)
-		highlighted = keyPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-			// The original string is "key":<space>
-			parts := keyPattern.FindStringSubmatch(s)
-			if len(parts) < 4 {
-				return s
-			}
-			key := parts[1]   // The quoted key itself
-			space := parts[3] // The space after the colon
-
-			// Color the key blue, keep the colon and space uncolored (or implicitly white)
-			return Colorize(key, ColorBlue) + ":" + space
-		})
-
-		// Primitives (numbers, true/false/null) - Purple/Yellow
-
-		// Numbers
-		numPattern := regexp.MustCompile(`\b-?\d+(\.\d+)?([eE][+-]?\d+)?\b`)
-		highlighted = numPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-			if strings.Contains(s, ColorReset) {
-				return s
-			}
-			return Colorize(s, ColorPurple)
-		})
-
-		// Booleans/Null
-		primitivesPattern := regexp.MustCompile(`\b(true|false|null)\b`)
-		highlighted = primitivesPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-			if strings.Contains(s, ColorReset) {
-				return s
-			}
-			return Colorize(s, ColorYellow)
-		})
-
-		// Structural elements (braces/brackets/comma) - Cyan
-		structPattern := regexp.MustCompile(`[{}[\],]`)
-		highlighted = structPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-			return Colorize(s, ColorCyan)
-		})
-
 	case "markdown", "md":
 		// Headers (#, ##, etc) - Bright Red for the markers
 		headerPattern := regexp.MustCompile(`(^\s*#+\s)`)
@@ -319,6 +308,17 @@ func highlightSyntax(line, language string) string {
 	default:
 		// Default to plain text if language is not supported
 		return line
+	}
+
+	// Apply general string highlighting for languages that don't have special handling
+	if lang != "json" {
+		highlighted = stringPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
+			// Do not re-color if already part of a comment (contains DarkGray)
+			if strings.Contains(s, ColorDarkGray) {
+				return s
+			}
+			return Colorize(s, ColorGreen)
+		})
 	}
 
 	return highlighted
