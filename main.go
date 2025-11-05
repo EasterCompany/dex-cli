@@ -22,7 +22,7 @@ func main() {
 	// Set the running version string from build-time variables.
 	cmd.RunningVersion = cmd.FormatVersion(version, branch, commit, buildDate, buildHash)
 
-	if err := cmd.EnsurePythonVenv(version); err != nil {
+	if err := cmd.EnsurePythonVenv(cmd.RunningVersion); err != nil {
 		fmt.Println() // Add padding at the start
 		ui.PrintError(fmt.Sprintf("Error ensuring Python environment: %v", err))
 		fmt.Println() // Add padding at the end

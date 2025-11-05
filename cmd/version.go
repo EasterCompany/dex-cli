@@ -46,6 +46,20 @@ func Version(jsonOutput bool, version, branch, commit, buildDate, buildYear, bui
 
 // FormatVersion constructs the full version string from build-time variables.
 func FormatVersion(version, branch, commit, buildDate, buildHash string) string {
+	// The 'version' variable from ldflags is the full 8-part string.
+	// We just need to ensure it's correctly formatted.
+	// If the version string is already dot-separated, we can trust it.
+	if len(strings.Split(version, ".")) == 8 {
+		return version
+	}
+
+	// Fallback for older builds or local dev where `version` might just be a tag.
+	version = strings.TrimPrefix(version, "v")
+	versionParts := strings.Split(version, ".")
+	if len(versionParts) != 3 {
+		versionParts = []string{"0", "0", "0"} // Default if tag is invalid
+	}
+
 	// Format the build date: 2025-11-03T02:38:13Z -> 2025-11-03-02-38-13
 	formattedDate := strings.ReplaceAll(buildDate, "T", "-")
 	formattedDate = strings.ReplaceAll(formattedDate, ":", "-")
@@ -54,9 +68,8 @@ func FormatVersion(version, branch, commit, buildDate, buildHash string) string 
 	// Format the architecture: linux/amd64 -> linux_amd64
 	arch := fmt.Sprintf("%s_%s", runtime.GOOS, runtime.GOARCH)
 
-	// Create the full version string, ensuring the 'v' is stripped from the version tag.
-	return fmt.Sprintf("%s.%s.%s.%s.%s.%s",
-		strings.TrimPrefix(version, "v"),
+	return fmt.Sprintf("%s.%s.%s.%s.%s.%s.%s.%s",
+		versionParts[0], versionParts[1], versionParts[2],
 		branch,
 		commit,
 		formattedDate,
