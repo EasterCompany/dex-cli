@@ -256,11 +256,13 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 		}
 	}
 
+	version := utils.GetServiceVersion(service)
+
 	// For simplified endpoint, version is the status itself, other metrics are N/A
 	return []string{
 		serviceID,
 		address,
-		colorizeNA(ui.Truncate(status, 12)), // Version is now the status string
+		colorizeNA(ui.Truncate(version, 12)), // Version is now the status string
 		colorizeStatus(status),
 		colorizeNA("N/A"),
 		colorizeNA("N/A"),
