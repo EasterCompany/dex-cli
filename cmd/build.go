@@ -226,16 +226,19 @@ func runUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), isC
 			ui.PrintWarning(fmt.Sprintf("Could not parse tag '%s', defaulting to v0.0.0. Error: %v", latestTag, err))
 			major, minor, patch = 0, 0, 0
 		}
-		newVersion := fmt.Sprintf("v%d.%d.%d", major, minor, patch+1)
 
 		branch, commit := git.GetVersionInfo(sourcePath)
 		buildDate := time.Now().UTC().Format("2006-01-02T15:04:05Z")
 		buildYear := time.Now().UTC().Format("2006")
+		buildArch := "linux/amd64"
 		buildHash := "local" // Placeholder for build hash
 
-		ldflags := fmt.Sprintf("-X main.version=%s -X main.branch=%s -X main.commit=%s -X main.buildDate=%s -X main.buildYear=%s -X main.buildHash=%s",
-			newVersion, branch, commit, buildDate, buildYear, buildHash)
+		// Format the version string to match the new parsing logic (M.m.p.branch.commit.date.arch.hash)
+		fullVersionStr := fmt.Sprintf("%d.%d.%d.%s.%s.%s.%s.%s",
+			major, minor, patch+1, branch, commit, buildDate, buildArch, buildHash)
 
+		ldflags := fmt.Sprintf("-X main.version=%s -X main.branch=%s -X main.commit=%s -X main.buildDate=%s -X main.buildYear=%s -X main.buildHash=%s",
+			fullVersionStr, branch, commit, buildDate, buildYear, buildHash)
 		buildCmd = exec.Command("go", "build", "-ldflags", ldflags, "-o", outputPath, ".")
 	} else {
 		// Standard build for other services

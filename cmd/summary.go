@@ -43,40 +43,39 @@ func formatSummaryLine(def config.ServiceDefinition, oldVersionStr, newVersionSt
 	// --- 2. Format Git Diff Summary ---
 	diffDisplay := ""
 	// Only show a diff if both versions were parsed correctly and the commits are different.
-	if errOld == nil && errNew == nil && oldVersion.Commit != newVersion.Commit {
+	if errOld == nil && errNew == nil && oldVersion.Commit != "" && newVersion.Commit != "" && oldVersion.Commit != newVersion.Commit {
+		var branch, files, insertions, deletions string
+
+		// Determine branch
+		if newVersion.Branch != "" {
+			branch = newVersion.Branch
+		} else {
+			branch = oldVersion.Branch
+		}
+
 		sourcePath, err := config.ExpandPath(def.Source)
 		if err == nil {
 			stats, err := git.GetDiffSummaryBetween(sourcePath, oldVersion.Commit, newVersion.Commit)
-			if err == nil && (stats.FilesChanged > 0 || stats.Insertions > 0 || stats.Deletions > 0) {
-				var branch string
-				if newVersion.Branch != "" {
-					branch = newVersion.Branch
-				} else {
-					branch = oldVersion.Branch
+			if err == nil {
+				if stats.FilesChanged > 0 {
+					files = fmt.Sprintf("files:%d", stats.FilesChanged)
 				}
-
-				var insertions, deletions string
 				if stats.Insertions > 0 {
 					insertions = ui.Colorize(fmt.Sprintf("+%d", stats.Insertions), ui.ColorGreen)
 				}
 				if stats.Deletions > 0 {
 					deletions = ui.Colorize(fmt.Sprintf("-%d", stats.Deletions), ui.ColorBrightRed)
 				}
-
-				// Build the final diff string, omitting zero values
-				diffParts := []string{branch}
-				if stats.FilesChanged > 0 {
-					diffParts = append(diffParts, fmt.Sprintf("files:%d", stats.FilesChanged))
-				}
-				if insertions != "" {
-					diffParts = append(diffParts, insertions)
-				}
-				if deletions != "" {
-					diffParts = append(diffParts, deletions)
-				}
-				diffDisplay = ui.Colorize(fmt.Sprintf(" [%s]", ui.Join(diffParts, "|")), ui.ColorDarkGray)
 			}
 		}
+
+		// If no stats were found, but there was a commit change, show N/A
+		if files == "" && insertions == "" && deletions == "" {
+			files = "N/A"
+		}
+
+		diffParts := []string{branch, files, insertions, deletions}
+		diffDisplay = ui.Colorize(fmt.Sprintf(" [%s]", ui.Join(diffParts, "|")), ui.ColorDarkGray)
 	}
 
 	// --- 3. Combine and Return ---
