@@ -19,8 +19,8 @@ var (
 )
 
 func main() {
-	// Set the running version string from build-time variables.
-	cmd.RunningVersion = cmd.FormatVersion(version, branch, commit, buildDate, buildHash)
+	// Set the running version string directly from build-time variables.
+	cmd.RunningVersion = version
 
 	if err := cmd.EnsurePythonVenv(cmd.RunningVersion); err != nil {
 		fmt.Println() // Add padding at the start
