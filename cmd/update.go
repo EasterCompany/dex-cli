@@ -123,27 +123,12 @@ func Update(args []string, buildYear string) error {
 			return err // Stop-on-failure
 		}
 
-		// 2. Format
-		if err := utils.RunServicePipelineStep(def, "format"); err != nil {
+		// 2. Build
+		if _, err := utils.RunUnifiedBuildPipeline(def, log); err != nil {
 			return err // Stop-on-failure
 		}
 
-		// 3. Lint
-		if err := utils.RunServicePipelineStep(def, "lint"); err != nil {
-			return err // Stop-on-failure
-		}
-
-		// 4. Test
-		if err := utils.RunServicePipelineStep(def, "test"); err != nil {
-			return err // Stop-on-failure
-		}
-
-		// 5. Build
-		if err := utils.RunServicePipelineStep(def, "build"); err != nil {
-			return err // Stop-on-failure
-		}
-
-		// 6. Install
+		// 3. Install
 		if err := utils.InstallSystemdService(def); err != nil {
 			return err // Stop-on-failure
 		}

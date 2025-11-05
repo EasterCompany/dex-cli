@@ -7,8 +7,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/EasterCompany/dex-cli/config"
+	"github.com/EasterCompany/dex-cli/git"
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
@@ -42,44 +44,115 @@ func GitUpdateService(def config.ServiceDefinition) error {
 	return nil
 }
 
-// runServicePipelineStep executes a single step (format, lint, test, build)
-func RunServicePipelineStep(def config.ServiceDefinition, step string) error {
+// RunUnifiedBuildPipeline executes the full build pipeline for a service.
+func RunUnifiedBuildPipeline(def config.ServiceDefinition, log func(string)) (bool, error) {
 	sourcePath, err := config.ExpandPath(def.Source)
 	if err != nil {
-		return fmt.Errorf("failed to expand source path: %w", err)
+		return false, fmt.Errorf("failed to expand source path for %s: %w", def.ShortName, err)
 	}
 
-	if !CheckFileExists(filepath.Join(sourcePath, "go.mod")) {
-		return fmt.Errorf("skipping %s: not a Go project (no go.mod)", step)
+	if !CheckFileExists(sourcePath) {
+		ui.PrintWarning(fmt.Sprintf("Skipping %s: source code not found at %s. Run 'dex add' to download & install it.", def.ShortName, sourcePath))
+		return false, nil
 	}
 
-	var cmd *exec.Cmd
-	switch step {
-	case "format":
-		ui.PrintInfo(fmt.Sprintf("[%s] Running Formatting...", def.ShortName))
-		cmd = exec.Command("go", "fmt", "./...")
-	case "lint":
-		ui.PrintInfo(fmt.Sprintf("[%s] Running Linting...", def.ShortName))
-		cmd = exec.Command("golangci-lint", "run")
-	case "test":
-		ui.PrintInfo(fmt.Sprintf("[%s] Running Testing...", def.ShortName))
-		cmd = exec.Command("go", "test", "./...")
-	case "build":
-		ui.PrintInfo(fmt.Sprintf("[%s] Running Building...", def.ShortName))
-		binPath, err := config.ExpandPath(def.GetBinaryPath())
-		if err != nil {
-			return fmt.Errorf("could not expand binary path: %w", err)
-		}
-		cmd = exec.Command("go", "build", "-o", binPath)
-	default:
-		return fmt.Errorf("unknown pipeline step: %s", step)
+	log(fmt.Sprintf("Building %s from local source...", def.ShortName))
+
+	// ---
+	// 1. Tidy
+	// ---
+	ui.PrintInfo("Ensuring Go modules are tidy...")
+	tidyCmd := exec.Command("go", "mod", "tidy")
+	tidyCmd.Dir = sourcePath
+	tidyCmd.Stdout = os.Stdout
+	tidyCmd.Stderr = os.Stderr
+	if err := tidyCmd.Run(); err != nil {
+		log(fmt.Sprintf("%s 'go mod tidy' failed: %v", def.ShortName, err))
+		return false, fmt.Errorf("%s 'go mod tidy' failed: %w", def.ShortName, err)
 	}
 
-	cmd.Dir = sourcePath
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed %s for %s:\n%s", step, def.ShortName, string(output))
+	// ---
+	// 2. Format
+	// ---
+	ui.PrintInfo("Formatting...")
+	formatCmd := exec.Command("go", "fmt", "./...")
+	formatCmd.Dir = sourcePath
+	formatCmd.Stdout = os.Stdout
+	formatCmd.Stderr = os.Stderr
+	if err := formatCmd.Run(); err != nil {
+		log(fmt.Sprintf("%s 'go fmt' failed: %v", def.ShortName, err))
+		return false, fmt.Errorf("%s 'go fmt' failed: %w", def.ShortName, err)
 	}
-	return nil
+
+	// ---
+	// 3. Lint
+	// ---
+	ui.PrintInfo("Linting...")
+	lintCmd := exec.Command("golangci-lint", "run")
+	lintCmd.Dir = sourcePath
+	lintCmd.Stdout = os.Stdout
+	lintCmd.Stderr = os.Stderr
+	if err := lintCmd.Run(); err != nil {
+		log(fmt.Sprintf("%s 'golangci-lint run' failed: %v", def.ShortName, err))
+		return false, fmt.Errorf("%s 'golangci-lint run' failed: %w", def.ShortName, err)
+	}
+
+	// ---
+	// 4. Test
+	// ---
+	ui.PrintInfo("Testing...")
+	testCmd := exec.Command("go", "test", "-v", "./...")
+	testCmd.Dir = sourcePath
+	testCmd.Stdout = os.Stdout
+	testCmd.Stderr = os.Stderr
+	if err := testCmd.Run(); err != nil {
+		log(fmt.Sprintf("%s 'go test' failed: %v", def.ShortName, err))
+		return false, fmt.Errorf("%s 'go test' failed: %w", def.ShortName, err)
+	}
+
+	// ---
+	// 5. Build
+	// ---
+	ui.PrintInfo("Building...")
+	outputPath, err := config.ExpandPath(def.GetBinaryPath())
+	if err != nil {
+		return false, fmt.Errorf("could not expand binary path for %s: %w", def.ShortName, err)
+	}
+
+	var buildCmd *exec.Cmd
+	// Embed version info for all buildable services
+	latestTag, err := git.GetLatestTag(sourcePath)
+	if err != nil {
+		return false, fmt.Errorf("failed to get latest git tag for %s: %w", def.ShortName, err)
+	}
+	major, minor, patch, err := git.ParseVersionTag(latestTag)
+	if err != nil {
+		ui.PrintWarning(fmt.Sprintf("Could not parse tag '%s' for %s, defaulting to 0.0.0. Error: %v", latestTag, def.ShortName, err))
+		major, minor, patch = 0, 0, 0
+	}
+
+	branch, commit := git.GetVersionInfo(sourcePath)
+	buildDate := time.Now().UTC().Format("2006-01-02-15-04-05") // Hyphenated format
+	buildYear := time.Now().UTC().Format("2006")
+	buildArch := "linux-amd64"         // Hyphenated format
+	buildHash := GenerateRandomHash(8) // Generate an 8-character random hash
+
+	// Format the version string to match the new parsing logic (M.m.p.branch.commit.date.arch.hash)
+	fullVersionStr := fmt.Sprintf("%d.%d.%d.%s.%s.%s.%s.%s",
+		major, minor, patch+1, branch, commit, buildDate, buildArch, buildHash)
+
+	ldflags := fmt.Sprintf("-X main.version=%s -X main.branch=%s -X main.commit=%s -X main.buildDate=%s -X main.buildYear=%s -X main.buildHash=%s -X main.arch=%s",
+		fullVersionStr, branch, commit, buildDate, buildYear, buildHash, buildArch)
+	buildCmd = exec.Command("go", "build", "-ldflags", ldflags, "-o", outputPath, ".")
+	buildCmd.Dir = sourcePath
+	buildCmd.Stdout = os.Stdout
+	buildCmd.Stderr = os.Stderr
+	if err := buildCmd.Run(); err != nil {
+		log(fmt.Sprintf("%s 'go build' failed: %v", def.ShortName, err))
+		return false, fmt.Errorf("%s 'go build' failed: %w", def.ShortName, err)
+	}
+
+	return true, nil
 }
 
 // InstallSystemdService creates and enables the systemd service file.
