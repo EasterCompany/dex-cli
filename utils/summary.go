@@ -41,10 +41,23 @@ func FormatSummaryLine(service config.ServiceDefinition, oldVersion, newVersion 
 	}
 
 	var sizeChange string
-	if oldSize == newSize {
-		sizeChange = ui.Colorize(fmt.Sprintf("(%s)", FormatBytes(newSize)), ui.ColorDarkGray)
+	sizeDiff := newSize - oldSize
+
+	if oldSize == 0 && newSize > 0 {
+		// New file created
+		sizeChange = ui.Colorize(fmt.Sprintf("(+%s)", FormatBytes(newSize)), ui.ColorGreen)
+	} else if sizeDiff == 0 {
+		// No change
+		sizeChange = ui.Colorize("(0 B)", ui.ColorDarkGray)
 	} else {
-		sizeChange = ui.Colorize(fmt.Sprintf("(%s -> %s)", FormatBytes(oldSize), FormatBytes(newSize)), ui.ColorGreen)
+		sign := "+"
+		color := ui.ColorYellow // Yellow for increase
+		if sizeDiff < 0 {
+			sign = "-"
+			color = ui.ColorGreen // Green for decrease
+			sizeDiff = -sizeDiff  // Use absolute value for formatting
+		}
+		sizeChange = ui.Colorize(fmt.Sprintf("(%s%s)", sign, FormatBytes(sizeDiff)), color)
 	}
 
 	return fmt.Sprintf("  %-20s %-40s %s", service.ShortName, versionChange, sizeChange)
