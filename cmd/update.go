@@ -33,7 +33,12 @@ func Update(args []string, buildYear string) error {
 	oldVersions := make(map[string]string)
 	for _, s := range allServices {
 		if s.IsBuildable() {
-			oldVersions[s.ID] = getServiceVersion(s)
+			if s.ShortName == "cli" {
+				// For the CLI, the "old" version is the one currently running.
+				oldVersions[s.ID] = RunningVersion
+			} else {
+				oldVersions[s.ID] = getServiceVersion(s)
+			}
 		}
 	}
 

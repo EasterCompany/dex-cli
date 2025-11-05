@@ -31,15 +31,20 @@ func getServiceVersion(service config.ServiceDefinition) string {
 
 // getCLIVersion executes `dex version` to get the CLI's version.
 func getCLIVersion() string {
-	cmd := exec.Command("dex", "version")
+	// Use the direct path to the newly built binary to ensure we get the new version.
+	dexPath, err := config.ExpandPath("~/Dexter/bin/dex")
+	if err != nil {
+		return "N/A"
+	}
+
+	cmd := exec.Command(dexPath, "version")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "N/A"
 	}
 	// The `version` command now outputs "v: <version>", so we strip the prefix.
 	versionStr := strings.TrimSpace(string(output))
-	versionStr = strings.TrimPrefix(versionStr, "v: ")
-	return strings.TrimPrefix(versionStr, "v")
+	return strings.TrimPrefix(versionStr, "v: ")
 }
 
 // getCacheVersion connects to a cache service to get its version.

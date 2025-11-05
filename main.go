@@ -19,6 +19,9 @@ var (
 )
 
 func main() {
+	// Set the running version string from build-time variables.
+	cmd.RunningVersion = cmd.FormatVersion(version, branch, commit, buildDate, buildHash)
+
 	if err := cmd.EnsurePythonVenv(version); err != nil {
 		ui.PrintError(fmt.Sprintf("Error ensuring Python environment: %v", err))
 		os.Exit(1)
