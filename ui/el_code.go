@@ -117,13 +117,13 @@ func highlightSyntax(line, language string) string {
 		parts := strings.SplitN(line, "//", 2)
 		if len(parts) == 2 {
 			// Handle // comments
-			highlighted = parts[0] + fmt.Sprintf("%s//%s%s", ColorDarkGray, parts[1], ColorReset)
+			highlighted = parts[0] + Colorize(fmt.Sprintf("//%s", parts[1]), ColorDarkGray)
 		} else {
 			// Handle # comments
 			parts = strings.SplitN(line, "#", 2)
 			// Exclude CSS/HTML IDs, but NOT Markdown headers
 			if len(parts) == 2 && lang != "css" && lang != "html" && lang != "markdown" && lang != "md" {
-				highlighted = parts[0] + fmt.Sprintf("%s#%s%s", ColorDarkGray, parts[1], ColorReset)
+				highlighted = parts[0] + Colorize(fmt.Sprintf("#%s", parts[1]), ColorDarkGray)
 			}
 		}
 	}
@@ -134,7 +134,7 @@ func highlightSyntax(line, language string) string {
 		if strings.Contains(s, ColorDarkGray) {
 			return s
 		}
-		return fmt.Sprintf("%s%s%s", ColorGreen, s, ColorReset)
+		return Colorize(s, ColorGreen)
 	})
 
 	// --- Language Specific Highlights ---
@@ -171,7 +171,7 @@ func highlightSyntax(line, language string) string {
 					if strings.Contains(s, ColorReset) {
 						return s
 					}
-					return fmt.Sprintf("%s%s%s", ColorYellow, s, ColorReset)
+					return Colorize(s, ColorYellow)
 				})
 			}
 		}
@@ -184,7 +184,7 @@ func highlightSyntax(line, language string) string {
 					if strings.Contains(s, ColorReset) {
 						return s
 					}
-					return fmt.Sprintf("%s%s%s", ColorCyan, s, ColorReset)
+					return Colorize(s, ColorCyan)
 				})
 			}
 		}
@@ -193,13 +193,13 @@ func highlightSyntax(line, language string) string {
 		// Tags (<tag>, </tag>) - Bright Red
 		tagPattern := regexp.MustCompile(`(</?[\w-]+)`)
 		highlighted = tagPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-			return fmt.Sprintf("%s%s%s", ColorBrightRed, s, ColorReset)
+			return Colorize(s, ColorBrightRed)
 		})
 
 		// Attributes (attr=) - Cyan
 		attrPattern := regexp.MustCompile(`([\w-]+)=`)
 		highlighted = attrPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-			return fmt.Sprintf("%s%s%s:", ColorCyan, strings.TrimRight(s, "="), ColorReset)
+			return Colorize(strings.TrimRight(s, "="), ColorCyan) + "="
 		})
 
 	case "css":
@@ -207,13 +207,13 @@ func highlightSyntax(line, language string) string {
 		selectorPattern := regexp.MustCompile(`([\w\.\#:\*\s]+){`)
 		highlighted = selectorPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
 			selector := strings.TrimRight(s, "{")
-			return fmt.Sprintf("%s%s%s{", ColorYellow, selector, ColorReset)
+			return Colorize(selector, ColorYellow) + "{"
 		})
 
 		// Properties (property: ) - Cyan
 		propPattern := regexp.MustCompile(`([\w-]+):`)
 		highlighted = propPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-			return fmt.Sprintf("%s%s%s:", ColorCyan, strings.TrimRight(s, ":"), ColorReset)
+			return Colorize(strings.TrimRight(s, ":"), ColorCyan) + ":"
 		})
 
 		// Values (simple values) - Purple
@@ -223,7 +223,7 @@ func highlightSyntax(line, language string) string {
 			// Only color the part *after* the colon.
 			parts := strings.SplitN(s, ":", 2)
 			if len(parts) == 2 {
-				return ":" + fmt.Sprintf("%s%s%s", ColorPurple, parts[1], ColorReset)
+				return ":" + Colorize(parts[1], ColorPurple)
 			}
 			return s
 		})
@@ -278,38 +278,38 @@ func highlightSyntax(line, language string) string {
 		// Headers (#, ##, etc) - Bright Red for the markers
 		headerPattern := regexp.MustCompile(`(^\s*#+\s)`)
 		highlighted = headerPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-			return fmt.Sprintf("%s%s%s", ColorBrightRed, s, ColorReset)
+			return Colorize(s, ColorBrightRed)
 		})
 
 		// Emphasis (Bold/Italic markers: **, __, *, _, and inline code backticks `) - Yellow
 		emphasisPattern := regexp.MustCompile(`(\*\*|\*|__|_|\x60\x60\x60|\x60)`)
 		highlighted = emphasisPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
 			// Only color the markers themselves
-			return fmt.Sprintf("%s%s%s", ColorYellow, s, ColorReset)
+			return Colorize(s, ColorYellow)
 		})
 
 		// Links/Images ([text](url)) - Cyan for structure
 		// Targets the entire link structure's brackets and parentheses
 		linkBracketsPattern := regexp.MustCompile(`[\[\]]`) // The [ and ] part
 		highlighted = linkBracketsPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-			return fmt.Sprintf("%s%s%s", ColorCyan, s, ColorReset)
+			return Colorize(s, ColorCyan)
 		})
 
 		linkParenthesesPattern := regexp.MustCompile(`[\(\)]`) // The ( and ) part
 		highlighted = linkParenthesesPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-			return fmt.Sprintf("%s%s%s", ColorCyan, s, ColorReset)
+			return Colorize(s, ColorCyan)
 		})
 
 		// List markers (*, -, + and 1., 2. etc.) - Purple
 		listPattern := regexp.MustCompile(`(^\s*[\*\-\+]\s)|(^\s*\d+\.\s)`)
 		highlighted = listPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-			return fmt.Sprintf("%s%s%s", ColorPurple, s, ColorReset)
+			return Colorize(s, ColorPurple)
 		})
 
 		// Blockquotes (>) - Dark Gray
 		blockquotePattern := regexp.MustCompile(`(^\s*>+\s)`)
 		highlighted = blockquotePattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-			return fmt.Sprintf("%s%s%s", ColorDarkGray, s, ColorReset)
+			return Colorize(s, ColorDarkGray)
 		})
 
 	case "text", "plain", "":
