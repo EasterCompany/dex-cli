@@ -128,7 +128,7 @@ func Build(args []string) error {
 
 	var summaryData []utils.SummaryInfo
 	for _, s := range allServices {
-		if !s.IsBuildable() {
+		if s.IsBuildable() {
 			oldVersionStr := oldVersions[s.ID]
 			newVersionStr := utils.GetServiceVersion(s)
 
