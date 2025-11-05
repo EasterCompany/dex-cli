@@ -87,7 +87,6 @@ func PrintSummaryTable(summaries []SummaryInfo) {
 	}
 
 	table.Render()
-	table.Render()
 }
 
 // GetBinarySize returns the size of the service's binary in bytes.
