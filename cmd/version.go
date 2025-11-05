@@ -40,7 +40,7 @@ func Version(jsonOutput bool, version, branch, commit, buildDate, buildYear, bui
 		fmt.Println(string(jsonData))
 	} else {
 		fullVersion := FormatVersion(version, branch, commit, buildDate, buildHash)
-		fmt.Printf("v: %s\n", fullVersion)
+		fmt.Printf("v: %s", fullVersion)
 	}
 }
 
