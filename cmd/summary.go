@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/git"
@@ -9,73 +10,51 @@ import (
 )
 
 // formatSummaryLine generates the complete, formatted version comparison line for a service.
-func formatSummaryLine(def config.ServiceDefinition, oldVersionStr, newVersionStr string) string {
+func formatSummaryLine(def config.ServiceDefinition, oldVersionStr, newVersionStr string, oldSize, newSize int64) string {
 	// --- 1. Format Version Change ---
 	oldVersion, errOld := git.Parse(oldVersionStr)
 	newVersion, errNew := git.Parse(newVersionStr)
+	oldVersionDisplay := formatVersionDisplay(oldVersion, errOld, newVersion, errNew, false)
+	newVersionDisplay := formatVersionDisplay(newVersion, errNew, oldVersion, errOld, true)
 
-	var oldVersionDisplay, newVersionDisplay string
-
-	// Format old version
-	if errOld != nil {
-		oldVersionDisplay = ui.Colorize("N/A", ui.ColorDarkGray)
-	} else {
-		shortTag := oldVersion.Short()
-		// Colorize red if it was upgraded
-		if errNew == nil && oldVersion.Compare(newVersion) < 0 {
-			shortTag = ui.Colorize(shortTag, ui.ColorBrightRed)
-		}
-		oldVersionDisplay = formatVersionDisplay(oldVersion, shortTag)
-	}
-
-	// Format new version
-	if errNew != nil {
-		newVersionDisplay = ui.Colorize("N/A", ui.ColorDarkGray)
-	} else {
-		shortTag := newVersion.Short()
-		// Colorize green if it was upgraded
-		if errOld == nil && newVersion.Compare(oldVersion) > 0 {
-			shortTag = ui.Colorize(shortTag, ui.ColorGreen)
-		}
-		newVersionDisplay = formatVersionDisplay(newVersion, shortTag)
-	}
-
-	// --- 2. Format Git Diff Summary ---
+	// --- 2. Format Git Diff and Size Summary ---
 	diffDisplay := ""
-	// Only show a diff if both versions were parsed correctly and the commits are different.
+	// Only attempt a diff if both versions are valid and have different commits.
 	if errOld == nil && errNew == nil && oldVersion.Commit != "" && newVersion.Commit != "" && oldVersion.Commit != newVersion.Commit {
-		var branch, files, insertions, deletions string
-
-		// Determine branch
-		if newVersion.Branch != "" {
-			branch = newVersion.Branch
-		} else {
-			branch = oldVersion.Branch
-		}
-
+		var summaryParts []string
 		sourcePath, err := config.ExpandPath(def.Source)
-		if err == nil {
+		if err != nil {
+			summaryParts = append(summaryParts, fmt.Sprintf("err: %v", err))
+		} else {
+			// Git Diff
 			stats, err := git.GetDiffSummaryBetween(sourcePath, oldVersion.Commit, newVersion.Commit)
-			if err == nil {
+			if err != nil {
+				summaryParts = append(summaryParts, fmt.Sprintf("diff err: %v", err))
+			} else {
 				if stats.FilesChanged > 0 {
-					files = fmt.Sprintf("files:%d", stats.FilesChanged)
+					summaryParts = append(summaryParts, fmt.Sprintf("files:%d", stats.FilesChanged))
 				}
 				if stats.Insertions > 0 {
-					insertions = ui.Colorize(fmt.Sprintf("+%d", stats.Insertions), ui.ColorGreen)
+					summaryParts = append(summaryParts, ui.Colorize(fmt.Sprintf("+%d", stats.Insertions), ui.ColorGreen))
 				}
 				if stats.Deletions > 0 {
-					deletions = ui.Colorize(fmt.Sprintf("-%d", stats.Deletions), ui.ColorBrightRed)
+					summaryParts = append(summaryParts, ui.Colorize(fmt.Sprintf("-%d", stats.Deletions), ui.ColorBrightRed))
 				}
 			}
 		}
-
-		// If no stats were found, but there was a commit change, show N/A
-		if files == "" && insertions == "" && deletions == "" {
-			files = "N/A"
+		// Binary Size Change
+		sizeDiff := newSize - oldSize
+		if sizeDiff != 0 {
+			sign := "+"
+			if sizeDiff < 0 {
+				sign = "" // The negative sign is already part of the number
+			}
+			summaryParts = append(summaryParts, fmt.Sprintf("%s%.2fkb", sign, float64(sizeDiff)/1024.0))
 		}
 
-		diffParts := []string{branch, files, insertions, deletions}
-		diffDisplay = ui.Colorize(fmt.Sprintf(" [%s]", ui.Join(diffParts, "|")), ui.ColorDarkGray)
+		if len(summaryParts) > 0 {
+			diffDisplay = ui.Colorize(fmt.Sprintf(" [%s]", ui.Join(summaryParts, "|")), ui.ColorDarkGray)
+		}
 	}
 
 	// --- 3. Combine and Return ---
@@ -83,12 +62,34 @@ func formatSummaryLine(def config.ServiceDefinition, oldVersionStr, newVersionSt
 	return fmt.Sprintf("[%s] %s %s -> %s%s", def.ShortName, greyV, oldVersionDisplay, newVersionDisplay, diffDisplay)
 }
 
-// formatVersionDisplay combines a parsed version and its pre-formatted tag into a display string.
-func formatVersionDisplay(v *git.Version, shortTag string) string {
+// formatVersionDisplay creates the colored string for one side of the version arrow (->).
+func formatVersionDisplay(v *git.Version, vErr error, other *git.Version, otherErr error, isNewVersion bool) string {
+	if vErr != nil {
+		return ui.Colorize("N/A", ui.ColorDarkGray)
+	}
+
+	shortTag := v.Short()
+	// Colorize based on comparison, only if both versions are valid.
+	if otherErr == nil {
+		comparison := v.Compare(other)
+		if isNewVersion && comparison > 0 {
+			shortTag = ui.Colorize(shortTag, ui.ColorGreen) // New version is greater
+		} else if !isNewVersion && comparison < 0 {
+			shortTag = ui.Colorize(shortTag, ui.ColorBrightRed) // Old version is less
+		}
+	}
+
+	// Append branch and commit, grayed out.
 	var branchAndCommit string
 	if v.Branch != "" && v.Commit != "" {
-		branchAndCommit = fmt.Sprintf(".%s.%s", v.Branch, v.Commit)
+		// Shorten commit hash for display
+		commit := v.Commit
+		if len(commit) > 7 {
+			commit = commit[:7]
+		}
+		branchAndCommit = fmt.Sprintf(".%s.%s", v.Branch, commit)
 		branchAndCommit = ui.Colorize(branchAndCommit, ui.ColorDarkGray)
 	}
+
 	return fmt.Sprintf("%s%s", shortTag, branchAndCommit)
 }

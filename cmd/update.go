@@ -27,18 +27,15 @@ func Update(args []string, buildYear string) error {
 	log("Updating to latest version...")
 
 	// ---
-	// 1. Get initial versions
+	// 1. Get initial versions and sizes
 	// ---
 	allServices := config.GetAllServices()
 	oldVersions := make(map[string]string)
+	oldSizes := make(map[string]int64)
 	for _, s := range allServices {
 		if s.IsBuildable() {
-			if s.ShortName == "cli" {
-				// For the CLI, the "old" version is the one currently running.
-				oldVersions[s.ID] = RunningVersion
-			} else {
-				oldVersions[s.ID] = getServiceVersion(s)
-			}
+			oldVersions[s.ID] = getServiceVersion(s)
+			oldSizes[s.ID] = getBinarySize(s)
 		}
 	}
 
@@ -172,7 +169,9 @@ func Update(args []string, buildYear string) error {
 			if s.IsBuildable() {
 				oldVersionStr := oldVersions[s.ID]
 				newVersionStr := getServiceVersion(s)
-				ui.PrintInfo(formatSummaryLine(s, oldVersionStr, newVersionStr))
+				oldSize := oldSizes[s.ID]
+				newSize := getBinarySize(s)
+				ui.PrintInfo(formatSummaryLine(s, oldVersionStr, newVersionStr, oldSize, newSize))
 			}
 		}
 	}
