@@ -3,18 +3,15 @@ package cmd
 import (
 	"bufio"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
-	"net/http"
 	"os/exec"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/EasterCompany/dex-cli/config"
-	"github.com/EasterCompany/dex-cli/git"
 )
 
 // getServiceVersion fetches the version of a service based on its type.
@@ -116,32 +113,11 @@ func getCacheVersion(service config.ServiceDefinition) string {
 	return "N/A"
 }
 
-// getHTTPVersion fetches the version from a service's /version endpoint.
+// getHTTPVersion fetches the version from a service's /service endpoint.
 func getHTTPVersion(service config.ServiceDefinition) string {
-	versionURL := service.GetHTTP("/version")
-	client := http.Client{
-		Timeout: 2 * time.Second,
-	}
-	resp, err := client.Get(versionURL)
+	report, err := GetServiceReport(service)
 	if err != nil {
 		return "N/A"
 	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "N/A"
-	}
-
-	var versionResp map[string]string
-	if err := json.Unmarshal(body, &versionResp); err != nil {
-		return "N/A"
-	}
-
-	parsedVersion, err := git.Parse(versionResp["version"])
-	if err != nil {
-		return "N/A"
-	}
-
-	return parsedVersion.String()
+	return report.Version.Str
 }

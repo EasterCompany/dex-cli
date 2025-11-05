@@ -3,11 +3,9 @@ package cmd
 import (
 	"bufio"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net"
-	"net/http"
 	"os"
 	"os/exec"
 	"regexp"
@@ -17,7 +15,6 @@ import (
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/git"
-	"github.com/EasterCompany/dex-cli/health"
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
@@ -307,64 +304,39 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 	return []string{serviceID, address, colorizeNA(ui.Truncate(version, 12)), colorizeStatus("OK"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 }
 
-// checkHTTPStatus checks a service via its HTTP /status endpoint
+// checkHTTPStatus checks a service via its new, unified /service endpoint
 func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string) ui.TableRow {
-	versionURL := service.GetHTTP("/version")
-	statusURL := service.GetHTTP("/status")
-
-	// Use a custom HTTP client with a 2-second timeout
-	client := http.Client{
-		Timeout: 2 * time.Second,
-	}
-
-	// Get Version
-	version := "N/A"
-	resp, err := client.Get(versionURL)
-	if err == nil {
-		defer func() { _ = resp.Body.Close() }()
-		body, err := io.ReadAll(resp.Body)
-		if err == nil {
-			var versionResp map[string]string
-			if err := json.Unmarshal(body, &versionResp); err == nil {
-				parsedVersion, err := git.Parse(versionResp["version"])
-				if err == nil {
-					version = parsedVersion.Short()
-				}
-			}
+	report, err := GetServiceReport(service)
+	if err != nil {
+		// If the endpoint fails, we return a BAD status with N/A for all other fields.
+		return []string{
+			serviceID,
+			address,
+			colorizeNA("N/A"),
+			colorizeStatus("BAD"),
+			colorizeNA("N/A"),
+			colorizeNA("N/A"),
+			colorizeNA("N/A"),
+			time.Now().Format("15:04:05"),
 		}
 	}
 
-	// Get Status
-	resp, err = client.Get(statusURL)
-	if err != nil {
-		return []string{serviceID, address, colorizeNA(version), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return []string{serviceID, address, colorizeNA(version), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
-	}
-
-	var statusResp health.StatusResponse
-	if err := json.Unmarshal(body, &statusResp); err != nil {
-		return []string{serviceID, address, colorizeNA(version), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
-	}
-
-	uptime := ui.Truncate(formatUptime(time.Duration(statusResp.Uptime)*time.Second), 10)
-
-	goroutines := fmt.Sprintf("%d", statusResp.Metrics.Goroutines)
-	mem := fmt.Sprintf("%.2f", statusResp.Metrics.MemoryAllocMB)
+	// Format values from the report for table display
+	version := ui.Truncate(report.Version.Tag, 12)
+	uptime := ui.Truncate(formatUptime(time.Duration(report.Health.Uptime)*time.Second), 10)
+	goroutines := fmt.Sprintf("%d", report.Health.Metrics.Goroutines)
+	mem := fmt.Sprintf("%.2f", report.Health.Metrics.MemoryAllocMB)
+	timestamp := time.Unix(report.Health.Timestamp, 0).Format("15:04:05")
 
 	return []string{
 		serviceID,
 		address,
-		colorizeNA(ui.Truncate(version, 12)),
-		colorizeStatus(statusResp.Status),
+		colorizeNA(version),
+		colorizeStatus(report.Status),
 		colorizeNA(uptime),
 		colorizeNA(goroutines),
 		colorizeNA(mem),
-		time.Unix(statusResp.Timestamp, 0).Format("15:00:00"), // Shortened timestamp
+		timestamp,
 	}
 }
 
@@ -380,4 +352,22 @@ func colorizeStatus(status string) string {
 	default:
 		return status
 	}
+}
+
+// formatUptime converts a duration into a compact string like "1d 2h 3m".
+func formatUptime(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	}
+	if d < time.Hour {
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	}
+	if d < 24*time.Hour {
+		h := int(d.Hours())
+		m := int(d.Minutes()) % 60
+		return fmt.Sprintf("%dh %dm", h, m)
+	}
+	days := int(d.Hours()) / 24
+	h := int(d.Hours()) % 24
+	return fmt.Sprintf("%dd %dh", days, h)
 }
