@@ -58,37 +58,11 @@ func Build(args []string) error {
 	}
 
 	// ---
-	// 2. Process dex-cli FIRST
+	// 2. Process cli FIRST
 	// ---
-	ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, "# Building dex-cli", ui.ColorReset))
-	// For dex-cli, we run 'make install' as it correctly handles all steps
-	sourcePath, _ := config.ExpandPath(dexCliDef.Source)
-	if !checkFileExists(sourcePath) {
-		return fmt.Errorf("dex-cli source code not found at %s. Run 'dex add' to download & install it", sourcePath)
-	}
-
-	// Automatically bump the patch version for the build
-	latestTag, err := git.GetLatestTag(sourcePath)
-	if err != nil {
-		return fmt.Errorf("failed to get latest git tag for dex-cli: %w", err)
-	}
-
-	major, minor, patch, err := git.ParseVersionTag(latestTag)
-	if err != nil {
-		// Fallback to a default if the tag is malformed
-		ui.PrintWarning(fmt.Sprintf("Could not parse tag '%s', defaulting to v0.0.0. Error: %v", latestTag, err))
-		major, minor, patch = 0, 0, 0
-	}
-
-	newVersion := fmt.Sprintf("v%d.%d.%d", major, minor, patch+1)
-	installCmd := exec.Command("make", "install", fmt.Sprintf("VERSION=%s", newVersion))
-	installCmd.Dir = sourcePath
-	installCmd.Stdout = os.Stdout
-	installCmd.Stderr = os.Stderr
-
-	if err := installCmd.Run(); err != nil {
-		log(fmt.Sprintf("dex-cli 'make install' failed: %v", err))
-		return fmt.Errorf("dex-cli 'make install' failed: %w", err)
+	ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, "# Building cli", ui.ColorReset))
+	if err := runUnifiedBuildPipeline(dexCliDef, log, true); err != nil {
+		return err
 	}
 
 	// ---
@@ -96,7 +70,6 @@ func Build(args []string) error {
 	// ---
 	servicesBuilt := 0
 	for _, def := range allServices {
-		// Skip os type and dex-cli (which we just did)
 		if !def.IsManageable() || def.ShortName == "cli" {
 			continue
 		}
@@ -104,38 +77,13 @@ func Build(args []string) error {
 		fmt.Println()
 		ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, fmt.Sprintf("# Building %s", def.ShortName), ui.ColorReset))
 
-		// Check if source exists before trying to build
-		sourcePath, _ := config.ExpandPath(def.Source)
-		if !checkFileExists(sourcePath) {
-			ui.PrintWarning(fmt.Sprintf("Skipping %s: source code not found at %s. Run 'dex add' to download & install it.", def.ShortName, sourcePath))
-			continue
+		if err := runUnifiedBuildPipeline(def, log, false); err != nil {
+			return err
 		}
 
-		log(fmt.Sprintf("Building %s from local source...", def.ShortName))
-
-		// 1. Format
-		if err := runServicePipelineStep(def, "format"); err != nil {
-			return err // Stop-on-failure
-		}
-
-		// 2. Lint
-		if err := runServicePipelineStep(def, "lint"); err != nil {
-			return err // Stop-on-failure
-		}
-
-		// 3. Test
-		if err := runServicePipelineStep(def, "test"); err != nil {
-			return err // Stop-on-failure
-		}
-
-		// 4. Build
-		if err := runServicePipelineStep(def, "build"); err != nil {
-			return err // Stop-on-failure
-		}
-
-		// 5. Install
+		// After a successful build, install the systemd service
 		if err := installSystemdService(def); err != nil {
-			return err // Stop-on-failure
+			return err
 		}
 
 		ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %s!", def.ShortName))
@@ -230,8 +178,115 @@ func Build(args []string) error {
 		}
 	}
 
-	fmt.Println()                                                                                    // Add a blank line for spacing
 	ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %d service(s).", servicesBuilt+1)) // +1 for dex-cli
+
+	return nil
+}
+func runUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), isCli bool) error {
+	sourcePath, err := config.ExpandPath(def.Source)
+	if err != nil {
+		return fmt.Errorf("failed to expand source path for %s: %w", def.ShortName, err)
+	}
+
+	if !checkFileExists(sourcePath) {
+		ui.PrintWarning(fmt.Sprintf("Skipping %s: source code not found at %s. Run 'dex add' to download & install it.", def.ShortName, sourcePath))
+		return nil
+	}
+
+	log(fmt.Sprintf("Building %s from local source...", def.ShortName))
+
+	// ---
+	// 1. Tidy
+	// ---
+	ui.PrintInfo("Ensuring Go modules are tidy...")
+	tidyCmd := exec.Command("go", "mod", "tidy")
+	tidyCmd.Dir = sourcePath
+	tidyCmd.Stdout = os.Stdout
+	tidyCmd.Stderr = os.Stderr
+	if err := tidyCmd.Run(); err != nil {
+		log(fmt.Sprintf("%s 'go mod tidy' failed: %v", def.ShortName, err))
+		return fmt.Errorf("%s 'go mod tidy' failed: %w", def.ShortName, err)
+	}
+
+	// ---
+	// 2. Format
+	// ---
+	ui.PrintInfo("Formatting...")
+	formatCmd := exec.Command("go", "fmt", "./...")
+	formatCmd.Dir = sourcePath
+	formatCmd.Stdout = os.Stdout
+	formatCmd.Stderr = os.Stderr
+	if err := formatCmd.Run(); err != nil {
+		log(fmt.Sprintf("%s 'go fmt' failed: %v", def.ShortName, err))
+		return fmt.Errorf("%s 'go fmt' failed: %w", def.ShortName, err)
+	}
+
+	// ---
+	// 3. Lint
+	// ---
+	ui.PrintInfo("Linting...")
+	lintCmd := exec.Command("golangci-lint", "run")
+	lintCmd.Dir = sourcePath
+	lintCmd.Stdout = os.Stdout
+	lintCmd.Stderr = os.Stderr
+	if err := lintCmd.Run(); err != nil {
+		log(fmt.Sprintf("%s 'golangci-lint run' failed: %v", def.ShortName, err))
+		return fmt.Errorf("%s 'golangci-lint run' failed: %w", def.ShortName, err)
+	}
+
+	// ---
+	// 4. Test
+	// ---
+	ui.PrintInfo("Testing...")
+	testCmd := exec.Command("go", "test", "-v", "./...")
+	testCmd.Dir = sourcePath
+	testCmd.Stdout = os.Stdout
+	testCmd.Stderr = os.Stderr
+	if err := testCmd.Run(); err != nil {
+		log(fmt.Sprintf("%s 'go test' failed: %v", def.ShortName, err))
+		return fmt.Errorf("%s 'go test' failed: %w", def.ShortName, err)
+	}
+
+	// ---
+	// 5. Build
+	// ---
+	ui.PrintInfo("Building...")
+	var buildCmd *exec.Cmd
+	if isCli {
+		// Special handling for dex-cli to embed version info
+		latestTag, err := git.GetLatestTag(sourcePath)
+		if err != nil {
+			return fmt.Errorf("failed to get latest git tag for cli: %w", err)
+		}
+		major, minor, patch, err := git.ParseVersionTag(latestTag)
+		if err != nil {
+			ui.PrintWarning(fmt.Sprintf("Could not parse tag '%s', defaulting to v0.0.0. Error: %v", latestTag, err))
+			major, minor, patch = 0, 0, 0
+		}
+		newVersion := fmt.Sprintf("v%d.%d.%d", major, minor, patch+1)
+
+		branch, commit := git.GetVersionInfo(sourcePath)
+		buildDate := time.Now().UTC().Format("2006-01-02T15:04:05Z")
+		buildYear := time.Now().UTC().Format("2006")
+		buildHash := "local" // Placeholder for build hash
+
+		ldflags := fmt.Sprintf("-X main.version=%s -X main.branch=%s -X main.commit=%s -X main.buildDate=%s -X main.buildYear=%s -X main.buildHash=%s",
+			newVersion, branch, commit, buildDate, buildYear, buildHash)
+
+		outputPath, _ := config.ExpandPath("~/Dexter/bin/dex")
+		buildCmd = exec.Command("go", "build", "-ldflags", ldflags, "-o", outputPath, ".")
+	} else {
+		// Standard build for other services
+		buildCmd = exec.Command("go", "build", "-o", fmt.Sprintf("/usr/local/bin/%s", def.ShortName), ".")
+	}
+
+	buildCmd.Dir = sourcePath
+	buildCmd.Stdout = os.Stdout
+	buildCmd.Stderr = os.Stderr
+	if err := buildCmd.Run(); err != nil {
+		log(fmt.Sprintf("%s 'go build' failed: %v", def.ShortName, err))
+		return fmt.Errorf("%s 'go build' failed: %w", def.ShortName, err)
+	}
 
 	return nil
 }
