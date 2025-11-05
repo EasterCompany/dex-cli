@@ -84,6 +84,10 @@ func Update(args []string, buildYear string) error {
 		return fmt.Errorf("dex-cli 'make install' failed: %w", err)
 	}
 
+	ui.PrintSuccess(fmt.Sprintf("Successfully updated and installed %s!", dexCliDef.ShortName))
+	ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, oldVersions[dexCliDef.ID], ui.ColorReset))
+	ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.GetFullServiceVersion(dexCliDef), ui.ColorReset))
+
 	// ---
 	// 3. Process all OTHER services *that are in the service map*
 	// ---
@@ -147,7 +151,7 @@ func Update(args []string, buildYear string) error {
 		ui.PrintSuccess(fmt.Sprintf("Successfully updated and installed %s!", def.ShortName))
 		parsedOldVersion := utils.ParseServiceVersionFromJSON(oldVersions[def.ID])
 		ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, parsedOldVersion, ui.ColorReset))
-		ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.GetFullServiceVersion(def), ui.ColorReset))
+		ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.ParseServiceVersionFromJSON(utils.GetFullServiceVersion(def)), ui.ColorReset))
 	}
 
 	// ---
