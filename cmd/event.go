@@ -20,6 +20,6 @@ func Event(args []string) error {
 		return fmt.Errorf("failed to get event service status: %w", err)
 	}
 
-	ui.PrintInfo(fmt.Sprintf("Event Service Status: %s", status))
+	ui.PrintInfo(status)
 	return nil
 }
