@@ -145,7 +145,7 @@ func highlightSyntax(line, language string) string {
 		})
 
 		// 2. Identify which placeholders are keys and color them blue
-		keyPattern := regexp.MustCompile(`(__STRING_\d__):`)
+		keyPattern := regexp.MustCompile(`(__STRING_\d+__):`)
 		highlighted = keyPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
 			placeholder := strings.TrimRight(s, ":")
 			// Overwrite the map entry with the blue key color
