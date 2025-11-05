@@ -22,11 +22,14 @@ func main() {
 	// Set the running version string directly from build-time variables.
 	cmd.RunningVersion = version
 
-	if err := cmd.EnsurePythonVenv(cmd.RunningVersion); err != nil {
-		fmt.Println() // Add padding at the start
-		ui.PrintError(fmt.Sprintf("Error ensuring Python environment: %v", err))
-		fmt.Println() // Add padding at the end
-		os.Exit(1)
+	// Skip Python check for version command to prevent output pollution
+	if len(os.Args) > 1 && os.Args[1] != "version" {
+		if err := cmd.EnsurePythonVenv(cmd.RunningVersion); err != nil {
+			fmt.Println() // Add padding at the start
+			ui.PrintError(fmt.Sprintf("Error ensuring Python environment: %v", err))
+			fmt.Println() // Add padding at the end
+			os.Exit(1)
+		}
 	}
 
 	if err := config.EnsureDirectoryStructure(); err != nil {
