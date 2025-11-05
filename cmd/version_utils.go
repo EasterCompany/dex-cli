@@ -29,20 +29,22 @@ func getServiceVersion(service config.ServiceDefinition) string {
 	}
 }
 
-// getCLIVersion reads the version from the Makefile.
+// getCLIVersion executes `dex version` to get the CLI's version.
 func getCLIVersion() string {
-	dexPath, err := config.ExpandPath("~/EasterCompany/dex-cli")
+	// Use the direct path to the newly built binary to ensure we get the new version.
+	dexPath, err := config.ExpandPath("~/Dexter/bin/dex")
 	if err != nil {
-		return "NA"
+		return "N/A"
 	}
 
-	cmd := exec.Command("make", "-s", "-f", "Makefile", "echo-version")
-	cmd.Dir = dexPath
+	cmd := exec.Command(dexPath, "version")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "N/A"
 	}
-	return strings.TrimSpace(string(output))
+	// The `version` command now outputs "v: <version>", so we strip the prefix.
+	versionStr := strings.TrimSpace(string(output))
+	return strings.TrimPrefix(versionStr, "v: ")
 }
 
 // getCacheVersion connects to a cache service to get its version.
