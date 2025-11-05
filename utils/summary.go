@@ -9,58 +9,80 @@ import (
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
+// SummaryInfo holds all the data needed to print a single service's summary.
+type SummaryInfo struct {
+	Service       config.ServiceDefinition
+	OldVersion    string
+	NewVersion    string
+	OldSize       int64
+	NewSize       int64
+	ChangeSummary string
+}
+
 // truncateVersion shortens a version string for display.
 func truncateVersion(version string) string {
-	// Don't truncate special status strings
-	if version == "N/A" || version == "OK" || version == "BAD" {
-		return version
+	if version == "N/A" || version == "OK" || version == "BAD" || version == "" {
+		return "N/A"
 	}
-
 	parts := strings.Split(version, ".")
 	if len(parts) >= 3 {
+		// Return M.m.p
 		return strings.Join(parts[:3], ".")
 	}
-
-	if len(version) > 5 {
-		return version[:5]
-	}
-
 	return version
 }
 
-// FormatSummaryLine formats a single line for the update summary.
-func FormatSummaryLine(service config.ServiceDefinition, oldVersion, newVersion string, oldSize, newSize int64) string {
-	displayOld := truncateVersion(oldVersion)
-	displayNew := truncateVersion(newVersion)
+// PrintSummaryTable prints the final summary table for the build or update commands.
+func PrintSummaryTable(summaries []SummaryInfo) {
+	table := ui.NewTable([]string{
+		"Service",
+		"Version Change",
+		"Size Change",
+		"Code Change Summary",
+	})
 
-	var versionChange string
-	if oldVersion == newVersion {
-		versionChange = ui.Colorize(displayNew, ui.ColorDarkGray)
-	} else {
-		versionChange = ui.Colorize(fmt.Sprintf("%s -> %s", displayOld, displayNew), ui.ColorGreen)
-	}
-
-	var sizeChange string
-	sizeDiff := newSize - oldSize
-
-	if oldSize == 0 && newSize > 0 {
-		// New file created
-		sizeChange = ui.Colorize(fmt.Sprintf("(+%s)", FormatBytes(newSize)), ui.ColorGreen)
-	} else if sizeDiff == 0 {
-		// No change
-		sizeChange = ui.Colorize("(0 B)", ui.ColorDarkGray)
-	} else {
-		sign := "+"
-		color := ui.ColorYellow // Yellow for increase
-		if sizeDiff < 0 {
-			sign = "-"
-			color = ui.ColorGreen // Green for decrease
-			sizeDiff = -sizeDiff  // Use absolute value for formatting
+	for _, s := range summaries {
+		// --- Format Version Change ---
+		displayOld := truncateVersion(s.OldVersion)
+		displayNew := truncateVersion(s.NewVersion)
+		var versionChange string
+		if s.OldVersion == s.NewVersion {
+			versionChange = ui.Colorize(displayNew, ui.ColorDarkGray)
+		} else {
+			versionChange = ui.Colorize(fmt.Sprintf("%s -> %s", displayOld, displayNew), ui.ColorGreen)
 		}
-		sizeChange = ui.Colorize(fmt.Sprintf("(%s%s)", sign, FormatBytes(sizeDiff)), color)
+
+		// --- Format Size Change ---
+		sizeDiff := s.NewSize - s.OldSize
+		var sizeChange string
+		if s.OldSize == 0 && s.NewSize > 0 {
+			sizeChange = ui.Colorize(fmt.Sprintf("(+%s)", FormatBytes(s.NewSize)), ui.ColorGreen)
+		} else if sizeDiff == 0 {
+			sizeChange = ui.Colorize("(0 B)", ui.ColorDarkGray)
+		} else {
+			sign, color := "+", ui.ColorYellow
+			if sizeDiff < 0 {
+				sign, color, sizeDiff = "-", ui.ColorGreen, -sizeDiff
+			}
+			sizeChange = ui.Colorize(fmt.Sprintf("(%s%s)", sign, FormatBytes(sizeDiff)), color)
+		}
+
+		// --- Format Change Summary ---
+		summary := s.ChangeSummary
+		if summary == "" {
+			summary = "Not a git repository."
+		}
+		summary = ui.Colorize(summary, ui.ColorDarkGray)
+
+		table.AddRow(ui.TableRow{
+			s.Service.ShortName,
+			versionChange,
+			sizeChange,
+			summary,
+		})
 	}
 
-	return fmt.Sprintf("  %-20s %-40s %s", service.ShortName, versionChange, sizeChange)
+	table.Render()
 }
 
 // GetBinarySize returns the size of the service's binary in bytes.
@@ -69,11 +91,9 @@ func GetBinarySize(service config.ServiceDefinition) int64 {
 	if err != nil {
 		return 0
 	}
-
 	info, err := os.Stat(path)
 	if err != nil {
 		return 0
 	}
-
 	return info.Size()
 }

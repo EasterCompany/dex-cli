@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/EasterCompany/dex-cli/config"
+	"github.com/EasterCompany/dex-cli/git"
 	"github.com/EasterCompany/dex-cli/ui"
 	"github.com/EasterCompany/dex-cli/utils"
 )
@@ -42,7 +43,7 @@ func Build(args []string) error {
 	}
 
 	// ---
-	// 1. Get initial versions and sizes (after finding cli def to get RunningVersion)
+	// 1. Get initial versions and sizes
 	// ---
 	oldVersions := make(map[string]string)
 	oldSizes := make(map[string]int64)
@@ -72,7 +73,6 @@ func Build(args []string) error {
 	// ---
 	// 3. Process all OTHER services
 	// ---
-	servicesBuilt := 0
 	for _, def := range allServices {
 		if !def.IsManageable() || def.ShortName == "cli" {
 			continue
@@ -87,7 +87,6 @@ func Build(args []string) error {
 		}
 
 		if built {
-			// After a successful build, install the systemd service
 			if err := utils.InstallSystemdService(def); err != nil {
 				return err
 			}
@@ -95,7 +94,6 @@ func Build(args []string) error {
 			parsedOldVersion := utils.ParseServiceVersionFromJSON(oldVersions[def.ID])
 			ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, parsedOldVersion, ui.ColorReset))
 			ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.ParseServiceVersionFromJSON(utils.GetFullServiceVersion(def)), ui.ColorReset))
-			servicesBuilt++
 		}
 	}
 
@@ -112,12 +110,11 @@ func Build(args []string) error {
 	for _, serviceList := range serviceMap.Services {
 		for _, serviceEntry := range serviceList {
 			def := config.GetServiceDefinition(serviceEntry.ID)
-			// Skip services of type "os" as they don't have git repositories
 			if def.Type == "os" {
 				continue
 			}
 			if err := gitAddCommitPush(def); err != nil {
-				return err // Stop-on-failure
+				return err
 			}
 		}
 	}
@@ -127,29 +124,42 @@ func Build(args []string) error {
 	// ---
 	fmt.Println()
 	ui.PrintHeader("Complete")
-
-	// Add a small delay to allow services to restart
 	time.Sleep(2 * time.Second)
 
-	// Get new versions and print changes for ALL services
+	var summaryData []utils.SummaryInfo
 	for _, s := range allServices {
-		if s.IsBuildable() {
+		if !s.IsBuildable() {
 			oldVersionStr := oldVersions[s.ID]
 			newVersionStr := utils.GetServiceVersion(s)
 
-			// Parse versions if they are JSON
 			if s.Type != "cli" {
 				oldVersionStr = utils.ParseServiceVersionFromJSON(oldVersionStr)
 				newVersionStr = utils.ParseServiceVersionFromJSON(newVersionStr)
 			}
 
-			oldSize := oldSizes[s.ID]
-			newSize := utils.GetBinarySize(s)
-			ui.PrintInfo(utils.FormatSummaryLine(s, oldVersionStr, newVersionStr, oldSize, newSize))
+			oldVer, _ := git.Parse(oldVersionStr)
+			newVer, _ := git.Parse(newVersionStr)
+
+			var changeLog string
+			if oldVer != nil && newVer != nil && oldVer.Commit != "" && newVer.Commit != "" {
+				repoPath, _ := config.ExpandPath(s.Source)
+				changeLog, _ = git.GetCommitLogBetween(repoPath, oldVer.Commit, newVer.Commit)
+			}
+
+			summaryData = append(summaryData, utils.SummaryInfo{
+				Service:       s,
+				OldVersion:    oldVersionStr,
+				NewVersion:    newVersionStr,
+				OldSize:       oldSizes[s.ID],
+				NewSize:       utils.GetBinarySize(s),
+				ChangeSummary: changeLog,
+			})
 		}
 	}
 
-	fmt.Println() // Add a blank line for spacing
+	utils.PrintSummaryTable(summaryData)
+
+	fmt.Println()
 	ui.PrintSuccess("All services are built.")
 
 	return nil
@@ -163,25 +173,21 @@ func gitAddCommitPush(def config.ServiceDefinition) error {
 
 	ui.PrintInfo(fmt.Sprintf("[%s] Adding, committing, and pushing changes...", def.ShortName))
 
-	// Git Add
 	addCmd := exec.Command("git", "add", ".")
 	addCmd.Dir = sourcePath
 	if output, err := addCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git add failed for %s:\n%s", def.ShortName, string(output))
 	}
 
-	// Git Commit
 	commitMsg := "dex build: successful build"
 	commitCmd := exec.Command("git", "commit", "-m", commitMsg)
 	commitCmd.Dir = sourcePath
 	if output, err := commitCmd.CombinedOutput(); err != nil {
-		// It's possible there are no changes to commit, so we can ignore this error
 		if !strings.Contains(string(output), "nothing to commit") {
 			return fmt.Errorf("git commit failed for %s:\n%s", def.ShortName, string(output))
 		}
 	}
 
-	// Git Push
 	pushCmd := exec.Command("git", "push")
 	pushCmd.Dir = sourcePath
 	if output, err := pushCmd.CombinedOutput(); err != nil {

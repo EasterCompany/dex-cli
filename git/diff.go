@@ -66,3 +66,29 @@ func parseDiffStat(statLine string) (*DiffStats, error) {
 
 	return stats, nil
 }
+
+// GetCommitLogBetween returns a formatted string of commit subjects between two git refs.
+func GetCommitLogBetween(repoPath, oldRef, newRef string) (string, error) {
+	if oldRef == "" || newRef == "" || oldRef == newRef {
+		return "No changes.", nil
+	}
+
+	// %s is the subject (commit message title)
+	cmd := exec.Command("git", "log", "--pretty=format:- %s", fmt.Sprintf("%s..%s", oldRef, newRef))
+	cmd.Dir = repoPath
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// If the old ref is not found (e.g., a new service), just show the log for the new ref.
+		if strings.Contains(string(output), "bad revision") {
+			return GetCommitLogBetween(repoPath, "", newRef)
+		}
+		return "", fmt.Errorf("git log command failed: %w\nOutput: %s", err, string(output))
+	}
+
+	log := strings.TrimSpace(string(output))
+	if log == "" {
+		return "No changes.", nil
+	}
+
+	return log, nil
+}

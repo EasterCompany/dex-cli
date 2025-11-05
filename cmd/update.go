@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/EasterCompany/dex-cli/config"
+	"github.com/EasterCompany/dex-cli/git"
 	"github.com/EasterCompany/dex-cli/ui"
 	"github.com/EasterCompany/dex-cli/utils"
 )
@@ -38,7 +39,6 @@ func Update(args []string, buildYear string) error {
 	}
 
 	var dexCliDef config.ServiceDefinition
-	// Find dex-cli definition
 	for _, s := range allServices {
 		if s.ShortName == "cli" {
 			dexCliDef = s
@@ -61,14 +61,13 @@ func Update(args []string, buildYear string) error {
 	ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.GetFullServiceVersion(dexCliDef), ui.ColorReset))
 
 	// ---
-	// 3. Process all OTHER services *that are in the service map*
+	// 3. Process all OTHER installed services
 	// ---
 	serviceMap, err := config.LoadServiceMapConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load service-map.json: %w", err)
 	}
 
-	// Create a quick lookup map of installed services
 	installedServices := make(map[string]bool)
 	for _, serviceList := range serviceMap.Services {
 		for _, serviceEntry := range serviceList {
@@ -77,12 +76,9 @@ func Update(args []string, buildYear string) error {
 	}
 
 	for _, def := range allServices {
-		// Skip os type and dex-cli (which we just did)
 		if !def.IsManageable() || def.ShortName == "cli" {
 			continue
 		}
-
-		// *** Only update services that are in the service-map.json ***
 		if _, isInstalled := installedServices[def.ID]; !isInstalled {
 			log(fmt.Sprintf("Skipping %s (not in service-map.json)", def.ShortName))
 			continue
@@ -90,19 +86,14 @@ func Update(args []string, buildYear string) error {
 
 		ui.PrintInfo(ui.Colorize(fmt.Sprintf("# Updating %s", def.ShortName), ui.ColorCyan))
 
-		// 1. Download
 		if err := utils.GitUpdateService(def); err != nil {
-			return err // Stop-on-failure
+			return err
 		}
-
-		// 2. Build
 		if _, err := utils.RunUnifiedBuildPipeline(def, log); err != nil {
-			return err // Stop-on-failure
+			return err
 		}
-
-		// 3. Install
 		if err := utils.InstallSystemdService(def); err != nil {
-			return err // Stop-on-failure
+			return err
 		}
 
 		ui.PrintSuccess(fmt.Sprintf("Successfully updated and installed %s!", def.ShortName))
@@ -117,14 +108,11 @@ func Update(args []string, buildYear string) error {
 	log("Update complete.")
 	fmt.Println()
 	ui.PrintHeader("Complete")
-
-	// Add a small delay to allow services to restart
 	time.Sleep(2 * time.Second)
 
-	// Get new versions and print changes, but ONLY for services in the service map
+	var summaryData []utils.SummaryInfo
 	configuredServices, err := utils.GetConfiguredServices()
 	if err != nil {
-		// Don't fail the whole command, just warn.
 		ui.PrintWarning(fmt.Sprintf("Could not load configured services for final summary: %v", err))
 	} else {
 		for _, s := range configuredServices {
@@ -132,20 +120,35 @@ func Update(args []string, buildYear string) error {
 				oldVersionStr := oldVersions[s.ID]
 				newVersionStr := utils.GetServiceVersion(s)
 
-				// Parse versions if they are JSON
 				if s.Type != "cli" {
 					oldVersionStr = utils.ParseServiceVersionFromJSON(oldVersionStr)
 					newVersionStr = utils.ParseServiceVersionFromJSON(newVersionStr)
 				}
 
-				oldSize := oldSizes[s.ID]
-				newSize := utils.GetBinarySize(s)
-				ui.PrintInfo(utils.FormatSummaryLine(s, oldVersionStr, newVersionStr, oldSize, newSize))
+				oldVer, _ := git.Parse(oldVersionStr)
+				newVer, _ := git.Parse(newVersionStr)
+
+				var changeLog string
+				if oldVer != nil && newVer != nil && oldVer.Commit != "" && newVer.Commit != "" {
+					repoPath, _ := config.ExpandPath(s.Source)
+					changeLog, _ = git.GetCommitLogBetween(repoPath, oldVer.Commit, newVer.Commit)
+				}
+
+				summaryData = append(summaryData, utils.SummaryInfo{
+					Service:       s,
+					OldVersion:    oldVersionStr,
+					NewVersion:    newVersionStr,
+					OldSize:       oldSizes[s.ID],
+					NewSize:       utils.GetBinarySize(s),
+					ChangeSummary: changeLog,
+				})
 			}
 		}
 	}
 
-	fmt.Println() // Add a blank line for spacing
+	utils.PrintSummaryTable(summaryData)
+
+	fmt.Println()
 	ui.PrintSuccess("All services are up to date.")
 
 	return nil
