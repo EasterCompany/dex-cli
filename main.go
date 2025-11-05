@@ -54,16 +54,17 @@ func main() {
 		runCommand(func() error { return cmd.System(os.Args[2:]) })
 
 	case "version", "-v", "--version":
-		jsonOutput := false
-		for _, arg := range os.Args {
-			if arg == "--json" {
-				jsonOutput = true
-				break
+		runCommand(func() error {
+			jsonOutput := false
+			for _, arg := range os.Args {
+				if arg == "--json" {
+					jsonOutput = true
+					break
+				}
 			}
-		}
-		fmt.Println() // Add padding at the start
-		cmd.Version(jsonOutput, version, branch, commit, buildDate, buildYear, buildHash)
-		fmt.Println() // Add padding at the end
+			cmd.Version(jsonOutput, version, branch, commit, buildDate, buildYear, buildHash)
+			return nil
+		})
 
 	case "build":
 		runCommand(func() error { return cmd.Build(os.Args[2:]) })
