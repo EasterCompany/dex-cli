@@ -2,7 +2,6 @@ package git
 
 import (
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -38,63 +37,56 @@ func ParseVersionTag(tag string) (int, int, int, error) {
 
 // Version holds the components of a parsed version string.
 type Version struct {
-	Major      string
-	Minor      string
-	Patch      string
-	PreRelease string
-	Branch     string
-	Commit     string
-	BuildDate  string
-	Arch       string
-	Random     string
+	Major     string
+	Minor     string
+	Patch     string
+	Branch    string
+	Commit    string
+	BuildDate string
+	Arch      string
+	BuildHash string
 }
 
 // Parse takes a version string and returns a Version object.
 func Parse(versionStr string) (*Version, error) {
-	// Regex to capture all parts of the version string
-	re := regexp.MustCompile(`^v?(\d+)\.(\d+)\.(\d+)(-[a-zA-Z0-9]+)?\.([a-zA-Z0-9_-]+)\.([a-f0-9]+)\.([0-9-]+)\.([a-zA-Z0-9_]+)\.([a-zA-Z0-9]+)$`)
-	matches := re.FindStringSubmatch(versionStr)
+	versionStr = strings.TrimPrefix(versionStr, "v")
+	parts := strings.Split(versionStr, ".")
 
-	if len(matches) != 10 {
-		// A simpler regex for just MAJOR.MINOR.PATCH, often from cache services
-		reSimple := regexp.MustCompile(`^v?(\d+)\.(\d+)\.(\d+)$`)
-		matchesSimple := reSimple.FindStringSubmatch(versionStr)
-		if len(matchesSimple) != 4 {
-			return nil, fmt.Errorf("invalid version string format: %s", versionStr)
-		}
+	// Handle simple "M.m.p" versions, common for cache services or initial states.
+	if len(parts) == 3 {
 		return &Version{
-			Major: matchesSimple[1],
-			Minor: matchesSimple[2],
-			Patch: matchesSimple[3],
+			Major: parts[0],
+			Minor: parts[1],
+			Patch: parts[2],
 		}, nil
 	}
 
+	// Handle the full "M.m.p.branch.commit.build_date.arch.build_hash" format.
+	if len(parts) != 7 {
+		return nil, fmt.Errorf("invalid version string format: expected 3 or 7 parts, got %d for '%s'", len(parts), versionStr)
+	}
+
 	return &Version{
-		Major:      matches[1],
-		Minor:      matches[2],
-		Patch:      matches[3],
-		PreRelease: strings.TrimPrefix(matches[4], "-"),
-		Branch:     matches[5],
-		Commit:     matches[6],
-		BuildDate:  matches[7],
-		Arch:       matches[8],
-		Random:     matches[9],
+		Major:     parts[0],
+		Minor:     parts[1],
+		Patch:     parts[2],
+		Branch:    parts[3],
+		Commit:    parts[4],
+		BuildDate: parts[5],
+		Arch:      parts[6],
+		BuildHash: parts[7],
 	}, nil
 }
 
 // String formats a Version object back into a version string.
 func (v *Version) String() string {
-	// If we only have major/minor/patch, return the short form
-	if v.Branch == "" {
+	// If we only have major/minor/patch, return the short form.
+	if v.Branch == "" || v.Commit == "" {
 		return v.Short()
 	}
-	preRelease := ""
-	if v.PreRelease != "" {
-		preRelease = fmt.Sprintf("-%s", v.PreRelease)
-	}
-	return fmt.Sprintf("v%s.%s.%s%s.%s.%s.%s.%s.%s",
-		v.Major, v.Minor, v.Patch, preRelease,
-		v.Branch, v.Commit, v.BuildDate, v.Arch, v.Random,
+	return fmt.Sprintf("%s.%s.%s.%s.%s.%s.%s.%s",
+		v.Major, v.Minor, v.Patch,
+		v.Branch, v.Commit, v.BuildDate, v.Arch, v.BuildHash,
 	)
 }
 
