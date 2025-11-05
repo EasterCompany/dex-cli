@@ -132,22 +132,54 @@ func highlightSyntax(line, language string) string {
 
 	switch lang {
 	case "json":
-		// Isolate key highlighting for debugging.
+		// Final, corrected placeholder implementation.
 		placeholders := make(map[string]string)
 		placeholderID := 0
 
-		// 1. Find and replace keys only.
+		// 1. Replace keys with placeholders.
 		keyPattern := regexp.MustCompile(`("([^"]+)")\s*:`)
 		highlighted = keyPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
 			matches := keyPattern.FindStringSubmatch(s)
 			quotedKey := matches[1]
-			placeholder := fmt.Sprintf("__PH_%d__", placeholderID)
+			placeholder := fmt.Sprintf("__PH_KEY_%d__", placeholderID)
 			placeholders[placeholder] = Colorize(quotedKey, ColorBlue)
 			placeholderID++
-			return placeholder + strings.TrimPrefix(s, quotedKey)
+			// Replace the entire match (e.g., "key":) with the placeholder and a colon.
+			// The colon will be colored later.
+			return placeholder + ":"
 		})
 
-		// Restore placeholders.
+		// 2. Replace string values with placeholders.
+		valueStringPattern := regexp.MustCompile(`"(.*?)"`)
+		highlighted = valueStringPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
+			// Ensure we don't match a key that might have been missed.
+			trimmed := strings.TrimSpace(s)
+			if strings.HasSuffix(trimmed, ":") {
+				return s
+			}
+			placeholder := fmt.Sprintf("__PH_VAL_%d__", placeholderID)
+			placeholders[placeholder] = Colorize(s, ColorGreen)
+			placeholderID++
+			return placeholder
+		})
+
+		// 3. Highlight primitives.
+		primitivesPattern := regexp.MustCompile(`\b(-?\d+(\.\d+)?([eE][+-]?\d+)?|true|false|null)\b`)
+		highlighted = primitivesPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
+			color := ColorPurple // Default for numbers
+			if s == "true" || s == "false" || s == "null" {
+				color = ColorYellow
+			}
+			return Colorize(s, color)
+		})
+
+		// 4. Highlight structural elements.
+		structPattern := regexp.MustCompile(`[{}[\],:]`)
+		highlighted = structPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
+			return Colorize(s, ColorCyan)
+		})
+
+		// 5. Restore all placeholders.
 		for p, v := range placeholders {
 			highlighted = strings.ReplaceAll(highlighted, p, v)
 		}
