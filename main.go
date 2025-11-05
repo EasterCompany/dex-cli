@@ -167,13 +167,13 @@ func printUsage() {
 		ui.PrintInfo("status     Checks the status of cli and services")
 	}
 	if config.IsCommandAvailable("start") {
-		ui.PrintInfo("start      Start services")
+		ui.PrintInfo("start      Start service(s)")
 	}
 	if config.IsCommandAvailable("stop") {
-		ui.PrintInfo("stop       Stop services")
+		ui.PrintInfo("stop       Stop service(s)")
 	}
 	if config.IsCommandAvailable("restart") {
-		ui.PrintInfo("restart    Restart services")
+		ui.PrintInfo("restart    Restart service(s)")
 	}
 	if config.IsCommandAvailable("logs") {
 		ui.PrintInfo("logs       <service> [-f] View service logs")
