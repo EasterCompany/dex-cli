@@ -152,7 +152,7 @@ func runCommand(commandFunc func() error) {
 
 func printUsage() {
 	fmt.Println() // Add padding at the start
-	ui.PrintInfo("dex <command> [options]")
+	ui.PrintInfo("dex        <command> [options]")
 
 	if config.IsCommandAvailable("update") {
 		ui.PrintInfo("update     Update dex-cli and all services")
