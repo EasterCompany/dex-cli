@@ -76,8 +76,6 @@ func Update(args []string, buildYear string) error {
 	}
 
 	newVersion := fmt.Sprintf("v%d.%d.%d", major, minor, patch+1)
-	ui.PrintInfo(fmt.Sprintf("  Bumping version: %s -> %s", latestTag, newVersion))
-
 	installCmd := exec.Command("make", "install", fmt.Sprintf("VERSION=%s", newVersion))
 	installCmd.Dir = sourcePath
 	installCmd.Stdout = os.Stdout
