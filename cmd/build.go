@@ -96,7 +96,7 @@ func Build(args []string) error {
 			ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %s!", def.ShortName))
 			parsedOldVersion := utils.ParseServiceVersionFromJSON(oldVersions[def.ID])
 			ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, parsedOldVersion, ui.ColorReset))
-			ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.GetFullServiceVersion(def), ui.ColorReset))
+			ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.ParseServiceVersionFromJSON(utils.GetFullServiceVersion(def)), ui.ColorReset))
 			servicesBuilt++
 		}
 	}
