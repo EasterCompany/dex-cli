@@ -132,57 +132,17 @@ func highlightSyntax(line, language string) string {
 
 	switch lang {
 	case "json":
-		// Final, corrected placeholder implementation.
-		placeholders := make(map[string]string)
-		placeholderID := 0
-
-		// 1. Replace keys with placeholders.
+		// Simplified highlighting: only color keys.
 		keyPattern := regexp.MustCompile(`("([^"]+)")\s*:`)
 		highlighted = keyPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
 			matches := keyPattern.FindStringSubmatch(s)
-			quotedKey := matches[1]
-			placeholder := fmt.Sprintf("__PH_KEY_%d__", placeholderID)
-			placeholders[placeholder] = Colorize(quotedKey, ColorBlue)
-			placeholderID++
-			// Replace the entire match (e.g., "key":) with the placeholder and a colon.
-			// The colon will be colored later.
-			return placeholder + ":"
-		})
-
-		// 2. Replace string values with placeholders.
-		valueStringPattern := regexp.MustCompile(`"(.*?)"`)
-		highlighted = valueStringPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-			// Ensure we don't match a key that might have been missed.
-			trimmed := strings.TrimSpace(s)
-			if strings.HasSuffix(trimmed, ":") {
-				return s
+			if len(matches) > 1 {
+				quotedKey := matches[1]
+				// Color the key and preserve the rest of the match (e.g., the colon and whitespace).
+				return Colorize(quotedKey, ColorBlue) + strings.TrimPrefix(s, quotedKey)
 			}
-			placeholder := fmt.Sprintf("__PH_VAL_%d__", placeholderID)
-			placeholders[placeholder] = Colorize(s, ColorGreen)
-			placeholderID++
-			return placeholder
+			return s
 		})
-
-		// 3. Highlight primitives.
-		primitivesPattern := regexp.MustCompile(`\b(-?\d+(\.\d+)?([eE][+-]?\d+)?|true|false|null)\b`)
-		highlighted = primitivesPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-			color := ColorPurple // Default for numbers
-			if s == "true" || s == "false" || s == "null" {
-				color = ColorYellow
-			}
-			return Colorize(s, color)
-		})
-
-		// 4. Highlight structural elements.
-		structPattern := regexp.MustCompile(`[{}[\],:]`)
-		highlighted = structPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-			return Colorize(s, ColorCyan)
-		})
-
-		// 5. Restore all placeholders.
-		for p, v := range placeholders {
-			highlighted = strings.ReplaceAll(highlighted, p, v)
-		}
 
 	case "go", "js", "ts", "python", "bash", "sh":
 		// Keywords - Yellow
