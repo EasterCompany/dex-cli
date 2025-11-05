@@ -54,7 +54,7 @@ func Update(args []string, buildYear string) error {
 	// ---
 	// 2. Process dex-cli FIRST (always)
 	// ---
-	ui.PrintInfo(ui.Colorize("# Updating dex-cli", ui.ColorCyan))
+	ui.PrintInfo(ui.Colorize(fmt.Sprintf("# Updating %s", dexCliDef.ShortName), ui.ColorCyan))
 	if err := gitUpdateService(dexCliDef); err != nil {
 		return fmt.Errorf("failed to update dex-cli source: %w", err)
 	}
@@ -162,57 +162,18 @@ func Update(args []string, buildYear string) error {
 	// Add a small delay to allow services to restart
 	time.Sleep(2 * time.Second)
 
-	// Get new versions and print changes
-	for _, s := range allServices {
-		if s.IsBuildable() {
-			oldVersionStr := oldVersions[s.ID]
-			newVersionStr := getServiceVersion(s)
-
-			oldVersion, errOld := git.Parse(oldVersionStr)
-			newVersion, errNew := git.Parse(newVersionStr)
-
-			var oldVersionDisplay, newVersionDisplay string
-
-			// Format old version
-			if errOld != nil {
-				oldVersionDisplay = ui.Colorize("N/A", ui.ColorDarkGray)
-			} else {
-				shortTag := oldVersion.Short()
-				if errNew == nil && oldVersion.Compare(newVersion) < 0 {
-					shortTag = ui.Colorize(shortTag, ui.ColorBrightRed)
-				} else {
-					shortTag = ui.Colorize(shortTag, ui.ColorReset) // White
-				}
-
-				var branchAndCommit string
-				if oldVersion.Branch != "" && oldVersion.Commit != "" {
-					branchAndCommit = fmt.Sprintf(".%s.%s", oldVersion.Branch, oldVersion.Commit)
-					branchAndCommit = ui.Colorize(branchAndCommit, ui.ColorDarkGray)
-				}
-				oldVersionDisplay = fmt.Sprintf("%s%s", shortTag, branchAndCommit)
+	// Get new versions and print changes, but ONLY for services in the service map
+	configuredServices, err := getConfiguredServices()
+	if err != nil {
+		// Don't fail the whole command, just warn.
+		ui.PrintWarning(fmt.Sprintf("Could not load configured services for final summary: %v", err))
+	} else {
+		for _, s := range configuredServices {
+			if s.IsBuildable() {
+				oldVersionStr := oldVersions[s.ID]
+				newVersionStr := getServiceVersion(s)
+				ui.PrintInfo(formatSummaryLine(s, oldVersionStr, newVersionStr))
 			}
-
-			// Format new version
-			if errNew != nil {
-				newVersionDisplay = ui.Colorize("N/A", ui.ColorDarkGray)
-			} else {
-				shortTag := newVersion.Short()
-				if errOld == nil && newVersion.Compare(oldVersion) > 0 {
-					shortTag = ui.Colorize(shortTag, ui.ColorGreen)
-				} else {
-					shortTag = ui.Colorize(shortTag, ui.ColorReset) // White
-				}
-
-				var branchAndCommit string
-				if newVersion.Branch != "" && newVersion.Commit != "" {
-					branchAndCommit = fmt.Sprintf(".%s.%s", newVersion.Branch, newVersion.Commit)
-					branchAndCommit = ui.Colorize(branchAndCommit, ui.ColorDarkGray)
-				}
-				newVersionDisplay = fmt.Sprintf("%s%s", shortTag, branchAndCommit)
-			}
-
-			greyV := ui.Colorize("v", ui.ColorDarkGray)
-			ui.PrintInfo(fmt.Sprintf("[%s] %s %s -> %s", s.ShortName, greyV, oldVersionDisplay, newVersionDisplay))
 		}
 	}
 

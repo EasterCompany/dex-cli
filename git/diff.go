@@ -1,0 +1,64 @@
+package git
+
+import (
+	"fmt"
+	"os/exec"
+	"regexp"
+	"strconv"
+	"strings"
+)
+
+// DiffStats holds the summary of a git diff.
+type DiffStats struct {
+	FilesChanged int
+	Insertions   int
+	Deletions    int
+}
+
+// GetDiffSummary calculates the diff between the current HEAD and the previous commit.
+func GetDiffSummary(repoPath string) (*DiffStats, error) {
+	// --shortstat shows only the summary line of a diff
+	// HEAD~1 references the commit before HEAD
+	cmd := exec.Command("git", "diff", "--shortstat", "HEAD~1", "HEAD")
+	cmd.Dir = repoPath
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		// This can happen if there's only one commit in the repo.
+		// We'll treat it as no changes.
+		if strings.Contains(string(output), "bad revision") {
+			return &DiffStats{}, nil
+		}
+		return nil, fmt.Errorf("git diff command failed: %w\nOutput: %s", err, string(output))
+	}
+
+	return parseDiffStat(string(output))
+}
+
+// parseDiffStat parses the output of "git diff --shortstat".
+// e.g., " 1 file changed, 5 insertions(+), 2 deletions(-)"
+func parseDiffStat(statLine string) (*DiffStats, error) {
+	stats := &DiffStats{}
+	statLine = strings.TrimSpace(statLine)
+
+	if statLine == "" {
+		return stats, nil // No changes
+	}
+
+	// Regex to find the numbers for files, insertions, and deletions
+	re := regexp.MustCompile(`(\d+)\s*file(?:s)? changed|(\d+)\s*insertion(?:s)?\(\+\)|(\d+)\s*deletion(?:s)?\(-\)`)
+	matches := re.FindAllStringSubmatch(statLine, -1)
+
+	for _, match := range matches {
+		if numStr := match[1]; numStr != "" { // Files changed
+			stats.FilesChanged, _ = strconv.Atoi(numStr)
+		}
+		if numStr := match[2]; numStr != "" { // Insertions
+			stats.Insertions, _ = strconv.Atoi(numStr)
+		}
+		if numStr := match[3]; numStr != "" { // Deletions
+			stats.Deletions, _ = strconv.Atoi(numStr)
+		}
+	}
+
+	return stats, nil
+}
