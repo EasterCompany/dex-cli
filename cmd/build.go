@@ -122,7 +122,7 @@ func Build(args []string) error {
 	ui.PrintHeader("Complete")
 
 	// Add a small delay to allow services to restart
-	time.Sleep(2 * time.Second)
+	time.Sleep(5 * time.Second)
 
 	// Get new versions and print changes for ALL services
 	for _, s := range allServices {
@@ -139,6 +139,7 @@ func Build(args []string) error {
 
 	return nil
 }
+
 func runUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), isCli bool) (bool, error) {
 	sourcePath, err := config.ExpandPath(def.Source)
 	if err != nil {
