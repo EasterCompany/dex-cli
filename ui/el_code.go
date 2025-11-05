@@ -26,8 +26,6 @@ type CodeSnippet struct {
 
 // PrintCodeBlock renders a stylized, boxed code snippet with colorized syntax.
 func PrintCodeBlock(snippet CodeSnippet) {
-	var sb strings.Builder
-
 	// 1. Prepare Header Metadata (Top Border)
 	statusColor := ColorGreen
 	if strings.Contains(strings.ToLower(snippet.Status), "error") {
@@ -50,8 +48,8 @@ func PrintCodeBlock(snippet CodeSnippet) {
 	// Horizontal separator line (Fixed width)
 	separator := strings.Repeat(BorderHorizontal, 80)
 
-	sb.WriteString(fmt.Sprintf("%s%s%s\n", ColorDarkGray, metaLine, ColorReset))
-	sb.WriteString(fmt.Sprintf("%s%s%s\n", ColorDarkGray, separator, ColorReset))
+	PrintRaw(fmt.Sprintf("%s%s%s\n", ColorDarkGray, metaLine, ColorReset))
+	PrintRaw(fmt.Sprintf("%s%s%s\n", ColorDarkGray, separator, ColorReset))
 
 	// 2. Process and Render Code Content
 	lines := strings.Split(snippet.CodeContent, "\n")
@@ -70,13 +68,11 @@ func PrintCodeBlock(snippet CodeSnippet) {
 		highlightedCode := highlightSyntax(line, snippet.Language)
 
 		// Output: Line Num + Space + Code + Reset
-		sb.WriteString(fmt.Sprintf("%s %s %s\n", lineNumber, highlightedCode, ColorReset))
+		PrintRaw(fmt.Sprintf("%s %s %s\n", lineNumber, highlightedCode, ColorReset))
 	}
 
 	// 3. Render Bottom Border
-	sb.WriteString(fmt.Sprintf("%s%s%s\n", ColorDarkGray, separator, ColorReset))
-
-	PrintRaw(sb.String())
+	PrintRaw(fmt.Sprintf("%s%s%s\n", ColorDarkGray, separator, ColorReset))
 }
 
 // PrintCodeBlockFromBytes is a helper to print raw bytes (useful for JSON/YAML/etc.)
