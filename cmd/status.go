@@ -299,7 +299,7 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 // colorizeStatus applies color coding to the status string.
 func colorizeStatus(status string) string {
 	switch status {
-	case "OK":
+	case "OK", "HEALTHY":
 		return fmt.Sprintf("%s%s%s", ui.ColorGreen, status, ui.ColorReset)
 	case "BAD":
 		return fmt.Sprintf("%s%s%s", ui.ColorBrightRed, status, ui.ColorReset)
