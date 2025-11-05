@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/EasterCompany/dex-cli/config"
@@ -23,6 +24,15 @@ func Event(args []string) error {
 	// --- Debugging Step 1: Print Raw Response ---
 	ui.PrintHeader("1. Raw Response")
 	ui.PrintRaw(string(status) + "\n")
+
+	// --- Debugging Step 2: Print Formatted Response ---
+	var v interface{}
+	if err := json.Unmarshal(status, &v); err == nil {
+		if formatted, err := json.MarshalIndent(v, "", "  "); err == nil {
+			ui.PrintHeader("2. Formatted Response")
+			ui.PrintRaw(string(formatted) + "\n")
+		}
+	}
 
 	return nil
 }
