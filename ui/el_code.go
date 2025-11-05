@@ -249,7 +249,7 @@ func highlightSyntax(line, language string) string {
 			space := parts[3] // The space after the colon
 
 			// Color the key blue, keep the colon and space uncolored (or implicitly white)
-			return fmt.Sprintf("%s%s%s:%s", ColorBlue, key, ColorReset, space)
+			return Colorize(key, ColorBlue) + ":" + space
 		})
 
 		// Primitives (numbers, true/false/null) - Purple/Yellow
@@ -260,7 +260,7 @@ func highlightSyntax(line, language string) string {
 			if strings.Contains(s, ColorReset) {
 				return s
 			}
-			return fmt.Sprintf("%s%s%s", ColorPurple, s, ColorReset)
+			return Colorize(s, ColorPurple)
 		})
 
 		// Booleans/Null
@@ -269,13 +269,13 @@ func highlightSyntax(line, language string) string {
 			if strings.Contains(s, ColorReset) {
 				return s
 			}
-			return fmt.Sprintf("%s%s%s", ColorYellow, s, ColorReset)
+			return Colorize(s, ColorYellow)
 		})
 
 		// Structural elements (braces/brackets/comma) - Cyan
 		structPattern := regexp.MustCompile(`[{}[\],]`)
 		highlighted = structPattern.ReplaceAllStringFunc(highlighted, func(s string) string {
-			return fmt.Sprintf("%s%s%s", ColorCyan, s, ColorReset)
+			return Colorize(s, ColorCyan)
 		})
 
 	case "markdown", "md":
