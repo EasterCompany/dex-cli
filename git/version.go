@@ -62,8 +62,8 @@ func Parse(versionStr string) (*Version, error) {
 	}
 
 	// Handle the full "M.m.p.branch.commit.build_date.arch.build_hash" format.
-	if len(parts) != 7 {
-		return nil, fmt.Errorf("invalid version string format: expected 3 or 7 parts, got %d for '%s'", len(parts), versionStr)
+	if len(parts) != 8 {
+		return nil, fmt.Errorf("invalid version string format: expected 3 or 8 parts, got %d for '%s'", len(parts), versionStr)
 	}
 
 	return &Version{
