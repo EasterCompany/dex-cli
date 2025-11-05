@@ -237,8 +237,8 @@ func runUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), isC
 		fullVersionStr := fmt.Sprintf("%d.%d.%d.%s.%s.%s.%s.%s",
 			major, minor, patch+1, branch, commit, buildDate, buildArch, buildHash)
 
-		ldflags := fmt.Sprintf("-X main.version=%s -X main.branch=%s -X main.commit=%s -X main.buildDate=%s -X main.buildYear=%s -X main.buildHash=%s",
-			fullVersionStr, branch, commit, buildDate, buildYear, buildHash)
+		ldflags := fmt.Sprintf("-X main.version=%s -X main.branch=%s -X main.commit=%s -X main.buildDate=%s -X main.buildYear=%s -X main.buildHash=%s -X main.arch=%s",
+			fullVersionStr, branch, commit, buildDate, buildYear, buildHash, buildArch)
 		buildCmd = exec.Command("go", "build", "-ldflags", ldflags, "-o", outputPath, ".")
 	} else {
 		// Standard build for other services
