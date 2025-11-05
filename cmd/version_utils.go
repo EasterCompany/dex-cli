@@ -38,7 +38,8 @@ func getCLIVersion() string {
 	}
 	// The `version` command now outputs "v: <version>", so we strip the prefix.
 	versionStr := strings.TrimSpace(string(output))
-	return strings.TrimPrefix(versionStr, "v: ")
+	versionStr = strings.TrimPrefix(versionStr, "v: ")
+	return strings.TrimPrefix(versionStr, "v")
 }
 
 // getCacheVersion connects to a cache service to get its version.
