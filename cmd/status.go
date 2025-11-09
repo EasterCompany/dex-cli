@@ -135,9 +135,6 @@ func checkCLIStatus(_ config.ServiceDefinition, serviceID string) ui.TableRow {
 		colorizeNA(commit),
 		colorizeStatus(status),
 		colorizeNA("N/A"),
-		colorizeNA("N/A"),
-		colorizeNA("N/A"),
-		time.Now().Format("15:04:05"),
 	}
 }
 

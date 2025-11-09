@@ -98,7 +98,7 @@ func FormatFormatTableRow(service, status string) TableRow {
 
 func CreateServiceTable(rows []TableRow) Table {
 	// Adjusted columns for a more modern, compact CLI look
-	table := NewTable([]string{"SERVICE", "ADDRESS", "VERSION", "BRANCH", "COMMIT", "NOTE", "STATUS", "UPTIME"})
+	table := NewTable([]string{"SERVICE", "ADDRESS", "VERSION", "BRANCH", "COMMIT", "STATUS", "UPTIME"})
 	for _, row := range rows {
 		table.AddRow(row)
 	}
