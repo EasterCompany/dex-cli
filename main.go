@@ -20,13 +20,9 @@ var (
 )
 
 func main() {
-	// Set the running version string directly from build-time variables.
 	cmd.RunningVersion = version
-
-	// Skip Python check for version command to prevent output pollution
 	if len(os.Args) > 1 && os.Args[1] != "version" {
 		command := os.Args[1]
-		// Only show the Python check for specific commands
 		isVerboseCommand := command == "build" || command == "update" || command == "test"
 		if err := utils.EnsurePythonVenv(!isVerboseCommand); err != nil {
 			fmt.Println() // Add padding at the start
@@ -151,9 +147,8 @@ func runCommand(commandFunc func() error) {
 }
 
 func printUsage() {
-	fmt.Println() // Add padding at the start
+	fmt.Println()
 	ui.PrintInfo("<command>  [options]")
-
 	if config.IsCommandAvailable("system") {
 		ui.PrintInfo("system     Show system info and manage packages")
 	}
@@ -210,6 +205,6 @@ func printUsage() {
 	ui.PrintInfo("Dexter root:        ~/Dexter")
 	ui.PrintInfo("EasterCompany root: ~/EasterCompany")
 	fmt.Println()
-	fmt.Println("™ © 2024 The Easter Company. All rights reserved.")
-	fmt.Println() // Add padding at the end
+	fmt.Println("Dexter™ © 2025 The Easter Company. All rights reserved.")
+	fmt.Println()
 }
