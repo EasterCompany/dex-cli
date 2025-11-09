@@ -226,7 +226,7 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 			address,
 			colorizeNA(ui.Truncate(version, maxVersionLen)),
 			colorizeNA("main"),
-			colorizeNA("stable"),
+			colorizeNA("--"),
 			colorizeStatus("OK"),
 			colorizeNA("N/A"),
 		}
@@ -255,7 +255,7 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 		address,
 		colorizeNA(ui.Truncate(version, maxVersionLen)),
 		colorizeNA("main"),
-		colorizeNA("stable"),
+		colorizeNA("--"),
 		colorizeStatus("OK"),
 		colorizeNA("N/A"),
 	}
