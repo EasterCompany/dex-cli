@@ -19,10 +19,10 @@ import (
 )
 
 const (
-	maxServiceLen = 19
-	maxAddressLen = 17
-	maxVersionLen = 10
-	maxUptimeLen  = 10
+	maxServiceLen = 8
+	maxAddressLen = 8
+	maxVersionLen = 8
+	maxUptimeLen  = 8
 )
 
 // Status checks the health of one or all services
@@ -83,7 +83,6 @@ func Status(serviceShortName string) error {
 
 // checkServiceStatus acts as a dispatcher, routing to the correct status checker based on service type.
 func checkServiceStatus(service config.ServiceDefinition) ui.TableRow {
-
 	// Use the ShortName from the definition for the table
 	serviceID := ui.Truncate(service.ShortName, maxServiceLen)
 	address := ui.Truncate(service.GetHost(), maxAddressLen)
@@ -107,8 +106,8 @@ func colorizeNA(value string) string {
 	return value
 }
 
-// checkCLIStatus checks if a CLI tool is installed and working
-func checkCLIStatus(service config.ServiceDefinition, serviceID string) ui.TableRow {
+// checkCLIStatus checks if the CLI tool is installed and working
+func checkCLIStatus(_ config.ServiceDefinition, serviceID string) ui.TableRow {
 	cmd := exec.Command("dex", "version")
 	output, err := cmd.CombinedOutput()
 
@@ -125,7 +124,7 @@ func checkCLIStatus(service config.ServiceDefinition, serviceID string) ui.Table
 
 	return []string{
 		serviceID,
-		colorizeNA("N/A"), // Address is N/A for CLI
+		colorizeNA("N/A"),
 		colorizeNA(ui.Truncate(version, maxVersionLen)),
 		colorizeStatus(status),
 		colorizeNA("N/A"),
