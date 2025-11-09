@@ -172,6 +172,10 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 
 	reader := bufio.NewReader(conn)
 
+	badConnectionStatus := func() []string {
+		return []string{serviceID, address, colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A")}
+	}
+
 	// 1. Authenticate if password is provided
 	if service.Credentials != nil && service.Credentials.Password != "" {
 		var authCmd string
@@ -182,7 +186,7 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 		}
 
 		if _, err = conn.Write([]byte(authCmd)); err != nil {
-			return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Auth"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
+			return badConnectionStatus()
 		}
 		response, err := reader.ReadString('\n')
 
@@ -194,30 +198,22 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 				}
 			}
 			if err != nil || !strings.HasPrefix(response, "+OK") {
-				return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Auth"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
+				return badConnectionStatus()
 			}
 		}
 
 		if err := conn.SetDeadline(time.Now().Add(2 * time.Second)); err != nil {
-			return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
+			return badConnectionStatus()
 		}
 	}
 
 	// 2. Ping
 	if _, err = conn.Write([]byte("PING\r\n")); err != nil {
-		return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Ping"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
+		return badConnectionStatus()
 	}
 	response, err := reader.ReadString('\n')
 	if err != nil || !strings.HasPrefix(response, "+PONG") {
-		return []string{
-			serviceID,
-			address,
-			colorizeNA("N/A"),
-			colorizeNA("N/A"),
-			colorizeNA("N/A"),
-			colorizeStatus("BAD"),
-			colorizeNA("N/A"),
-		}
+		return badConnectionStatus()
 	}
 
 	// 3. Get Version
@@ -229,8 +225,8 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 			serviceID,
 			address,
 			colorizeNA(ui.Truncate(version, maxVersionLen)),
-			colorizeNA("N/A"),
-			colorizeNA("N/A"),
+			colorizeNA("main"),
+			colorizeNA("stable"),
 			colorizeStatus("OK"),
 			colorizeNA("N/A"),
 		}
@@ -258,8 +254,8 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 		serviceID,
 		address,
 		colorizeNA(ui.Truncate(version, maxVersionLen)),
-		colorizeNA("N/A"),
-		colorizeNA("N/A"),
+		colorizeNA("main"),
+		colorizeNA("stable"),
 		colorizeStatus("OK"),
 		colorizeNA("N/A"),
 	}
