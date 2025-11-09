@@ -85,7 +85,6 @@ func Status(serviceShortName string) error {
 
 // checkServiceStatus acts as a dispatcher, routing to the correct status checker based on service type.
 func checkServiceStatus(service config.ServiceDefinition) ui.TableRow {
-	// Use the ShortName from the definition for the table
 	serviceID := ui.Truncate(service.ShortName, maxServiceLen)
 	address := ui.Truncate(service.GetHost(), maxAddressLen)
 
@@ -95,7 +94,6 @@ func checkServiceStatus(service config.ServiceDefinition) ui.TableRow {
 	case "os":
 		return checkCacheStatus(service, serviceID, address)
 	default:
-		// All other types (cs, be, th) are HTTP services
 		return checkHTTPStatus(service, serviceID, address)
 	}
 }
