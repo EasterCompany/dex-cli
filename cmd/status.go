@@ -174,12 +174,10 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 
 	// 1. Authenticate if password is provided
 	if service.Credentials != nil && service.Credentials.Password != "" {
-		// --- FIX 2: Use Username and Password for AUTH ---
 		var authCmd string
 		if service.Credentials.Username != "" && service.Credentials.Username != "default" {
 			authCmd = fmt.Sprintf("AUTH %s %s\r\n", service.Credentials.Username, service.Credentials.Password)
 		} else {
-			// Fallback for older Redis (just password) or "default" user
 			authCmd = fmt.Sprintf("AUTH %s\r\n", service.Credentials.Password)
 		}
 
@@ -187,21 +185,19 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 			return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Auth"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 		}
 		response, err := reader.ReadString('\n')
+
 		if err != nil || !strings.HasPrefix(response, "+OK") {
-			// Try fallback AUTH (just password) if user+pass failed
 			if strings.Contains(authCmd, " ") {
 				authCmd = fmt.Sprintf("AUTH %s\r\n", service.Credentials.Password)
 				if _, err = conn.Write([]byte(authCmd)); err == nil {
 					response, err = reader.ReadString('\n')
 				}
 			}
-
-			// If it still fails
 			if err != nil || !strings.HasPrefix(response, "+OK") {
 				return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Auth"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 			}
 		}
-		// Reset deadline for the next operation
+
 		if err := conn.SetDeadline(time.Now().Add(2 * time.Second)); err != nil {
 			return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
 		}
@@ -213,14 +209,31 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 	}
 	response, err := reader.ReadString('\n')
 	if err != nil || !strings.HasPrefix(response, "+PONG") {
-		return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("BAD"), colorizeNA("Ping"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
+		return []string{
+			serviceID,
+			address,
+			colorizeNA("N/A"),
+			colorizeNA("N/A"),
+			colorizeNA("N/A"),
+			colorizeStatus("BAD"),
+			colorizeNA("N/A"),
+		}
 	}
 
 	// 3. Get Version
 	version := "N/A"
+
 	// Reset deadline for the next operation
 	if err := conn.SetDeadline(time.Now().Add(2 * time.Second)); err != nil {
-		return []string{serviceID, address, colorizeNA("N/A"), colorizeStatus("OK"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
+		return []string{
+			serviceID,
+			address,
+			colorizeNA(ui.Truncate(version, maxVersionLen)),
+			colorizeNA("N/A"),
+			colorizeNA("N/A"),
+			colorizeStatus("OK"),
+			colorizeNA("N/A"),
+		}
 	}
 
 	if _, err = conn.Write([]byte("INFO server\r\n")); err == nil {
@@ -230,7 +243,6 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 			// Read the info string itself
 			infoData, _ := io.ReadAll(io.LimitReader(reader, 4096))
 			infoStr := string(infoData)
-
 			// Try to find redis_version or valkey_version
 			re := regexp.MustCompile(`(redis_version|valkey_version):([0-9]+\.[0-9]+\.[0-9]+)`)
 			matches := re.FindStringSubmatch(infoStr)
@@ -242,7 +254,15 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 		}
 	}
 
-	return []string{serviceID, address, colorizeNA(ui.Truncate(version, maxVersionLen)), colorizeStatus("OK"), colorizeNA("N/A"), colorizeNA("N/A"), colorizeNA("N/A"), time.Now().Format("15:04:05")}
+	return []string{
+		serviceID,
+		address,
+		colorizeNA(ui.Truncate(version, maxVersionLen)),
+		colorizeNA("N/A"),
+		colorizeNA("N/A"),
+		colorizeStatus("OK"),
+		colorizeNA("N/A"),
+	}
 }
 
 // checkHTTPStatus checks a service via its new, unified /service endpoint
