@@ -202,9 +202,8 @@ func printUsage() {
 	}
 	ui.PrintInfo("version    Show version information")
 	ui.PrintInfo("help       Show this help message")
+	fmt.Println()
 	ui.PrintInfo("Dexter root:        ~/Dexter")
 	ui.PrintInfo("EasterCompany root: ~/EasterCompany")
-	fmt.Println()
-	fmt.Println("Dexter™ © 2025 The Easter Company. All rights reserved.")
 	fmt.Println()
 }
