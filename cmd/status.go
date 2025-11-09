@@ -20,9 +20,11 @@ import (
 
 const (
 	maxServiceLen = 8
-	maxAddressLen = 8
+	maxAddressLen = 16
 	maxVersionLen = 8
-	maxUptimeLen  = 8
+	maxBranchLen  = 8
+	maxCommitLen  = 8
+	maxUptimeLen  = 16
 )
 
 // Status checks the health of one or all services
@@ -117,15 +119,22 @@ func checkCLIStatus(_ config.ServiceDefinition, serviceID string) ui.TableRow {
 	}
 
 	version := "N/A"
+	branch := "N/A"
+	commit := "N/A"
+
 	parsedVersion, err := git.Parse(strings.TrimSpace(string(output)))
 	if err == nil {
 		version = parsedVersion.Short()
+		branch = parsedVersion.Branch
+		commit = parsedVersion.Commit
 	}
 
 	return []string{
 		serviceID,
 		colorizeNA("N/A"),
 		colorizeNA(ui.Truncate(version, maxVersionLen)),
+		colorizeNA(branch),
+		colorizeNA(commit),
 		colorizeStatus(status),
 		colorizeNA("N/A"),
 		colorizeNA("N/A"),

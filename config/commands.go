@@ -59,6 +59,11 @@ func GetCommandRequirements() map[string]CommandRequirement {
 		},
 		"bunx": {
 			Name:        "bunx",
+			Description: "Proxy for the system's js executable",
+			Check:       HasBun,
+		},
+		"llm": {
+			Name:        "ollama",
 			Description: "Proxy for the system's bunx executable",
 			Check:       HasBun,
 		},
