@@ -203,16 +203,16 @@ func printUsage() {
 	ui.PrintInfo("version    Show version information")
 	ui.PrintInfo("help       Show this help message")
 	ui.PrintInfo(`
-		Organisation Source Directory:
-		- Description: Contains all Organisation data
-		- Path: ~/EasterCompany
+Organisation Source Directory:
+- Description: Contains all Organisation data
+- Path: ~/EasterCompany
 
-		Project Source Directory:
-		- Description: Contains all Project related source code
-		- Path: ~/EasterCompany/dex-cli
+Project Source Directory:
+- Description: Contains all Project related source code
+- Path: ~/EasterCompany/dex-cli
 
-		Product Directory:
-		- Description: Contains all assests, binaries, and configuration files for production
-		- Path: ~/Dexter`)
+Product Directory:
+- Description: Contains all assests, binaries, and configuration files for production
+- Path: ~/Dexter`)
 	fmt.Println()
 }
