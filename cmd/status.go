@@ -119,6 +119,25 @@ func colorizeNA(value string) string {
 	return value
 }
 
+// formatUptime converts seconds into a human-readable uptime string
+func formatUptime(seconds int) string {
+	if seconds < 60 {
+		return fmt.Sprintf("%ds", seconds)
+	}
+
+	days := seconds / 86400
+	hours := (seconds % 86400) / 3600
+	minutes := (seconds % 3600) / 60
+
+	if days > 0 {
+		return fmt.Sprintf("%dd%dh", days, hours)
+	}
+	if hours > 0 {
+		return fmt.Sprintf("%dh%dm", hours, minutes)
+	}
+	return fmt.Sprintf("%dm", minutes)
+}
+
 // checkCLIStatus checks if the CLI tool is installed and working
 // Returns 8 columns: SERVICE, ADDRESS, VERSION, BRANCH, COMMIT, STATUS, UPTIME, SOURCE
 func checkCLIStatus(service config.ServiceDefinition, serviceID, address string) ui.TableRow {
@@ -162,6 +181,63 @@ func isCloudDomain(domain string) bool {
 	return strings.Contains(domain, "redis-cloud.com") || strings.Contains(domain, "redns.redis-cloud.com")
 }
 
+// isLocalAddress checks if the address is a local/localhost address
+func isLocalAddress(domain string) bool {
+	return domain == "localhost" ||
+		domain == "127.0.0.1" ||
+		strings.HasPrefix(domain, "127.") ||
+		domain == "0.0.0.0" ||
+		strings.HasPrefix(domain, "192.168.") ||
+		strings.HasPrefix(domain, "10.") ||
+		strings.HasPrefix(domain, "172.16.") ||
+		strings.HasPrefix(domain, "172.17.") ||
+		strings.HasPrefix(domain, "172.18.") ||
+		strings.HasPrefix(domain, "172.19.") ||
+		strings.HasPrefix(domain, "172.20.") ||
+		strings.HasPrefix(domain, "172.21.") ||
+		strings.HasPrefix(domain, "172.22.") ||
+		strings.HasPrefix(domain, "172.23.") ||
+		strings.HasPrefix(domain, "172.24.") ||
+		strings.HasPrefix(domain, "172.25.") ||
+		strings.HasPrefix(domain, "172.26.") ||
+		strings.HasPrefix(domain, "172.27.") ||
+		strings.HasPrefix(domain, "172.28.") ||
+		strings.HasPrefix(domain, "172.29.") ||
+		strings.HasPrefix(domain, "172.30.") ||
+		strings.HasPrefix(domain, "172.31.")
+}
+
+// getSystemdServiceUptime gets the uptime of a systemd service
+func getSystemdServiceUptime(serviceName string) string {
+	cmd := exec.Command("systemctl", "show", serviceName, "--property=ActiveEnterTimestamp")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "N/A"
+	}
+
+	// Parse output like: ActiveEnterTimestamp=Mon 2025-11-10 16:52:38 GMT
+	line := strings.TrimSpace(string(output))
+	if !strings.HasPrefix(line, "ActiveEnterTimestamp=") {
+		return "N/A"
+	}
+
+	timestampStr := strings.TrimPrefix(line, "ActiveEnterTimestamp=")
+	if timestampStr == "" {
+		return "N/A"
+	}
+
+	// Parse the timestamp
+	layout := "Mon 2006-01-02 15:04:05 MST"
+	startTime, err := time.Parse(layout, timestampStr)
+	if err != nil {
+		return "N/A"
+	}
+
+	// Calculate uptime in seconds
+	uptimeSeconds := int(time.Since(startTime).Seconds())
+	return formatUptime(uptimeSeconds)
+}
+
 // checkOllamaStatus checks an Ollama service via its HTTP API
 // Returns 8 columns: SERVICE, ADDRESS, VERSION, BRANCH, COMMIT, STATUS, UPTIME, SOURCE
 func checkOllamaStatus(service config.ServiceDefinition, serviceID, address string) ui.TableRow {
@@ -195,6 +271,12 @@ func checkOllamaStatus(service config.ServiceDefinition, serviceID, address stri
 		return badStatusRow()
 	}
 
+	// Get uptime from systemd if this is a local service
+	uptime := "N/A"
+	if isLocalAddress(service.Domain) {
+		uptime = getSystemdServiceUptime("ollama")
+	}
+
 	// Successful status row
 	return []string{
 		serviceID,
@@ -203,7 +285,7 @@ func checkOllamaStatus(service config.ServiceDefinition, serviceID, address stri
 		colorizeNA("--"), // BRANCH
 		colorizeNA("--"), // COMMIT
 		colorizeStatus("OK"),
-		colorizeNA("N/A"), // UPTIME
+		colorizeNA(uptime),
 	}
 }
 
@@ -294,11 +376,12 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 		return badStatusRow(fmt.Sprintf("PING response invalid: %s", strings.TrimSpace(response)))
 	}
 
-	// 3. Get Version
+	// 3. Get Version and Uptime
 	version := "N/A"
+	uptime := "N/A"
 
 	// Reset deadline for INFO/Version fetch
-	if err := conn.SetDeadline(time.Now().Add(2 * time.Second)); err == nil {
+	if err := conn.SetDeadline(time.Now().Add(5 * time.Second)); err == nil {
 		if _, err = conn.Write([]byte("INFO server\r\n")); err == nil {
 			responseHeader, err := reader.ReadString('\n')
 			if err == nil && strings.HasPrefix(responseHeader, "$") {
@@ -314,10 +397,19 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 				infoStr := string(infoData)
 
 				// Find redis_version or valkey_version
-				re := regexp.MustCompile(`(redis_version|valkey_version):([0-9]+\.[0-9]+\.[0-9]+)`)
-				matches := re.FindStringSubmatch(infoStr)
-				if len(matches) >= 3 && matches[2] != "" {
-					version = matches[2]
+				versionRe := regexp.MustCompile(`(redis_version|valkey_version):([0-9]+\.[0-9]+\.[0-9]+)`)
+				versionMatches := versionRe.FindStringSubmatch(infoStr)
+				if len(versionMatches) >= 3 && versionMatches[2] != "" {
+					version = versionMatches[2]
+				}
+
+				// Find uptime_in_seconds and format it
+				uptimeRe := regexp.MustCompile(`uptime_in_seconds:(\d+)`)
+				uptimeMatches := uptimeRe.FindStringSubmatch(infoStr)
+				if len(uptimeMatches) >= 2 {
+					uptimeSeconds := 0
+					_, _ = fmt.Sscanf(uptimeMatches[1], "%d", &uptimeSeconds)
+					uptime = formatUptime(uptimeSeconds)
 				}
 			}
 		}
@@ -331,7 +423,7 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 		colorizeNA("--"), // BRANCH
 		colorizeNA("--"), // COMMIT
 		colorizeStatus("OK"),
-		colorizeNA("N/A"), // UPTIME
+		colorizeNA(uptime),
 	}
 }
 
