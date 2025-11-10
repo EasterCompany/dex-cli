@@ -117,6 +117,11 @@ func GetCommandRequirements() map[string]CommandRequirement {
 			Description: "Interact with the model service",
 			Check:       HasModelService,
 		},
+		"discord": {
+			Name:        "discord",
+			Description: "Interact with the discord service",
+			Check:       HasDiscordService,
+		},
 		"config": {
 			Name:        "config",
 			Description: "Show the service-map.json config for a service",
@@ -258,6 +263,26 @@ func HasModelService() bool {
 
 	for _, service := range coreServices {
 		if service.ID == "dex-model-service" {
+			return true
+		}
+	}
+	return false
+}
+
+// HasDiscordService checks if dex-event-service is in service-map.json
+func HasDiscordService() bool {
+	serviceMap, err := LoadServiceMapConfig()
+	if err != nil {
+		return false // If we can't load the map, don't show the command
+	}
+
+	coreServices, ok := serviceMap.Services["cs"]
+	if !ok {
+		return false
+	}
+
+	for _, service := range coreServices {
+		if service.ID == "dex-discord-service" {
 			return true
 		}
 	}

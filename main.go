@@ -177,7 +177,6 @@ Product Directory:
 	if config.IsCommandAvailable("logs") {
 		ui.PrintInfo("logs       | <service> [-f] View service logs")
 	}
-	fmt.Println()
 	ui.PrintSubHeader("Developer Lifecycle Commands")
 	if config.IsCommandAvailable("test") {
 		ui.PrintInfo("test       | Test services")
@@ -188,7 +187,6 @@ Product Directory:
 	if config.IsCommandAvailable("update") {
 		ui.PrintInfo("update     | Update cli and services")
 	}
-	fmt.Println()
 	ui.PrintSubHeader("Global Service Management Commands")
 	if config.IsCommandAvailable("status") {
 		ui.PrintInfo("status     | Checks the status of cli and services")
@@ -208,7 +206,6 @@ Product Directory:
 	if config.IsCommandAvailable("restart") {
 		ui.PrintInfo("restart    | Restart all manageable services")
 	}
-	fmt.Println()
 	ui.PrintSubHeader("Proxy Commands")
 	if config.IsCommandAvailable("python") {
 		ui.PrintInfo("python     | Access the python virtual environment")
@@ -219,17 +216,17 @@ Product Directory:
 	if config.IsCommandAvailable("bunx") {
 		ui.PrintInfo("bunx       | Access the system bunx executable")
 	}
-	fmt.Println()
 	ui.PrintSubHeader("Service Commands")
 	if config.IsCommandAvailable("event") {
-		ui.PrintInfo("event      | Interact with the event server for this instance")
+		ui.PrintInfo("event      | Interact with the event service for this instance")
 	}
 	if config.IsCommandAvailable("model") {
-		ui.PrintInfo("model      | Interact with the model server for this instance")
+		ui.PrintInfo("model      | Interact with the model service for this instance")
 	}
-	fmt.Println()
+	if config.IsCommandAvailable("discord") {
+		ui.PrintInfo("discord    | Interact with the discord service for this instance")
+	}
 	ui.PrintSubHeader("CLI Basic commands")
 	ui.PrintInfo("version    Show version information")
 	ui.PrintInfo("help       Show this help message")
-	fmt.Println()
 }
