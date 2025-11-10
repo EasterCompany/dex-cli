@@ -384,7 +384,7 @@ func printTestSummaryTable(summaries []ServiceTestSummary) {
 	// Define fixed/max column widths for consistent formatting
 	// Service: 15, Format: 12, Lint: 12, Test: 12, Duration: 10
 	table := ui.NewTableWithWidths(
-		[]string{"Service", "Format", "Lint", "Test", "Duration"},
+		[]string{"SERVICE", "FORMAT", "LINT", "TEST", "DURATION"},
 		[]int{15, 12, 12, 12, 10},
 	)
 
