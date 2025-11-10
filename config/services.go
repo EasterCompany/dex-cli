@@ -194,7 +194,7 @@ var serviceDefinitions = []ServiceDefinition{
 		Port:      "18309",
 		Credentials: &ServiceCredentials{
 			Username: "default",
-			Password: "",
+			Password: "Mi9mm7DfzWnP59PiMyCuuMr2AC7OMBLr",
 		},
 	},
 	{
@@ -205,7 +205,7 @@ var serviceDefinitions = []ServiceDefinition{
 		Port:      "13647",
 		Credentials: &ServiceCredentials{
 			Username: "default",
-			Password: "",
+			Password: "J3zfv4SPss8DjxIiefRQwOOokT0yHVqO",
 		},
 	},
 	{
