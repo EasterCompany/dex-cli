@@ -174,6 +174,9 @@ func HasAnyDexService() bool {
 	}
 
 	for _, entry := range entries {
+		if entry.IsDir() && strings.HasPrefix(entry.Name(), "dex-cli") {
+			return true
+		}
 		if entry.IsDir() && strings.HasPrefix(entry.Name(), "dex-") && strings.HasSuffix(entry.Name(), "-service") {
 			return true
 		}
