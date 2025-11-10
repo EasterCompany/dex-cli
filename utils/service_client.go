@@ -45,3 +45,27 @@ func GetHTTPBody(url string) ([]byte, int, error) {
 
 	return body, resp.StatusCode, nil
 }
+
+// FetchURL fetches the raw body from a URL with a custom timeout.
+func FetchURL(url string, timeout time.Duration) (string, error) {
+	client := &http.Client{
+		Timeout: timeout,
+	}
+
+	resp, err := client.Get(url)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	return string(body), nil
+}

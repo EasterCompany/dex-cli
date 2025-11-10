@@ -101,6 +101,10 @@ func checkServiceStatus(service config.ServiceDefinition) ui.TableRow {
 	case "cli":
 		return checkCLIStatus(service, serviceID, address)
 	case "os":
+		// Special handling for ollama (check by ID or short name)
+		if strings.Contains(strings.ToLower(service.ID), "ollama") || strings.Contains(strings.ToLower(service.ShortName), "ollama") {
+			return checkOllamaStatus(service, serviceID, address)
+		}
 		return checkCacheStatus(service, serviceID, address)
 	default: // All other service types are assumed to be HTTP-based (fe, be, cs, th)
 		return checkHTTPStatus(service, serviceID, address)
@@ -156,6 +160,51 @@ func checkCLIStatus(service config.ServiceDefinition, serviceID, address string)
 // isCloudDomain checks if the domain is a known cloud Redis provider requiring TLS.
 func isCloudDomain(domain string) bool {
 	return strings.Contains(domain, "redis-cloud.com") || strings.Contains(domain, "redns.redis-cloud.com")
+}
+
+// checkOllamaStatus checks an Ollama service via its HTTP API
+// Returns 8 columns: SERVICE, ADDRESS, VERSION, BRANCH, COMMIT, STATUS, UPTIME, SOURCE
+func checkOllamaStatus(service config.ServiceDefinition, serviceID, address string) ui.TableRow {
+	badStatusRow := func() ui.TableRow {
+		return []string{
+			serviceID,
+			address,
+			colorizeNA("N/A"),     // VERSION
+			colorizeNA("--"),      // BRANCH
+			colorizeNA("--"),      // COMMIT
+			colorizeStatus("BAD"), // STATUS
+			colorizeNA("N/A"),     // UPTIME
+		}
+	}
+
+	// Build the ollama version endpoint URL
+	host := service.GetHost()
+	url := fmt.Sprintf("http://%s/api/version", host)
+
+	// Try to fetch version info
+	resp, err := utils.FetchURL(url, 2*time.Second)
+	if err != nil {
+		return badStatusRow()
+	}
+
+	// Parse the JSON response
+	var versionData struct {
+		Version string `json:"version"`
+	}
+	if err := json.Unmarshal([]byte(resp), &versionData); err != nil {
+		return badStatusRow()
+	}
+
+	// Successful status row
+	return []string{
+		serviceID,
+		address,
+		colorizeNA(ui.Truncate(versionData.Version, maxVersionLen)),
+		colorizeNA("--"), // BRANCH
+		colorizeNA("--"), // COMMIT
+		colorizeStatus("OK"),
+		colorizeNA("N/A"), // UPTIME
+	}
 }
 
 // checkCacheStatus checks a cache/db service (Redis/Valkey) with a simplified PING command.
