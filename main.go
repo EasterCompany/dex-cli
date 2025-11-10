@@ -55,9 +55,6 @@ func main() {
 	}
 
 	switch command {
-	case "git":
-		runCommand(func() error { return cmd.Git(os.Args[2:]) })
-
 	case "update":
 		runCommand(func() error { return cmd.Update(os.Args[2:], buildYear) })
 
@@ -165,65 +162,73 @@ Product Directory:
 - Path: ~/Dexter
 `,
 	)
-	ui.PrintInfo("<command>  [options]")
+	ui.PrintHeader("DEX / DEX-CLI")
+	ui.PrintSection("A cli program for interfacing with local and/or remote dexter services.")
+	ui.PrintSubHeader("Local/User System Commands")
 	if config.IsCommandAvailable("system") {
-		ui.PrintInfo("system     Show system info and manage packages")
+		ui.PrintInfo("system     | Show system info and manage packages")
 	}
 	if config.IsCommandAvailable("config") {
-		ui.PrintInfo("config     <service> [field...] Show service config or a specific field")
+		ui.PrintInfo("config     | <service> [field...] Show service config or a specific field")
 	}
 	if config.IsCommandAvailable("cache") {
-		ui.PrintInfo("cache      [clear|list] Manage the local cache")
-	}
-	if config.IsCommandAvailable("status") {
-		ui.PrintInfo("status     Checks the status of cli and services")
-	}
-	if config.IsCommandAvailable("start") {
-		ui.PrintInfo("start      Start all manageable services")
-	}
-	if config.IsCommandAvailable("stop") {
-		ui.PrintInfo("stop       Stop all manageable services")
-	}
-	if config.IsCommandAvailable("restart") {
-		ui.PrintInfo("restart    Restart all manageable services")
+		ui.PrintInfo("cache      | [clear|list] Manage the local cache")
 	}
 	if config.IsCommandAvailable("logs") {
-		ui.PrintInfo("logs       <service> [-f] View service logs")
-	}
-	if config.IsCommandAvailable("test") {
-		ui.PrintInfo("test       Test services")
-	}
-	if config.IsCommandAvailable("build") {
-		ui.PrintInfo("build      Build and install cli and services")
-	}
-	if config.IsCommandAvailable("update") {
-		ui.PrintInfo("update     Update cli and services")
-	}
-	if config.IsCommandAvailable("add") {
-		ui.PrintInfo("add        Add (install) a service")
-	}
-	if config.IsCommandAvailable("remove") {
-		ui.PrintInfo("remove     Remove (uninstall) a service")
-	}
-
-	// Proxy commands
-	if config.IsCommandAvailable("python") {
-		ui.PrintInfo("python     [args...] Python virtual environment")
-	}
-	if config.IsCommandAvailable("bun") {
-		ui.PrintInfo("bun        [args...] System's bun executable")
-	}
-	if config.IsCommandAvailable("bunx") {
-		ui.PrintInfo("bunx       [args...] System's bunx executable")
-	}
-
-	// Service Commands
-	if config.IsCommandAvailable("event") {
-		ui.PrintInfo("event      Interact with the local/remote event server for this instance")
+		ui.PrintInfo("logs       | <service> [-f] View service logs")
 	}
 	fmt.Println()
-
-	// CLI Commands
+	ui.PrintSubHeader("Developer Lifecycle Commands")
+	if config.IsCommandAvailable("test") {
+		ui.PrintInfo("test       | Test services")
+	}
+	if config.IsCommandAvailable("build") {
+		ui.PrintInfo("build      | Build and install cli and services")
+	}
+	if config.IsCommandAvailable("update") {
+		ui.PrintInfo("update     | Update cli and services")
+	}
+	fmt.Println()
+	ui.PrintSubHeader("Global Service Management Commands")
+	if config.IsCommandAvailable("status") {
+		ui.PrintInfo("status     | Checks the status of cli and services")
+	}
+	if config.IsCommandAvailable("add") {
+		ui.PrintInfo("add        | Add (install) a service")
+	}
+	if config.IsCommandAvailable("remove") {
+		ui.PrintInfo("remove     | Remove (uninstall) a service")
+	}
+	if config.IsCommandAvailable("start") {
+		ui.PrintInfo("start      | Start all manageable services")
+	}
+	if config.IsCommandAvailable("stop") {
+		ui.PrintInfo("stop       | Stop all manageable services")
+	}
+	if config.IsCommandAvailable("restart") {
+		ui.PrintInfo("restart    | Restart all manageable services")
+	}
+	fmt.Println()
+	ui.PrintSubHeader("Proxy Commands")
+	if config.IsCommandAvailable("python") {
+		ui.PrintInfo("python     | Access the python virtual environment")
+	}
+	if config.IsCommandAvailable("bun") {
+		ui.PrintInfo("bun        | Access the system bun executable")
+	}
+	if config.IsCommandAvailable("bunx") {
+		ui.PrintInfo("bunx       | Access the system bunx executable")
+	}
+	fmt.Println()
+	ui.PrintSubHeader("Service Commands")
+	if config.IsCommandAvailable("event") {
+		ui.PrintInfo("event      | Interact with the event server for this instance")
+	}
+	if config.IsCommandAvailable("model") {
+		ui.PrintInfo("model      | Interact with the model server for this instance")
+	}
+	fmt.Println()
+	ui.PrintSubHeader("CLI Basic commands")
 	ui.PrintInfo("version    Show version information")
 	ui.PrintInfo("help       Show this help message")
 	fmt.Println()
