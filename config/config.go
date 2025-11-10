@@ -7,7 +7,6 @@ import (
 	"strings"
 )
 
-// Hardcoded Dexter environment layout
 const (
 	DexterRoot        = "~/Dexter"
 	DexterBin         = "~/Dexter/bin"
@@ -15,7 +14,6 @@ const (
 	EasterCompanyRoot = "~/EasterCompany"
 )
 
-// Required subdirectories in ~/Dexter
 var RequiredDexterDirs = []string{
 	"bin",
 	"config",

@@ -12,7 +12,7 @@ func PrintTemplateDemo() {
 	PrintSubHeader("Configuration and Project Status")
 
 	// --- Key Value Block 1 (Standard) ---
-	configData := []KeyValue{
+	configData := []KeyVal{
 		{Key: "Project Name", Value: "Aurora"},
 		{Key: "Version", Value: "v2.1.0-beta"},
 		{Key: "Environment", Value: "Production"},
@@ -22,7 +22,7 @@ func PrintTemplateDemo() {
 
 	// --- Key Value Block 2 (With Colorized Keys) ---
 	PrintRaw("\n") // Add separation
-	environmentData := []KeyValue{
+	environmentData := []KeyVal{
 		{Key: fmt.Sprintf("%sDEBUG%s Mode", ColorYellow, ColorReset), Value: "true"},
 		{Key: fmt.Sprintf("%sMax Threads%s", ColorPurple, ColorReset), Value: "16"},
 		{Key: fmt.Sprintf("%sStatus%s", ColorGreen, ColorReset), Value: "Online"},

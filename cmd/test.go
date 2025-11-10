@@ -83,12 +83,11 @@ func Test(args []string) error {
 		printDetailedResults("Formatting", formatResult, isSingleService)
 		printDetailedResults("Linting", lintResult, isSingleService)
 		printDetailedResults("Testing", testResult, isSingleService)
-
 		overallResults = append(overallResults, ui.TableRow{projectName, formatResult.Status, lintResult.Status, testResult.Status})
 	}
 
 	if len(projects) > 1 {
-		fmt.Println("\n--- Overall Results ---")
+		ui.PrintSubHeader("Results")
 		table := ui.NewTable([]string{"Project", "Format", "Lint", "Test"})
 		for _, row := range overallResults {
 			table.AddRow(row)

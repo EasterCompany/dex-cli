@@ -6,13 +6,13 @@ import (
 )
 
 // KeyValue represents a single key-value pair for the block.
-type KeyValue struct {
+type KeyVal struct {
 	Key   string
 	Value string
 }
 
 // PrintKeyValBlock renders a clean, boxed configuration block.
-func PrintKeyValBlock(title string, data []KeyValue) {
+func PrintKeyValBlock(title string, data []KeyVal) {
 	// Find the maximum key width for alignment
 	maxKeyLen := len(TitleCase(title))
 	for _, kv := range data {
