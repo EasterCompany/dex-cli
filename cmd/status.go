@@ -228,7 +228,7 @@ func isCloudDomain(domain string) bool {
 // Returns 8 columns: SERVICE, ADDRESS, VERSION, BRANCH, COMMIT, STATUS, UPTIME, SOURCE
 func checkCacheStatus(service config.ServiceDefinition, serviceID, address string) ui.TableRow {
 	// Source is N/A for OS/Cache services
-	sourceStatus := colorizeNA("N/A")
+	sourceStatus := CrossMark
 
 	badStatusRow := func() ui.TableRow {
 		return []string{
