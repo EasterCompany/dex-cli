@@ -15,19 +15,30 @@ type ServerMapConfig struct {
 
 // Server represents a single server in the server map
 type Server struct {
-	Host string `json:"host"`
-	User string `json:"user"`
-	Key  string `json:"key"`
+	User        string `json:"user"`
+	Key         string `json:"key"`
+	PublicIPV4  string `json:"public_ipv4"`
+	PrivateIPV4 string `json:"private_ipv4"`
+	PublicIPV6  string `json:"public_ipv6"`
 }
 
 // DefaultServerMapConfig returns the default server map configuration
 func DefaultServerMapConfig() *ServerMapConfig {
 	return &ServerMapConfig{
 		Servers: map[string]Server{
-			"onyx": {
-				Host: "192.168.1.100",
-				User: "root",
-				Key:  "~/.ssh/id_rsa",
+			"easter.company": {
+				User:        "ubuntu",
+				Key:         "~/.ssh/id_ed25519",
+				PublicIPV4:  "99.81.147.141",
+				PrivateIPV4: "172.26.8.94",
+				PublicIPV6:  "2a05:d018:e5c:d400:af72:c5a5:85a9:bced",
+			},
+			"api.easter.company": {
+				User:        "ubuntu",
+				Key:         "~/.ssh/id_ed25519",
+				PublicIPV4:  "",
+				PrivateIPV4: "172.26.7.9",
+				PublicIPV6:  "2a05:d018:e5c:d400:9698:256a:831b:e491",
 			},
 		},
 	}
