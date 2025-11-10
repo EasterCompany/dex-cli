@@ -179,7 +179,7 @@ var serviceDefinitions = []ServiceDefinition{
 		ID:        "local-cache-0",
 		ShortName: "cache0",
 		Type:      "os",
-		Domain:    "0.0.0.0",
+		Domain:    "127.0.0.1",
 		Port:      "6379",
 		Credentials: &ServiceCredentials{
 			Username: "default",
@@ -212,7 +212,7 @@ var serviceDefinitions = []ServiceDefinition{
 		ID:        "local-ollama-0",
 		ShortName: "ollama",
 		Type:      "os",
-		Domain:    "0.0.0.0",
+		Domain:    "127.0.0.1",
 		Port:      "11434",
 		Credentials: &ServiceCredentials{
 			Username: "",
