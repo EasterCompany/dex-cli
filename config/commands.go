@@ -54,18 +54,18 @@ func GetCommandRequirements() map[string]CommandRequirement {
 		},
 		"bun": {
 			Name:        "bun",
-			Description: "Proxy for the system's bun executable",
+			Description: "Proxy for the system bun executable",
 			Check:       HasBun,
 		},
 		"bunx": {
 			Name:        "bunx",
-			Description: "Proxy for the system's js executable",
+			Description: "Proxy for the system bunx executable",
 			Check:       HasBun,
 		},
-		"llm": {
+		"ollama": {
 			Name:        "ollama",
-			Description: "Proxy for the system's bunx executable",
-			Check:       HasBun,
+			Description: "Proxy for the system ollama executable",
+			Check:       HasOllama,
 		},
 		"logs": {
 			Name:        "logs",
@@ -216,6 +216,12 @@ func HasPythonVenv() bool {
 // HasBun checks if 'bun' executable is available in the system's PATH
 func HasBun() bool {
 	_, err := exec.LookPath("bun")
+	return err == nil
+}
+
+// HasOllama checks if 'ollama' executable is available in the system's PATH
+func HasOllama() bool {
+	_, err := exec.LookPath("ollama")
 	return err == nil
 }
 

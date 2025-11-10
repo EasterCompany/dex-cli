@@ -110,6 +110,9 @@ func main() {
 	case "bunx":
 		runCommand(func() error { return cmd.Bunx(os.Args[2:]) })
 
+	case "ollama":
+		runCommand(func() error { return cmd.Ollama(os.Args[2:]) })
+
 	case "add":
 		runCommand(func() error { return cmd.Add(os.Args[2:]) })
 
