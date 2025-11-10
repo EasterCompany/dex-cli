@@ -106,7 +106,7 @@ var serviceDefinitions = []ServiceDefinition{
 	{
 		ID:          "dex-cli",
 		ShortName:   "cli",
-		SystemdName: "", // Not a service
+		SystemdName: "",
 		Type:        "cli",
 		Repo:        "git@github.com:EasterCompany/dex-cli.git",
 		Source:      "~/EasterCompany/dex-cli",
@@ -177,26 +177,35 @@ var serviceDefinitions = []ServiceDefinition{
 	// OS Services (os)
 	{
 		ID:        "local-cache-0",
-		ShortName: "cache", // Changed from "local-cache"
+		ShortName: "cache0",
 		Type:      "os",
 		Domain:    "localhost",
 		Port:      "6379",
 		Credentials: &ServiceCredentials{
 			Username: "default",
 			Password: "",
-			DB:       0,
 		},
 	},
 	{
 		ID:        "cloud-cache-0",
-		ShortName: "cloud-cache",
+		ShortName: "cache1",
 		Type:      "os",
 		Domain:    "redis-18309.c243.eu-west-1-3.ec2.redns.redis-cloud.com",
 		Port:      "18309",
 		Credentials: &ServiceCredentials{
 			Username: "default",
 			Password: "",
-			DB:       0,
+		},
+	},
+	{
+		ID:        "cloud-cache-1",
+		ShortName: "cache2",
+		Type:      "os",
+		Domain:    "redis-13647.c269.eu-west-1-3.ec2.redns.redis-cloud.com",
+		Port:      "13647",
+		Credentials: &ServiceCredentials{
+			Username: "default",
+			Password: "",
 		},
 	},
 	{
@@ -206,9 +215,8 @@ var serviceDefinitions = []ServiceDefinition{
 		Domain:    "0.0.0.0",
 		Port:      "11434",
 		Credentials: &ServiceCredentials{
-			Username: "default",
+			Username: "",
 			Password: "",
-			DB:       0,
 		},
 	},
 }
