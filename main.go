@@ -147,21 +147,6 @@ func runCommand(commandFunc func() error) {
 }
 
 func printUsage() {
-	ui.PrintInfo(
-		`
-Organisation Source Directory:
-- Description: Contains all Organisation data
-- Path: ~/EasterCompany
-
-Project Source Directory:
-- Description: Contains all Project related source code
-- Path: ~/EasterCompany/dex-cli
-
-Product Directory:
-- Description: Contains all assests, binaries, and configuration files for production
-- Path: ~/Dexter
-`,
-	)
 	ui.PrintHeader("DEX / DEX-CLI")
 	ui.PrintSection("A cli program for interfacing with local and/or remote dexter services.")
 	ui.PrintSubHeader("Local/User System Commands")
@@ -229,4 +214,19 @@ Product Directory:
 	ui.PrintSubHeader("CLI Basic commands")
 	ui.PrintInfo("version    Show version information")
 	ui.PrintInfo("help       Show this help message")
+	ui.PrintSection(
+		`
+Organisation Source Directory:
+- Description: Contains all Organisation data
+- Path: ~/EasterCompany
+
+Project Source Directory:
+- Description: Contains all Project related source code
+- Path: ~/EasterCompany/dex-cli
+
+Product Directory:
+- Description: Contains all assests, binaries, and configuration files for production
+- Path: ~/Dexter
+`,
+	)
 }
