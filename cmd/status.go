@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -116,50 +115,6 @@ func colorizeNA(value string) string {
 	return value
 }
 
-// checkSourceExists checks if the local source directory exists.
-func checkSourceExists(path string) bool {
-	if path == "" {
-		return false
-	}
-	// Use os.Stat to check if the path exists and is a directory
-	info, err := os.Stat(path)
-	if err != nil {
-		// If error is os.IsNotExist, it doesn't exist. Other errors (like permission) should also fail the check.
-		return false
-	}
-	return info.IsDir()
-}
-
-// getLocalGitInfo attempts to read the current branch and short commit hash from a local source directory.
-// It returns the branch, commit, and a boolean indicating if the path exists AND git commands were successful.
-func getLocalGitInfo(path string) (branch string, commit string, ok bool) {
-	if !checkSourceExists(path) {
-		return "", "", false
-	}
-
-	// 1. Get branch
-	cmdBranch := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
-	cmdBranch.Dir = path
-	branchBytes, err := cmdBranch.Output()
-	if err != nil {
-		// Directory exists, but git command failed (maybe not a git repo or other issue)
-		return "", "", false
-	}
-	branch = strings.TrimSpace(string(branchBytes))
-
-	// 2. Get short commit hash
-	cmdCommit := exec.Command("git", "rev-parse", "--short", "HEAD")
-	cmdCommit.Dir = path
-	commitBytes, err := cmdCommit.Output()
-	if err != nil {
-		// Directory exists and branch found, but commit failed
-		return branch, "", false
-	}
-	commit = strings.TrimSpace(string(commitBytes))
-
-	return branch, commit, true
-}
-
 // checkCLIStatus checks if the CLI tool is installed and working
 // Returns 8 columns: SERVICE, ADDRESS, VERSION, BRANCH, COMMIT, STATUS, UPTIME, SOURCE
 func checkCLIStatus(service config.ServiceDefinition, serviceID, address string) ui.TableRow {
@@ -187,26 +142,6 @@ func checkCLIStatus(service config.ServiceDefinition, serviceID, address string)
 		address = "N/A"
 	}
 
-	// Determine SOURCE status (Only applies to CLI, FE, BE, CS, TH)
-	sourceStatus := colorizeNA("N/A")
-
-	if service.Source != "" {
-		if !checkSourceExists(service.Source) {
-			sourceStatus = CrossMark // Source provided but path does not exist
-		} else {
-			// Source path exists. Now check version match.
-			localBranch, localCommit, gitFound := getLocalGitInfo(service.Source)
-
-			if !gitFound || localBranch == "" || localCommit == "" {
-				sourceStatus = CrossMark
-			} else if localBranch == branch && localCommit == commit {
-				sourceStatus = CheckMark // Match!
-			} else {
-				sourceStatus = CrossMark // Mismatch.
-			}
-		}
-	}
-
 	return []string{
 		serviceID,
 		colorizeNA(address), // ADDRESS (Likely "N/A")
@@ -214,8 +149,7 @@ func checkCLIStatus(service config.ServiceDefinition, serviceID, address string)
 		colorizeNA(branch),
 		colorizeNA(commit),
 		colorizeStatus(status),
-		colorizeNA("N/A"), // UPTIME
-		sourceStatus,      // NEW SOURCE COLUMN
+		colorizeNA("N/A"),
 	}
 }
 
@@ -227,9 +161,6 @@ func isCloudDomain(domain string) bool {
 // checkCacheStatus checks a cache/db service (Redis/Valkey) with a simplified PING command.
 // Returns 8 columns: SERVICE, ADDRESS, VERSION, BRANCH, COMMIT, STATUS, UPTIME, SOURCE
 func checkCacheStatus(service config.ServiceDefinition, serviceID, address string) ui.TableRow {
-	// Source is N/A for OS/Cache services
-	sourceStatus := CrossMark
-
 	badStatusRow := func() ui.TableRow {
 		return []string{
 			serviceID,
@@ -239,7 +170,6 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 			colorizeNA("--"),      // COMMIT
 			colorizeStatus("BAD"), // STATUS
 			colorizeNA("N/A"),     // UPTIME
-			sourceStatus,          // SOURCE (N/A)
 		}
 	}
 
@@ -335,7 +265,6 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 		colorizeNA("--"), // COMMIT
 		colorizeStatus("OK"),
 		colorizeNA("N/A"), // UPTIME
-		sourceStatus,      // SOURCE (N/A)
 	}
 }
 
@@ -366,7 +295,6 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 			colorizeNA("--"),      // COMMIT
 			colorizeStatus("BAD"), // STATUS
 			colorizeNA("N/A"),     // UPTIME
-			colorizeNA("N/A"),     // SOURCE (Default N/A if service check fails)
 		}
 	}
 
@@ -386,25 +314,6 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 	branch := report.Version.Obj.Branch
 	commit := report.Version.Obj.Commit
 
-	// Determine SOURCE status (Only applies to CLI, FE, BE, CS, TH)
-	sourceStatus := colorizeNA("N/A")
-	if service.Source != "" {
-		if !checkSourceExists(service.Source) {
-			sourceStatus = CrossMark // Source provided but path does not exist
-		} else {
-			// Source path exists. Now check version match.
-			localBranch, localCommit, gitFound := getLocalGitInfo(service.Source)
-
-			if !gitFound || localBranch == "" || localCommit == "" {
-				sourceStatus = CrossMark
-			} else if localBranch == branch && localCommit == commit {
-				sourceStatus = CheckMark // Match!
-			} else {
-				sourceStatus = CrossMark // Mismatch.
-			}
-		}
-	}
-
 	// Use the parsed data for the table
 	shortVersion := utils.ParseToShortVersion(report.Version.Str)
 
@@ -419,7 +328,6 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 		colorizeNA(ui.Truncate(commit, maxCommitLen)),
 		colorizeStatus(strings.ToUpper(report.Health.Status)),
 		colorizeNA(uptime),
-		sourceStatus, // NEW SOURCE COLUMN
 	}
 }
 
