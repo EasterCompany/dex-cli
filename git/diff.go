@@ -92,3 +92,25 @@ func GetCommitLogBetween(repoPath, oldRef, newRef string) (string, error) {
 
 	return log, nil
 }
+
+// GetCommitMessage returns the commit message for a specific commit reference.
+func GetCommitMessage(repoPath, commitRef string) (string, error) {
+	if commitRef == "" {
+		return "N/A", nil
+	}
+
+	// %s is the subject (commit message title)
+	cmd := exec.Command("git", "log", "-1", "--pretty=format:%s", commitRef)
+	cmd.Dir = repoPath
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "N/A", fmt.Errorf("git log command failed: %w\nOutput: %s", err, string(output))
+	}
+
+	message := strings.TrimSpace(string(output))
+	if message == "" {
+		return "N/A", nil
+	}
+
+	return message, nil
+}

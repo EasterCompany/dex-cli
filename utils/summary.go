@@ -38,7 +38,7 @@ func PrintSummaryTable(summaries []SummaryInfo) {
 		"Service",
 		"Version Change",
 		"Size Change",
-		"Code Change Summary",
+		"Note",
 	})
 
 	for _, s := range summaries {
@@ -56,15 +56,15 @@ func PrintSummaryTable(summaries []SummaryInfo) {
 		sizeDiff := s.NewSize - s.OldSize
 		var sizeChange string
 		if s.OldSize == 0 && s.NewSize > 0 {
-			sizeChange = ui.Colorize(fmt.Sprintf("(+%s)", FormatBytes(s.NewSize)), ui.ColorGreen)
+			sizeChange = ui.Colorize(fmt.Sprintf("+%s", FormatBytes(s.NewSize)), ui.ColorGreen)
 		} else if sizeDiff == 0 {
-			sizeChange = ui.Colorize("(0 B)", ui.ColorDarkGray)
+			sizeChange = ui.Colorize("0 B", ui.ColorDarkGray)
 		} else {
 			sign, color := "+", ui.ColorYellow
 			if sizeDiff < 0 {
 				sign, color, sizeDiff = "-", ui.ColorGreen, -sizeDiff
 			}
-			sizeChange = ui.Colorize(fmt.Sprintf("(%s%s)", sign, FormatBytes(sizeDiff)), color)
+			sizeChange = ui.Colorize(fmt.Sprintf("%s%s", sign, FormatBytes(sizeDiff)), color)
 		}
 
 		// --- Format Change Summary ---

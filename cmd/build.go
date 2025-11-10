@@ -137,17 +137,14 @@ func Build(args []string) error {
 				newVersionStr = utils.ParseServiceVersionFromJSON(newVersionStr)
 			}
 
-			oldVer, _ := git.Parse(oldVersionStr)
 			newVer, _ := git.Parse(newVersionStr)
 
-			var changeLog string
-			if oldVer != nil && newVer != nil && oldVer.Commit != "" && newVer.Commit != "" {
-				if oldVer.Commit == newVer.Commit {
-					changeLog = "N/A"
-				} else {
-					repoPath, _ := config.ExpandPath(s.Source)
-					changeLog, _ = git.GetCommitLogBetween(repoPath, oldVer.Commit, newVer.Commit)
-				}
+			var commitNote string
+			if newVer != nil && newVer.Commit != "" {
+				repoPath, _ := config.ExpandPath(s.Source)
+				commitNote, _ = git.GetCommitMessage(repoPath, newVer.Commit)
+			} else {
+				commitNote = "N/A"
 			}
 
 			summaryData = append(summaryData, utils.SummaryInfo{
@@ -156,7 +153,7 @@ func Build(args []string) error {
 				NewVersion:    newVersionStr,
 				OldSize:       oldSizes[s.ID],
 				NewSize:       utils.GetBinarySize(s),
-				ChangeSummary: changeLog,
+				ChangeSummary: commitNote,
 			})
 		}
 	}
