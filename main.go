@@ -131,6 +131,7 @@ func main() {
 	default:
 		fmt.Println()
 		ui.PrintError(fmt.Sprintf("Unknown command: %s", command))
+		fmt.Println()
 		os.Exit(1)
 	}
 }
