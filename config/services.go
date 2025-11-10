@@ -179,7 +179,7 @@ var serviceDefinitions = []ServiceDefinition{
 		ID:        "local-cache-0",
 		ShortName: "cache0",
 		Type:      "os",
-		Domain:    "localhost",
+		Domain:    "0.0.0.0",
 		Port:      "6379",
 		Credentials: &ServiceCredentials{
 			Username: "default",
