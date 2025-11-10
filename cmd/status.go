@@ -210,7 +210,12 @@ func checkOllamaStatus(service config.ServiceDefinition, serviceID, address stri
 // checkCacheStatus checks a cache/db service (Redis/Valkey) with a simplified PING command.
 // Returns 8 columns: SERVICE, ADDRESS, VERSION, BRANCH, COMMIT, STATUS, UPTIME, SOURCE
 func checkCacheStatus(service config.ServiceDefinition, serviceID, address string) ui.TableRow {
-	badStatusRow := func() ui.TableRow {
+	badStatusRow := func(reason string) ui.TableRow {
+		// Log the failure reason for debugging
+		logFile, _ := config.LogFile()
+		if logFile != nil {
+			_, _ = fmt.Fprintf(logFile, "[%s] Cache check failed: %s\n", serviceID, reason)
+		}
 		return []string{
 			serviceID,
 			address,
@@ -222,58 +227,69 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 		}
 	}
 
-	dialer := &net.Dialer{Timeout: 2 * time.Second}
+	dialer := &net.Dialer{Timeout: 5 * time.Second} // Increased timeout for cloud instances
 	host := service.GetHost()
 
 	var conn net.Conn
 	var err error
 
-	// Check if TLS is required (retained for redundancy against potential remote cloud domains)
-	if isCloudDomain(service.Domain) {
-		conn, err = tls.DialWithDialer(dialer, "tcp", host, &tls.Config{})
+	// Check if TLS is required for cloud domains
+	useTLS := isCloudDomain(service.Domain)
+	if useTLS {
+		tlsConfig := &tls.Config{
+			ServerName: service.Domain, // Proper SNI for cloud Redis
+		}
+		conn, err = tls.DialWithDialer(dialer, "tcp", host, tlsConfig)
 	} else {
 		conn, err = dialer.Dial("tcp", host)
 	}
 
 	if err != nil {
-		return badStatusRow()
+		return badStatusRow(fmt.Sprintf("connection failed (TLS=%v): %v", useTLS, err))
 	}
 	defer func() { _ = conn.Close() }()
 
-	if err := conn.SetDeadline(time.Now().Add(2 * time.Second)); err != nil {
-		return badStatusRow()
+	if err := conn.SetDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		return badStatusRow(fmt.Sprintf("failed to set deadline: %v", err))
 	}
 
 	reader := bufio.NewReader(conn)
 
 	// 1. Authenticate if password is provided
 	if service.Credentials != nil && service.Credentials.Password != "" {
+		// Try AUTH with username first (Redis 6+)
 		authCmd := fmt.Sprintf("AUTH %s %s\r\n", service.Credentials.Username, service.Credentials.Password)
 		if _, err = conn.Write([]byte(authCmd)); err != nil {
-			return badStatusRow()
+			return badStatusRow(fmt.Sprintf("failed to send AUTH command: %v", err))
 		}
 		response, err := reader.ReadString('\n')
 
-		// If 2-factor AUTH failed or another error occurred, try simple password AUTH
+		// If 2-arg AUTH failed, try simple password AUTH (Redis <6 or ACL not used)
 		if err != nil || !strings.HasPrefix(response, "+OK") {
 			simpleAuthCmd := fmt.Sprintf("AUTH %s\r\n", service.Credentials.Password)
 			if _, err = conn.Write([]byte(simpleAuthCmd)); err != nil {
-				return badStatusRow()
+				return badStatusRow(fmt.Sprintf("failed to send simple AUTH: %v", err))
 			}
 			response, err = reader.ReadString('\n')
-			if err != nil || !strings.HasPrefix(response, "+OK") {
-				return badStatusRow()
+			if err != nil {
+				return badStatusRow(fmt.Sprintf("AUTH read error: %v", err))
+			}
+			if !strings.HasPrefix(response, "+OK") {
+				return badStatusRow(fmt.Sprintf("AUTH failed: %s", strings.TrimSpace(response)))
 			}
 		}
 	}
 
 	// 2. Ping check
 	if _, err = conn.Write([]byte("PING\r\n")); err != nil {
-		return badStatusRow()
+		return badStatusRow(fmt.Sprintf("PING write failed: %v", err))
 	}
 	response, err := reader.ReadString('\n')
-	if err != nil || !strings.HasPrefix(response, "+PONG") {
-		return badStatusRow()
+	if err != nil {
+		return badStatusRow(fmt.Sprintf("PING read failed: %v", err))
+	}
+	if !strings.HasPrefix(response, "+PONG") {
+		return badStatusRow(fmt.Sprintf("PING response invalid: %s", strings.TrimSpace(response)))
 	}
 
 	// 3. Get Version
