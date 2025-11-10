@@ -198,6 +198,18 @@ var serviceDefinitions = []ServiceDefinition{
 			DB:       0,
 		},
 	},
+	{
+		ID:        "local-ollama-0",
+		ShortName: "ollama",
+		Type:      "os",
+		Domain:    "0.0.0.0",
+		Port:      "11434",
+		Credentials: &ServiceCredentials{
+			Username: "default",
+			Password: "",
+			DB:       0,
+		},
+	},
 }
 
 // GetAllServices returns a copy of the master service list.
