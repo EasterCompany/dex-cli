@@ -17,6 +17,11 @@ type CommandRequirement struct {
 // GetCommandRequirements returns all command requirements
 func GetCommandRequirements() map[string]CommandRequirement {
 	return map[string]CommandRequirement{
+		"git": {
+			"git",
+			"Git interface for dex-cli, dex services, and other related projects",
+			HasSourceDirectory,
+		},
 		"update": {
 			Name:        "update",
 			Description: "Update dex-cli and all services",
@@ -95,8 +100,7 @@ func GetCommandRequirements() map[string]CommandRequirement {
 		"add": {
 			Name:        "add",
 			Description: "Add (clone, build, install) a new service",
-
-			Check: func() bool { return true }, // Always available
+			Check:       func() bool { return true }, // Always available
 		},
 		"remove": {
 			Name:        "remove",
@@ -130,6 +134,16 @@ func IsCommandAvailable(command string) bool {
 		return true
 	}
 	return req.Check()
+}
+
+// HasSourceDirectory checks if ~/EasterCompany/ exists
+func HasSourceDirectory() bool {
+	path, err := ExpandPath("~/EasterCompany/")
+	if err != nil {
+		return false
+	}
+	_, err = os.Stat(path)
+	return err == nil
 }
 
 // HasDexCliSource checks if ~/EasterCompany/dex-cli exists

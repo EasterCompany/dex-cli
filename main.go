@@ -55,6 +55,9 @@ func main() {
 	}
 
 	switch command {
+	case "git":
+		runCommand(func() error { return cmd.Git(os.Args[2:]) })
+
 	case "update":
 		runCommand(func() error { return cmd.Update(os.Args[2:], buildYear) })
 
@@ -202,8 +205,10 @@ Product Directory:
 	if config.IsCommandAvailable("remove") {
 		ui.PrintInfo("remove     Remove (uninstall) a service")
 	}
+
+	// Proxy commands
 	if config.IsCommandAvailable("python") {
-		ui.PrintInfo("python     [<subcommand>] [args...] Python virtual environment")
+		ui.PrintInfo("python     [args...] Python virtual environment")
 	}
 	if config.IsCommandAvailable("bun") {
 		ui.PrintInfo("bun        [args...] System's bun executable")
@@ -211,9 +216,14 @@ Product Directory:
 	if config.IsCommandAvailable("bunx") {
 		ui.PrintInfo("bunx       [args...] System's bunx executable")
 	}
+
+	// Service Commands
 	if config.IsCommandAvailable("event") {
-		ui.PrintInfo("event      Interact with the event service")
+		ui.PrintInfo("event      Interact with the local/remote event server for this instance")
 	}
+	fmt.Println()
+
+	// CLI Commands
 	ui.PrintInfo("version    Show version information")
 	ui.PrintInfo("help       Show this help message")
 	fmt.Println()
