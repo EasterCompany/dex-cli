@@ -220,7 +220,7 @@ func runLintCheck(def config.ServiceDefinition, sourcePath string, log func(stri
 			return TestResult{Status: "SKIPPED", Message: "golangci-lint not found"}
 		}
 
-		cmd := exec.Command("golangci-lint", "run", "--out-format=line-number")
+		cmd := exec.Command("golangci-lint", "run")
 		cmd.Dir = sourcePath
 		output, err := cmd.CombinedOutput()
 		duration := time.Since(startTime)
