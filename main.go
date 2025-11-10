@@ -204,6 +204,9 @@ func printUsage() {
 	if config.IsCommandAvailable("bunx") {
 		ui.PrintInfo("bunx       | Access the system bunx executable")
 	}
+	if config.IsCommandAvailable("ollama") {
+		ui.PrintInfo("ollama     | Access the system ollama executable")
+	}
 	ui.PrintSubHeader("Service Commands")
 	if config.IsCommandAvailable("event") {
 		ui.PrintInfo("event      | Interact with the event service for this instance")
