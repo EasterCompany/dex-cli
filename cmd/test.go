@@ -4,17 +4,34 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
-type Result struct {
-	Status  string
-	Message string
-	Tool    string
+// TestResult holds the outcome of a single test operation
+type TestResult struct {
+	Status      string // "OK", "FAILED", "SKIPPED", "N/A"
+	Message     string
+	Duration    time.Duration
+	TestCount   int
+	FailCount   int
+	Coverage    float64
+	IssueCount  int
+	DetailsLine string
+}
+
+// ServiceTestSummary holds all test results for a single service
+type ServiceTestSummary struct {
+	ServiceName   string
+	FormatResult  TestResult
+	LintResult    TestResult
+	TestResult    TestResult
+	TotalDuration time.Duration
 }
 
 // Test runs format, lint, and test for all services, or a specific service if provided.
@@ -36,235 +53,448 @@ func Test(args []string) error {
 
 	log("Running test command...")
 
-	easterCompanyPath, err := config.ExpandPath("~/EasterCompany")
-	if err != nil {
-		return err
-	}
+	// Determine which services to test
+	var servicesToTest []config.ServiceDefinition
+	allServices := config.GetAllServices()
 
-	var projects []string
 	if serviceName != "" {
-		// If a service name is provided, test only that service
-		resolvedServiceName, err := resolveServiceName(serviceName)
-		if err != nil {
-			return err
+		// Test a specific service
+		found := false
+		for _, s := range allServices {
+			if s.ShortName == serviceName || s.ID == serviceName {
+				servicesToTest = append(servicesToTest, s)
+				found = true
+				break
+			}
 		}
-		projectPath := filepath.Join(easterCompanyPath, resolvedServiceName)
-		if _, err := os.Stat(projectPath); os.IsNotExist(err) {
-			return fmt.Errorf("service '%s' not found in %s", resolvedServiceName, easterCompanyPath)
+		if !found {
+			return fmt.Errorf("service '%s' not found", serviceName)
 		}
-		projects = []string{projectPath}
 	} else {
-		// Otherwise, test all applicable services
-		allProjects, err := filepath.Glob(filepath.Join(easterCompanyPath, "*"))
-		if err != nil {
-			return err
-		}
-		for _, project := range allProjects {
-			projectName := filepath.Base(project)
-			if strings.HasPrefix(projectName, "dex-") || projectName == "easter.company" {
-				projects = append(projects, project)
+		// Test all buildable services
+		for _, s := range allServices {
+			if s.IsBuildable() {
+				sourcePath, err := config.ExpandPath(s.Source)
+				if err == nil {
+					if _, err := os.Stat(sourcePath); err == nil {
+						servicesToTest = append(servicesToTest, s)
+					}
+				}
 			}
 		}
 	}
 
-	var overallResults []ui.TableRow
-
-	for _, project := range projects {
-		projectName := filepath.Base(project)
-
-		fmt.Printf("▼ %s\n", projectName)
-		log(fmt.Sprintf("Testing project: %s", projectName))
-
-		formatResult := formatProject(project, log)
-		lintResult := lintProject(project, log)
-		testResult := testProject(project, log)
-
-		isSingleService := len(projects) == 1
-		printDetailedResults("Formatting", formatResult, isSingleService)
-		printDetailedResults("Linting", lintResult, isSingleService)
-		printDetailedResults("Testing", testResult, isSingleService)
-		overallResults = append(overallResults, ui.TableRow{projectName, formatResult.Status, lintResult.Status, testResult.Status})
+	if len(servicesToTest) == 0 {
+		return fmt.Errorf("no services found to test")
 	}
 
-	if len(projects) > 1 {
-		ui.PrintSubHeader("Results")
-		table := ui.NewTable([]string{"Project", "Format", "Lint", "Test"})
-		for _, row := range overallResults {
-			table.AddRow(row)
+	// Print header
+	ui.PrintHeader("Testing All Services")
+
+	var summaries []ServiceTestSummary
+
+	// Test each service
+	for _, def := range servicesToTest {
+		fmt.Println()
+		ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, fmt.Sprintf("# Testing %s", def.ShortName), ui.ColorReset))
+
+		sourcePath, err := config.ExpandPath(def.Source)
+		if err != nil {
+			ui.PrintError(fmt.Sprintf("Failed to expand source path: %v", err))
+			continue
 		}
-		table.Render()
+
+		if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
+			ui.PrintWarning(fmt.Sprintf("Skipping %s: source code not found at %s. Run 'dex add' to download & install it.", def.ShortName, sourcePath))
+			continue
+		}
+
+		startTime := time.Now()
+
+		// Run format, lint, test
+		formatResult := runFormatCheck(def, sourcePath, log)
+		lintResult := runLintCheck(def, sourcePath, log)
+		testResult := runTestCheck(def, sourcePath, log)
+
+		totalDuration := time.Since(startTime)
+
+		// Print individual results
+		printTestStepResult("Format", formatResult)
+		printTestStepResult("Lint", lintResult)
+		printTestStepResult("Test", testResult)
+
+		// Print duration
+		ui.PrintInfo(fmt.Sprintf("%s  Total Duration: %s%s", ui.ColorDarkGray, totalDuration.Round(time.Millisecond), ui.ColorReset))
+
+		summaries = append(summaries, ServiceTestSummary{
+			ServiceName:   def.ShortName,
+			FormatResult:  formatResult,
+			LintResult:    lintResult,
+			TestResult:    testResult,
+			TotalDuration: totalDuration,
+		})
+	}
+
+	// Print summary
+	fmt.Println()
+	ui.PrintHeader("Test Summary")
+
+	printTestSummaryTable(summaries)
+
+	// Determine overall status
+	allPassed := true
+	for _, s := range summaries {
+		if s.FormatResult.Status == "FAILED" || s.LintResult.Status == "FAILED" || s.TestResult.Status == "FAILED" {
+			allPassed = false
+			break
+		}
+	}
+
+	fmt.Println()
+	if allPassed {
+		ui.PrintSuccess("All tests passed!")
+	} else {
+		ui.PrintError("Some tests failed.")
 	}
 
 	return nil
 }
 
-func printDetailedResults(category string, result Result, isSingleService bool) {
-	if isSingleService {
-		fmt.Printf("  %s: %s (%s)\n", category, result.Status, result.Tool)
-		if result.Message != "" {
-			fmt.Printf("    └ %s\n", result.Message)
+// runFormatCheck runs formatting checks for a service
+func runFormatCheck(def config.ServiceDefinition, sourcePath string, log func(string)) TestResult {
+	startTime := time.Now()
+
+	ui.PrintInfo("Checking formatting...")
+
+	// For Go projects, run gofmt in check mode
+	if def.Type == "cli" || strings.HasPrefix(def.ID, "dex-") {
+		cmd := exec.Command("gofmt", "-l", ".")
+		cmd.Dir = sourcePath
+		output, err := cmd.CombinedOutput()
+		duration := time.Since(startTime)
+
+		if err != nil {
+			log(fmt.Sprintf("[%s] Format check failed: %v", def.ShortName, err))
+			return TestResult{
+				Status:   "FAILED",
+				Message:  fmt.Sprintf("gofmt failed: %v", err),
+				Duration: duration,
+			}
 		}
-	} else {
-		switch result.Status {
-		case "BAD":
-			fmt.Printf("  %s: %s\n", category, result.Status)
-			fmt.Printf("    └ %s\n", result.Message)
-		case "OK":
-			fmt.Printf("  %s: %s\n", category, result.Status)
+
+		// Check if any files need formatting
+		outputStr := strings.TrimSpace(string(output))
+		if outputStr != "" {
+			files := strings.Split(outputStr, "\n")
+			fileCount := len(files)
+			log(fmt.Sprintf("[%s] Format check found %d files needing formatting", def.ShortName, fileCount))
+			return TestResult{
+				Status:      "FAILED",
+				Message:     fmt.Sprintf("%d file(s) need formatting: %s", fileCount, strings.Join(files, ", ")),
+				Duration:    duration,
+				IssueCount:  fileCount,
+				DetailsLine: fmt.Sprintf("%d file(s) unformatted", fileCount),
+			}
+		}
+
+		return TestResult{
+			Status:      "OK",
+			Duration:    duration,
+			DetailsLine: "all files formatted",
+		}
+	}
+
+	return TestResult{Status: "SKIPPED", Message: "formatting not configured for this service type"}
+}
+
+// runLintCheck runs linting checks for a service
+func runLintCheck(def config.ServiceDefinition, sourcePath string, log func(string)) TestResult {
+	startTime := time.Now()
+
+	ui.PrintInfo("Linting...")
+
+	// For Go projects, run golangci-lint
+	if def.Type == "cli" || strings.HasPrefix(def.ID, "dex-") {
+		// Check if golangci-lint is available
+		if _, err := exec.LookPath("golangci-lint"); err != nil {
+			return TestResult{Status: "SKIPPED", Message: "golangci-lint not found"}
+		}
+
+		cmd := exec.Command("golangci-lint", "run", "--out-format=line-number")
+		cmd.Dir = sourcePath
+		output, err := cmd.CombinedOutput()
+		duration := time.Since(startTime)
+
+		outputStr := strings.TrimSpace(string(output))
+
+		if err != nil {
+			// Parse the number of issues
+			issueCount := countLintIssues(outputStr)
+			log(fmt.Sprintf("[%s] Lint found %d issues", def.ShortName, issueCount))
+
+			// Truncate output if too long
+			displayOutput := outputStr
+			if len(displayOutput) > 500 {
+				displayOutput = displayOutput[:500] + "... (truncated)"
+			}
+
+			return TestResult{
+				Status:      "FAILED",
+				Message:     displayOutput,
+				Duration:    duration,
+				IssueCount:  issueCount,
+				DetailsLine: fmt.Sprintf("%d issue(s)", issueCount),
+			}
+		}
+
+		// Check if there were issues even without error
+		issueCount := countLintIssues(outputStr)
+		if issueCount > 0 {
+			log(fmt.Sprintf("[%s] Lint found %d issues (non-fatal)", def.ShortName, issueCount))
+			return TestResult{
+				Status:      "FAILED",
+				Message:     outputStr,
+				Duration:    duration,
+				IssueCount:  issueCount,
+				DetailsLine: fmt.Sprintf("%d issue(s)", issueCount),
+			}
+		}
+
+		return TestResult{
+			Status:      "OK",
+			Duration:    duration,
+			DetailsLine: "no issues",
+		}
+	}
+
+	return TestResult{Status: "SKIPPED", Message: "linting not configured for this service type"}
+}
+
+// runTestCheck runs unit tests for a service
+func runTestCheck(def config.ServiceDefinition, sourcePath string, log func(string)) TestResult {
+	startTime := time.Now()
+
+	ui.PrintInfo("Running tests...")
+
+	// For Go projects, run go test
+	if def.Type == "cli" || strings.HasPrefix(def.ID, "dex-") {
+		cmd := exec.Command("go", "test", "-v", "-cover", "./...")
+		cmd.Dir = sourcePath
+		output, err := cmd.CombinedOutput()
+		duration := time.Since(startTime)
+
+		outputStr := string(output)
+
+		// Parse test results
+		testCount, failCount, coverage := parseGoTestOutput(outputStr)
+
+		if err != nil {
+			log(fmt.Sprintf("[%s] Tests failed: %d/%d failed", def.ShortName, failCount, testCount))
+
+			// Extract failure details
+			failureDetails := extractTestFailures(outputStr)
+
+			return TestResult{
+				Status:      "FAILED",
+				Message:     failureDetails,
+				Duration:    duration,
+				TestCount:   testCount,
+				FailCount:   failCount,
+				Coverage:    coverage,
+				DetailsLine: fmt.Sprintf("%d/%d passed, %.1f%% coverage", testCount-failCount, testCount, coverage),
+			}
+		}
+
+		// Check if there are no test files
+		if strings.Contains(outputStr, "[no test files]") {
+			return TestResult{
+				Status:      "SKIPPED",
+				Message:     "no test files found",
+				Duration:    duration,
+				DetailsLine: "no test files",
+			}
+		}
+
+		detailsLine := fmt.Sprintf("%d passed", testCount)
+		if coverage > 0 {
+			detailsLine += fmt.Sprintf(", %.1f%% coverage", coverage)
+		}
+
+		return TestResult{
+			Status:      "OK",
+			Duration:    duration,
+			TestCount:   testCount,
+			Coverage:    coverage,
+			DetailsLine: detailsLine,
+		}
+	}
+
+	return TestResult{Status: "SKIPPED", Message: "testing not configured for this service type"}
+}
+
+// printTestStepResult prints the result of a single test step
+func printTestStepResult(stepName string, result TestResult) {
+	icon := ""
+	color := ui.ColorWhite
+
+	switch result.Status {
+	case "OK":
+		icon = "✓"
+		color = ui.ColorGreen
+	case "FAILED":
+		icon = "✕"
+		color = ui.ColorRed
+	case "SKIPPED":
+		icon = "○"
+		color = ui.ColorYellow
+	case "N/A":
+		icon = "−"
+		color = ui.ColorDarkGray
+	}
+
+	// Build the status line
+	statusLine := fmt.Sprintf("%s%s %s", color, icon, stepName)
+	if result.DetailsLine != "" {
+		statusLine += fmt.Sprintf(" (%s)", result.DetailsLine)
+	}
+	if result.Duration > 0 {
+		statusLine += fmt.Sprintf(" [%s]", result.Duration.Round(time.Millisecond))
+	}
+	statusLine += ui.ColorReset
+
+	fmt.Println(statusLine)
+
+	// Print detailed message if failed
+	if result.Status == "FAILED" && result.Message != "" {
+		// Indent and print message
+		lines := strings.Split(result.Message, "\n")
+		for i, line := range lines {
+			if i < 10 { // Limit to first 10 lines
+				ui.PrintInfo(fmt.Sprintf("  %s", line))
+			}
+		}
+		if len(lines) > 10 {
+			ui.PrintInfo(fmt.Sprintf("  ... and %d more lines (see log for details)", len(lines)-10))
 		}
 	}
 }
 
-func getExecutablePath(name string) (string, bool) {
-	virtualEnvPath, err := config.ExpandPath("~/Dexter/python/bin/" + name)
-	if err == nil {
-		if _, err := os.Stat(virtualEnvPath); err == nil {
-			return virtualEnvPath, true
+// printTestSummaryTable prints the final summary table
+func printTestSummaryTable(summaries []ServiceTestSummary) {
+	table := ui.NewTable([]string{
+		"Service",
+		"Format",
+		"Lint",
+		"Test",
+		"Duration",
+	})
+
+	for _, s := range summaries {
+		formatStatus := formatStatusForTable(s.FormatResult)
+		lintStatus := formatStatusForTable(s.LintResult)
+		testStatus := formatStatusForTable(s.TestResult)
+		duration := s.TotalDuration.Round(time.Millisecond).String()
+
+		table.AddRow(ui.TableRow{
+			s.ServiceName,
+			formatStatus,
+			lintStatus,
+			testStatus,
+			duration,
+		})
+	}
+
+	table.Render()
+}
+
+// formatStatusForTable formats a test result for table display
+func formatStatusForTable(result TestResult) string {
+	switch result.Status {
+	case "OK":
+		return ui.Colorize("✓ PASS", ui.ColorGreen)
+	case "FAILED":
+		if result.IssueCount > 0 {
+			return ui.Colorize(fmt.Sprintf("✕ %d issue(s)", result.IssueCount), ui.ColorRed)
+		}
+		if result.FailCount > 0 {
+			return ui.Colorize(fmt.Sprintf("✕ %d/%d failed", result.FailCount, result.TestCount), ui.ColorRed)
+		}
+		return ui.Colorize("✕ FAIL", ui.ColorRed)
+	case "SKIPPED":
+		return ui.Colorize("○ SKIP", ui.ColorYellow)
+	case "N/A":
+		return ui.Colorize("− N/A", ui.ColorDarkGray)
+	default:
+		return ui.Colorize("?", ui.ColorDarkGray)
+	}
+}
+
+// countLintIssues counts the number of linting issues in the output
+func countLintIssues(output string) int {
+	if output == "" {
+		return 0
+	}
+	// Count lines that look like lint issues (typically have a file path and line number)
+	lines := strings.Split(output, "\n")
+	count := 0
+	for _, line := range lines {
+		// Look for patterns like "file.go:123:45: issue"
+		if strings.Contains(line, ".go:") && strings.Contains(line, ":") {
+			count++
 		}
 	}
-
-	path, err := exec.LookPath(name)
-	return path, err == nil
+	return count
 }
 
-func hasFiles(projectPath, pattern string) bool {
-	globPattern := filepath.Join(projectPath, pattern)
-	matches, err := filepath.Glob(globPattern)
-	return err == nil && len(matches) > 0
-}
+// parseGoTestOutput parses go test output to extract test count, failures, and coverage
+func parseGoTestOutput(output string) (testCount, failCount int, coverage float64) {
+	lines := strings.Split(output, "\n")
 
-func hasConfigFile(projectPath, configFileName string) bool {
-	_, err := os.Stat(filepath.Join(projectPath, configFileName))
-	return err == nil
-}
+	// Count tests and failures
+	for _, line := range lines {
+		// Look for test result lines like "--- PASS: TestName" or "--- FAIL: TestName"
+		if strings.HasPrefix(line, "--- PASS:") {
+			testCount++
+		} else if strings.HasPrefix(line, "--- FAIL:") {
+			testCount++
+			failCount++
+		}
 
-func runCheck(projectPath, toolName, filePattern string, configFiles []string, args ...string) Result {
-	if !hasFiles(projectPath, filePattern) {
-		return Result{Status: "N/A", Tool: toolName}
-	}
-
-	hasConfig := false
-	if len(configFiles) == 0 {
-		hasConfig = true // No config file needed
-	} else {
-		for _, configFile := range configFiles {
-			if hasConfigFile(projectPath, configFile) {
-				hasConfig = true
-				break
+		// Look for coverage line like "coverage: 75.5% of statements"
+		if strings.Contains(line, "coverage:") && strings.Contains(line, "% of statements") {
+			re := regexp.MustCompile(`coverage:\s+([\d.]+)%`)
+			matches := re.FindStringSubmatch(line)
+			if len(matches) > 1 {
+				if cov, err := strconv.ParseFloat(matches[1], 64); err == nil {
+					coverage = cov
+				}
 			}
 		}
 	}
 
-	if !hasConfig {
-		return Result{Status: "N/A", Tool: toolName, Message: fmt.Sprintf("No config for %s found", toolName)}
-	}
-
-	executable, ok := getExecutablePath(toolName)
-	if !ok {
-		return Result{Status: "N/A", Tool: toolName, Message: fmt.Sprintf("%s not found", toolName)}
-	}
-
-	cmd := exec.Command(executable, args...)
-	cmd.Dir = projectPath
-	if output, err := cmd.CombinedOutput(); err != nil {
-		// Ignore "no files found" errors from prettier
-		if toolName == "prettier" && strings.Contains(string(output), "No files matching") {
-			return Result{Status: "OK", Tool: toolName}
-		}
-		msg := fmt.Sprintf("%s failed: %s", toolName, string(output))
-		return Result{Status: "BAD", Tool: toolName, Message: msg}
-	}
-
-	return Result{Status: "OK", Tool: toolName}
+	return
 }
 
-func formatProject(projectPath string, log func(string)) Result {
-	projectName := filepath.Base(projectPath)
-	var results []Result
-	if strings.HasPrefix(projectName, "dex-") {
-		results = []Result{
-			runCheck(projectPath, "gofmt", "**/*.go", nil, "-w", "."),
-		}
-	} else if projectName == "easter.company" {
-		results = []Result{
-			runCheck(projectPath, "prettier", "**/*.js", []string{".prettierrc", ".prettierrc.json", ".prettierrc.js"}, "--write", "**/*.js"),
-			runCheck(projectPath, "prettier", "**/*.ts", []string{".prettierrc", ".prettierrc.json", ".prettierrc.js"}, "--write", "**/*.ts"),
-			runCheck(projectPath, "prettier", "**/*.css", []string{".prettierrc", ".prettierrc.json", ".prettierrc.js"}, "--write", "**/*.css"),
-			runCheck(projectPath, "prettier", "**/*.html", []string{".prettierrc", ".prettierrc.json", ".prettierrc.js"}, "--write", "**/*.html"),
-			runCheck(projectPath, "prettier", "**/*.json", []string{".prettierrc", ".prettierrc.json", ".prettierrc.js"}, "--write", "**/*.json"),
-			runCheck(projectPath, "prettier", "**/*.md", []string{".prettierrc", ".prettierrc.json", ".prettierrc.js"}, "--write", "**/*.md"),
-			runCheck(projectPath, "shfmt", "**/*.sh", nil, "-w", "**/*.sh"),
-		}
-	}
-	return aggregateResults(results)
-}
+// extractTestFailures extracts the most relevant failure information from test output
+func extractTestFailures(output string) string {
+	lines := strings.Split(output, "\n")
+	var failures []string
 
-func lintProject(projectPath string, log func(string)) Result {
-	projectName := filepath.Base(projectPath)
-	var results []Result
-	if strings.HasPrefix(projectName, "dex-") {
-		results = []Result{
-			runCheck(projectPath, "golangci-lint", "**/*.go", []string{".golangci.yml", ".golangci.yaml", ".golangci.json"}, "run"),
-		}
-	} else if projectName == "easter.company" {
-		results = []Result{
-			runCheck(projectPath, "eslint", "**/*.js", []string{".eslintrc.js", ".eslintrc.json"}, "**/*.js"),
-			runCheck(projectPath, "eslint", "**/*.ts", []string{".eslintrc.js", ".eslintrc.json"}, "**/*.ts"),
-			runCheck(projectPath, "stylelint", "**/*.css", []string{".stylelintrc.js", ".stylelintrc.json"}, "**/*.css"),
-			runCheck(projectPath, "htmlhint", "**/*.html", []string{".htmlhintrc"}, "**/*.html"),
-		}
-	}
-	return aggregateResults(results)
-}
-
-func testProject(projectPath string, log func(string)) Result {
-	projectName := filepath.Base(projectPath)
-	var results []Result
-	if strings.HasPrefix(projectName, "dex-") {
-		results = []Result{
-			runCheck(projectPath, "go", "go.mod", nil, "test", "-v", "./..."),
-		}
-	}
-	return aggregateResults(results)
-}
-
-func aggregateResults(results []Result) Result {
-	finalResult := Result{Status: "N/A"}
-	badMessages := []string{}
-
-	hasApplicable := false
-	for _, r := range results {
-		if r.Status == "BAD" {
-			finalResult.Status = "BAD"
-			badMessages = append(badMessages, r.Message)
-		}
-		if r.Status != "N/A" {
-			hasApplicable = true
+	for _, line := range lines {
+		// Look for FAIL lines
+		if strings.Contains(line, "FAIL") || strings.Contains(line, "Error:") || strings.Contains(line, "panic:") {
+			failures = append(failures, strings.TrimSpace(line))
 		}
 	}
 
-	if hasApplicable && finalResult.Status != "BAD" {
-		finalResult.Status = "OK"
+	if len(failures) == 0 {
+		return "Tests failed (see log for details)"
 	}
 
-	if len(badMessages) > 0 {
-		finalResult.Message = strings.Join(badMessages, "; ")
+	// Return first few failures
+	if len(failures) > 5 {
+		return strings.Join(failures[:5], "\n") + "\n... (more failures in log)"
 	}
 
-	return finalResult
-}
-
-func resolveServiceName(shortName string) (string, error) {
-	for _, service := range config.GetAllServices() {
-		if service.ShortName == shortName {
-			return service.ID, nil
-		}
-	}
-	// Fallback to checking the full ID if no short name matches
-	for _, service := range config.GetAllServices() {
-		if service.ID == shortName {
-			return service.ID, nil
-		}
-	}
-	return "", fmt.Errorf("service with name '%s' not found", shortName)
+	return strings.Join(failures, "\n")
 }
