@@ -129,9 +129,8 @@ func main() {
 		printUsage()
 
 	default:
-		fmt.Println() // Add padding at the start
+		fmt.Println()
 		ui.PrintError(fmt.Sprintf("Unknown command: %s", command))
-		printUsage()
 		os.Exit(1)
 	}
 }
@@ -147,7 +146,6 @@ func runCommand(commandFunc func() error) {
 }
 
 func printUsage() {
-	fmt.Println()
 	ui.PrintInfo(
 		`
 Organisation Source Directory:
