@@ -183,7 +183,8 @@ func PullModel(modelID string) error {
 
 	reader := bufio.NewReader(resp.Body)
 
-	ui.PrintInfo(fmt.Sprintf("Starting pull for model: %s...", modelID))
+	var lastStatus string
+	spinFrame := 0
 
 	for {
 		line, err := reader.ReadString('\n')
@@ -191,6 +192,7 @@ func PullModel(modelID string) error {
 			break
 		}
 		if err != nil {
+			ui.ClearLine()
 			return fmt.Errorf("error reading pull response stream: %w", err)
 		}
 		if strings.TrimSpace(line) == "" {
@@ -199,27 +201,31 @@ func PullModel(modelID string) error {
 
 		var chunk PullResponse
 		if jsonErr := json.Unmarshal([]byte(line), &chunk); jsonErr != nil {
-			ui.PrintInfo(fmt.Sprintf("Error unmarshalling chunk: %v. Raw: %s", jsonErr, line))
+			// Silently skip malformed chunks
 			continue
 		}
 
+		// Update status
+		if chunk.Status != "" {
+			lastStatus = chunk.Status
+		}
+
 		if chunk.Total > 0 && chunk.Completed > 0 {
+			// Show progress bar with download info
 			percent := float64(chunk.Completed) / float64(chunk.Total) * 100
-
-			label := fmt.Sprintf("%s: [%s] (%s of %s)",
-				chunk.Status,
-				chunk.Digest,
-				formatBytes(chunk.Completed),
-				formatBytes(chunk.Total),
-			)
+			label := fmt.Sprintf("Pulling %s (%s/%s)", modelID, formatBytes(chunk.Completed), formatBytes(chunk.Total))
 			ui.PrintProgressBar(label, int(percent))
-
 		} else {
-			ui.PrintInfo(fmt.Sprintf("%s: %s", chunk.Status, modelID))
+			// Show spinner for status updates without progress
+			label := fmt.Sprintf("%s: %s", lastStatus, modelID)
+			ui.PrintSpinner(label, spinFrame)
+			spinFrame++
 		}
 	}
 
-	ui.PrintInfo("Model pull completed.")
+	// Clear the line and print completion message
+	ui.ClearLine()
+	ui.PrintSuccess(fmt.Sprintf("Successfully pulled model: %s", modelID))
 	return nil
 }
 

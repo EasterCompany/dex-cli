@@ -27,7 +27,8 @@ func PrintProgressBar(label string, current int) {
 		barColor = ColorRed
 	}
 
-	output := fmt.Sprintf("%s%s:%s %s%s%s %s[%d%%]%s\n",
+	// Use \r to stay on one line, clear to end of line with spaces
+	output := fmt.Sprintf("\r%s%s:%s %s%s%s %s[%d%%]%s",
 		ColorCyan,
 		label,
 		ColorReset,
@@ -40,4 +41,30 @@ func PrintProgressBar(label string, current int) {
 	)
 
 	PrintRaw(output)
+
+	// Print newline only when complete
+	if current == 100 {
+		PrintRaw("\n")
+	}
+}
+
+// PrintSpinner shows a simple spinner animation on one line
+func PrintSpinner(label string, frame int) {
+	spinChars := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+	spinChar := spinChars[frame%len(spinChars)]
+
+	output := fmt.Sprintf("\r%s%s%s %s%s",
+		ColorCyan,
+		spinChar,
+		ColorReset,
+		label,
+		ColorReset,
+	)
+
+	PrintRaw(output)
+}
+
+// ClearLine clears the current line
+func ClearLine() {
+	PrintRaw("\r\033[K")
 }
