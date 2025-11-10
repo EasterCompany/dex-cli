@@ -4,12 +4,23 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+
+	"github.com/EasterCompany/dex-cli/ui"
+	"github.com/EasterCompany/dex-cli/utils"
 )
 
 // Ollama serves as a proxy for the system's actual 'ollama' executable.
 // It executes the system command with all provided arguments and pipes
 // the standard output and error directly back to the user.
 func Ollama(args []string) error {
+	// Intercept: If the command is 'dex ollama pull' with no model specified,
+	// execute the internal hardcoded pull function instead of proxying to the system 'ollama'.
+	if len(args) == 1 && args[0] == "pull" {
+		ui.PrintInfo("No model specified for 'ollama pull'. Starting hardcoded model synchronization.")
+		// The utility function will handle all output via the ui package.
+		return utils.PullHardcodedModels()
+	}
+
 	// 1. Locate the 'ollama' executable in the system's PATH.
 	ollamaPath, err := exec.LookPath("ollama")
 	if err != nil {

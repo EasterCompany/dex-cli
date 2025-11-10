@@ -15,7 +15,7 @@ import (
 
 const DefaultOllamaURL = "http://localhost:11434"
 
-var DefaultModels = []string{"llama2", "mistral"}
+var DefaultModels = []string{"codegemma:2b"}
 
 // ModelInfo reflects a single model entry returned by the /api/tags endpoint.
 type ModelInfo struct {
@@ -253,7 +253,6 @@ func PullHardcodedModels() error {
 			sb.WriteString(err.Error())
 			sb.WriteString("\n")
 		}
-		// FIX: Use constant format string to satisfy govet.
 		return fmt.Errorf("%s", sb.String())
 	}
 	return nil
@@ -286,7 +285,6 @@ func GetOllamaStatus() error {
 	url := DefaultOllamaURL
 	req, err := http.NewRequest(http.MethodHead, url, nil)
 	if err != nil {
-		// FIX: Use keyed fields for ui.KeyVal struct literal.
 		ui.PrintKeyValBlock("OLLAMA SERVICE STATUS", []ui.KeyVal{
 			{Key: "Status", Value: "ERROR"},
 			{Key: "Message", Value: fmt.Sprintf("Failed to create request: %v", err)},
@@ -311,8 +309,6 @@ func GetOllamaStatus() error {
 			message = fmt.Sprintf("Service reached at %s, but returned status code %d", url, resp.StatusCode)
 		}
 	}
-
-	// FIX: Use keyed fields for ui.KeyVal struct literal.
 	ui.PrintKeyValBlock("OLLAMA SERVICE STATUS", []ui.KeyVal{
 		{Key: "Status", Value: status},
 		{Key: "URL", Value: url},
