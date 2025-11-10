@@ -53,6 +53,13 @@ func StripANSI(s string) string {
 	return ansiRegex.ReplaceAllString(s, "")
 }
 
+// VisibleLength returns the visible character count of a string, excluding ANSI codes.
+// It properly counts Unicode characters (runes) rather than bytes.
+func VisibleLength(s string) int {
+	stripped := StripANSI(s)
+	return len([]rune(stripped))
+}
+
 // Colorize wraps a string with a given ANSI color code and reset code.
 func Colorize(s string, color string) string {
 	return fmt.Sprintf("%s%s%s", color, s, ColorReset)

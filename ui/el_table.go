@@ -50,9 +50,8 @@ func (t *Table) AddRow(row TableRow) {
 	t.Rows = append(t.Rows, row)
 	for i, cell := range row {
 		if i < len(t.Columns) {
-			// Calculate width based on the visible string, not the raw one with ANSI codes
-			visibleCell := StripANSI(cell)
-			visibleLen := len(visibleCell)
+			// Calculate width based on visible characters (counting runes, not bytes)
+			visibleLen := VisibleLength(cell)
 
 			// Apply max width constraint
 			if t.Columns[i].MaxWidth > 0 && visibleLen > t.Columns[i].MaxWidth {
@@ -73,23 +72,26 @@ func (t *Table) AddRow(row TableRow) {
 }
 
 // Truncate shortens a string to a max length, adding an ellipsis if necessary.
-// Handles ANSI color codes properly by preserving them while truncating visible content.
+// Handles ANSI color codes and Unicode characters properly.
 func Truncate(s string, maxLength int) string {
 	if maxLength <= 0 {
 		return s
 	}
 
-	stripped := StripANSI(s)
-	if len(stripped) <= maxLength {
+	visibleLen := VisibleLength(s)
+	if visibleLen <= maxLength {
 		return s
 	}
 
-	// If the string has no ANSI codes, simple truncation
+	stripped := StripANSI(s)
+
+	// If the string has no ANSI codes, simple rune-based truncation
 	if stripped == s {
+		runes := []rune(s)
 		if maxLength <= 3 {
-			return s[:maxLength]
+			return string(runes[:maxLength])
 		}
-		return s[:maxLength-3] + "..."
+		return string(runes[:maxLength-3]) + "..."
 	}
 
 	// For strings with ANSI codes, we need to preserve color codes
@@ -102,21 +104,23 @@ func Truncate(s string, maxLength int) string {
 
 	var result strings.Builder
 	inAnsi := false
-	for i := 0; i < len(s); i++ {
-		if s[i] == '\x1b' {
+	runes := []rune(s)
+
+	for i := 0; i < len(runes); i++ {
+		if runes[i] == '\x1b' {
 			inAnsi = true
 		}
 
 		if inAnsi {
-			result.WriteByte(s[i])
-			if s[i] == 'm' {
+			result.WriteRune(runes[i])
+			if runes[i] == 'm' {
 				inAnsi = false
 			}
 		} else {
 			if visibleCount >= targetVisible {
 				break
 			}
-			result.WriteByte(s[i])
+			result.WriteRune(runes[i])
 			visibleCount++
 		}
 	}
@@ -174,10 +178,14 @@ func (t *Table) Render() {
 }
 
 // padRight pads a string with spaces up to the specified width.
+// Uses rune count for proper Unicode character width calculation.
 func padRight(s string, width int) string {
-	visibleLength := len(StripANSI(s))
-	// Calculate padding based on the visible length
-	return s + strings.Repeat(" ", width-visibleLength)
+	visibleLength := VisibleLength(s)
+	padding := width - visibleLength
+	if padding < 0 {
+		padding = 0
+	}
+	return s + strings.Repeat(" ", padding)
 }
 
 func FormatFormatTableRow(service, status string) TableRow {
