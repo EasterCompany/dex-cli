@@ -147,7 +147,7 @@ func runCommand(commandFunc func() error) {
 }
 
 func printUsage() {
-	ui.PrintHeader("DEX / DEX-CLI")
+	ui.PrintHeader("DEX")
 	ui.PrintSection("A cli program for interfacing with local and/or remote dexter services.")
 	ui.PrintSubHeader("Local/User System Commands")
 	if config.IsCommandAvailable("system") {
