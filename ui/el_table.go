@@ -6,8 +6,10 @@ import (
 )
 
 type TableColumn struct {
-	Header string
-	Width  int
+	Header   string
+	Width    int
+	MaxWidth int // 0 means no max width
+	MinWidth int // 0 means use header length as minimum
 }
 
 type TableRow []string
@@ -20,7 +22,26 @@ type Table struct {
 func NewTable(headers []string) Table {
 	columns := make([]TableColumn, len(headers))
 	for i, header := range headers {
-		columns[i] = TableColumn{Header: header, Width: len(header)}
+		columns[i] = TableColumn{Header: header, Width: len(header), MaxWidth: 0, MinWidth: 0}
+	}
+	return Table{Columns: columns}
+}
+
+// NewTableWithWidths creates a table with specified column widths.
+// Use 0 for maxWidth to allow unlimited width, or specify a max width to truncate with "..."
+func NewTableWithWidths(headers []string, maxWidths []int) Table {
+	columns := make([]TableColumn, len(headers))
+	for i, header := range headers {
+		maxW := 0
+		if i < len(maxWidths) {
+			maxW = maxWidths[i]
+		}
+		columns[i] = TableColumn{
+			Header:   header,
+			Width:    len(header),
+			MaxWidth: maxW,
+			MinWidth: len(header),
+		}
 	}
 	return Table{Columns: columns}
 }
@@ -31,21 +52,83 @@ func (t *Table) AddRow(row TableRow) {
 		if i < len(t.Columns) {
 			// Calculate width based on the visible string, not the raw one with ANSI codes
 			visibleCell := StripANSI(cell)
-			if len(visibleCell) > t.Columns[i].Width {
-				t.Columns[i].Width = len(visibleCell)
+			visibleLen := len(visibleCell)
+
+			// Apply max width constraint
+			if t.Columns[i].MaxWidth > 0 && visibleLen > t.Columns[i].MaxWidth {
+				visibleLen = t.Columns[i].MaxWidth
+			}
+
+			// Update width if larger (but respect max width)
+			if visibleLen > t.Columns[i].Width {
+				t.Columns[i].Width = visibleLen
+			}
+
+			// Ensure minimum width
+			if t.Columns[i].MinWidth > 0 && t.Columns[i].Width < t.Columns[i].MinWidth {
+				t.Columns[i].Width = t.Columns[i].MinWidth
 			}
 		}
 	}
 }
 
 // Truncate shortens a string to a max length, adding an ellipsis if necessary.
+// Handles ANSI color codes properly by preserving them while truncating visible content.
 func Truncate(s string, maxLength int) string {
-	if StripANSI(s) == s { // Only truncate if no ANSI codes
-		if len(s) > maxLength {
-			return s[:maxLength-3] + "..."
+	if maxLength <= 0 {
+		return s
+	}
+
+	stripped := StripANSI(s)
+	if len(stripped) <= maxLength {
+		return s
+	}
+
+	// If the string has no ANSI codes, simple truncation
+	if stripped == s {
+		if maxLength <= 3 {
+			return s[:maxLength]
+		}
+		return s[:maxLength-3] + "..."
+	}
+
+	// For strings with ANSI codes, we need to preserve color codes
+	// Extract visible characters up to maxLength-3, then add "..."
+	visibleCount := 0
+	targetVisible := maxLength - 3
+	if maxLength <= 3 {
+		targetVisible = maxLength
+	}
+
+	var result strings.Builder
+	inAnsi := false
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\x1b' {
+			inAnsi = true
+		}
+
+		if inAnsi {
+			result.WriteByte(s[i])
+			if s[i] == 'm' {
+				inAnsi = false
+			}
+		} else {
+			if visibleCount >= targetVisible {
+				break
+			}
+			result.WriteByte(s[i])
+			visibleCount++
 		}
 	}
-	return s // Return colorized strings as-is
+
+	if maxLength > 3 {
+		result.WriteString("...")
+	}
+
+	// Add reset to ensure colors don't bleed
+	result.WriteString(ColorReset)
+
+	return result.String()
 }
 
 func (t *Table) Render() {
@@ -74,8 +157,13 @@ func (t *Table) Render() {
 		cells := make([]string, len(t.Columns))
 		for i, cell := range row {
 			if i < len(t.Columns) {
-				// Default row color is White/Reset
-				cells[i] = padRight(cell, t.Columns[i].Width)
+				// Truncate cell if it exceeds max width
+				truncatedCell := cell
+				if t.Columns[i].MaxWidth > 0 {
+					truncatedCell = Truncate(cell, t.Columns[i].MaxWidth)
+				}
+				// Pad to column width
+				cells[i] = padRight(truncatedCell, t.Columns[i].Width)
 			}
 		}
 		output.WriteString(strings.Join(cells, "  ")) // Increased spacing

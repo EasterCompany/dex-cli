@@ -381,13 +381,12 @@ func printTestStepResult(stepName string, result TestResult) {
 
 // printTestSummaryTable prints the final summary table
 func printTestSummaryTable(summaries []ServiceTestSummary) {
-	table := ui.NewTable([]string{
-		"Service",
-		"Format",
-		"Lint",
-		"Test",
-		"Duration",
-	})
+	// Define fixed/max column widths for consistent formatting
+	// Service: 15, Format: 12, Lint: 12, Test: 12, Duration: 10
+	table := ui.NewTableWithWidths(
+		[]string{"Service", "Format", "Lint", "Test", "Duration"},
+		[]int{15, 12, 12, 12, 10},
+	)
 
 	for _, s := range summaries {
 		formatStatus := formatStatusForTable(s.FormatResult)
