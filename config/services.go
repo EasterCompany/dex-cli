@@ -44,6 +44,7 @@ type BackupConfig struct {
 func (def *ServiceDefinition) ToServiceEntry() ServiceEntry {
 	return ServiceEntry{
 		ID:          def.ID,
+		ShortName:   def.ShortName,
 		Repo:        def.Repo,
 		Source:      def.Source,
 		Domain:      def.Domain,
@@ -258,16 +259,14 @@ func GetServiceDefinition(id string) ServiceDefinition {
 
 // ServiceMapConfig represents the structure of service-map.json
 type ServiceMapConfig struct {
-	Doc          string                    `json:"_doc"`
-	ServiceTypes []ServiceType             `json:"service_types"`
-	Services     map[string][]ServiceEntry `json:"services"`
+	Doc      string                    `json:"_doc"`
+	Services map[string][]ServiceEntry `json:"services"`
 }
 
 // serviceMapAlias is for custom JSON marshaling to order keys
 type serviceMapAlias struct {
-	Doc          string          `json:"_doc"`
-	ServiceTypes []ServiceType   `json:"service_types"`
-	Services     orderedServices `json:"services"`
+	Doc      string          `json:"_doc"`
+	Services orderedServices `json:"services"`
 }
 
 // orderedServices helps enforce key order in JSON
@@ -303,8 +302,7 @@ func (s *ServiceMapConfig) MarshalJSON() ([]byte, error) {
 	}
 
 	alias := serviceMapAlias{
-		Doc:          s.Doc,
-		ServiceTypes: s.ServiceTypes,
+		Doc: s.Doc,
 		Services: orderedServices{
 			CLI: s.Services["cli"],
 			FE:  s.Services["fe"],
@@ -317,18 +315,10 @@ func (s *ServiceMapConfig) MarshalJSON() ([]byte, error) {
 	return json.Marshal(&alias)
 }
 
-// ServiceType defines a category of services
-type ServiceType struct {
-	Type        string `json:"type"`
-	Label       string `json:"label"`
-	Description string `json:"description"`
-	MinPort     int    `json:"min_port"`
-	MaxPort     int    `json:"max_port"`
-}
-
 // ServiceEntry represents a single service in the service map
 type ServiceEntry struct {
 	ID          string              `json:"id"`
+	ShortName   string              `json:"short_name,omitempty"`
 	Repo        string              `json:"repo"`
 	Source      string              `json:"source"`
 	Domain      string              `json:"domain,omitempty"`
@@ -360,51 +350,7 @@ func DefaultServiceMapConfig() *ServiceMapConfig {
 	}
 
 	return &ServiceMapConfig{
-		Doc: "Maps service names to their configurations",
-		ServiceTypes: []ServiceType{
-			{
-				Type:        "cli",
-				Label:       "CLI",
-				Description: "CLI applications",
-				MinPort:     0,
-				MaxPort:     0,
-			},
-			{
-				Type:        "fe",
-				Label:       "Front Ends",
-				Description: "Frontend services",
-				MinPort:     8000,
-				MaxPort:     8099,
-			},
-			{
-				Type:        "cs",
-				Label:       "Core Services",
-				Description: "Essential Dexter services",
-				MinPort:     8100,
-				MaxPort:     8199,
-			},
-			{
-				Type:        "be",
-				Label:       "Back Ends",
-				Description: "Backend services",
-				MinPort:     8200,
-				MaxPort:     8299,
-			},
-			{
-				Type:        "th",
-				Label:       "3rd Party",
-				Description: "3rd party integration services",
-				MinPort:     8300,
-				MaxPort:     8399,
-			},
-			{
-				Type:        "os",
-				Label:       "Other Services",
-				Description: "Other services",
-				MinPort:     0,
-				MaxPort:     0,
-			},
-		},
+		Doc:      "Maps service names to their configurations",
 		Services: services,
 	}
 }

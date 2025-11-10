@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/EasterCompany/dex-cli/ui"
 )
 
 const (
@@ -109,12 +111,24 @@ func EnsureConfigFiles() error {
 		}
 	} else {
 		// File exists, check if it needs healing
-		healed := healOptionsConfig(userOpts, DefaultOptionsConfig())
-		if healed {
+		if healed := healOptionsConfig(userOpts, DefaultOptionsConfig()); healed {
 			fmt.Println("Healing options.json: Added missing default values.")
 			if err := SaveOptionsConfig(userOpts); err != nil {
 				return fmt.Errorf("failed to save healed options.json: %w", err)
 			}
+		}
+	}
+
+	// Server Map
+	_, serverMapErr := LoadServerMapConfig()
+	if serverMapErr != nil {
+		if os.IsNotExist(serverMapErr) {
+			fmt.Println("Creating default server-map.json...")
+			if err := SaveServerMapConfig(DefaultServerMapConfig()); err != nil {
+				return fmt.Errorf("failed to save default server-map.json: %w", err)
+			}
+		} else {
+			return fmt.Errorf("failed to load server-map.json: %w", serverMapErr)
 		}
 	}
 
@@ -124,43 +138,49 @@ func EnsureConfigFiles() error {
 // healOptionsConfig merges the default config into the user's config to add missing fields.
 // It modifies the userOpts object directly. Returns true if changes were made.
 func healOptionsConfig(userOpts *OptionsConfig, defaultOpts *OptionsConfig) bool {
-	healed := false
-
 	// Check top-level fields
 	if userOpts.Editor == "" {
 		userOpts.Editor = defaultOpts.Editor
-		healed = true
 	}
 	if userOpts.Theme == "" {
 		userOpts.Theme = defaultOpts.Theme
-		healed = true
 	}
 
 	// Check Discord options
 	if userOpts.Discord.Token == "" {
 		userOpts.Discord.Token = defaultOpts.Discord.Token
-		healed = true
 	}
 	if userOpts.Discord.ServerID == "" {
 		userOpts.Discord.ServerID = defaultOpts.Discord.ServerID
-		healed = true
 	}
 	if userOpts.Discord.DebugChannelID == "" {
 		userOpts.Discord.DebugChannelID = defaultOpts.Discord.DebugChannelID
-		healed = true
 	}
 
 	// Check Command Permissions
 	if userOpts.CommandPermissions.AllowedRoles == nil {
 		userOpts.CommandPermissions.AllowedRoles = defaultOpts.CommandPermissions.AllowedRoles
-		healed = true
 	}
 	if userOpts.CommandPermissions.UserWhitelist == nil {
 		userOpts.CommandPermissions.UserWhitelist = defaultOpts.CommandPermissions.UserWhitelist
-		healed = true
 	}
 
-	return healed
+	// Server Map
+	_, serverMapErr := LoadServerMapConfig()
+	if serverMapErr != nil {
+		if os.IsNotExist(serverMapErr) {
+			fmt.Println("Creating default server-map.json...")
+			if err := SaveServerMapConfig(DefaultServerMapConfig()); err != nil {
+				ui.PrintInfo("failed to save default server-map.json")
+				return false
+			}
+		} else {
+			ui.PrintInfo("failed to load server-map.json")
+			return false
+		}
+	}
+
+	return true
 }
 
 // LogFile returns a file handle to the dex-cli log file.
