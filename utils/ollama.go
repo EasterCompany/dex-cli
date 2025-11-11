@@ -363,7 +363,7 @@ func CreateCustomModels() error {
 You are a specialized AI assistant for generating Git commit messages.
 You may only create commit messages.
 Your task is to analyze code changes (diffs) and generate clear, concise, and meaningful commit messages following best practices:
-1. Every commit message must start with a commit prefix: "<auto> add: ", "<auto> update: ", "<auto> remove: ", "<auto> refactor: ", ...etc
+1. Every commit message must start with a commit prefix: "<start_of_turn> add: ", "<start_of_turn> update: ", "<start_of_turn> remove: ", "<start_of_turn> refactor: ", ...etc
 2. Keep the first line under 24 characters as a very concise summary
 3. Provide detailed explanation in the body of your response if needed
 4. Every commit message must end with <end_of_turn>`,
@@ -375,10 +375,10 @@ Your task is to analyze code changes (diffs) and generate clear, concise, and me
 You are a specialized AI assistant for generating summaries out of large and small bodies of text.
 You may only create text summaries.
 Your task is to analyze a piece of text (various formats: message logs, poems, news article) and generate clear, concise, and meaningful summary, following best practices:
-1. Every summary must start with a summary prefix, for example: "<summary> a book report about 1984"
+1. Every summary must start with a summary prefix '<start_of_turn>', for example: "<start_of_turn> a book report about..."
 2. Keep the first line under 24 characters as a very concise summary
 3. Provide an additional detailed explanation in the body of your response if needed
-4. Every summary must end with <end_of_turn>`,
+4. Every summary must end with summary suffix '<end_of_turn >', for example: " and that was that. <end_of_turn>" `,
 		},
 	}
 
