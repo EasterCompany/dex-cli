@@ -363,11 +363,10 @@ func CreateCustomModels() error {
 
 Your task is to analyze code changes (diffs) and generate clear, concise, and meaningful commit messages following best practices:
 
-	1. Every response must start with a commit prefix: "add: ", "update: ", "remove: ", "refactor: ", ...etc
+	1. Every commit message must start with a commit prefix: "<auto> add: ", "<auto> update: ", "<auto> remove: ", "<auto> refactor: ", ...etc
 	2. Keep the first line under 24 characters as a very concise summary
 	3. Provide detailed explanation in the body of your response if needed
-
-Analyze the provided diff and generate an appropriate commit message as your response/output.`,
+	4. Every commit message must end with <end_of_turn>`,
 		},
 		// Additional custom models will be added here
 	}
@@ -514,6 +513,28 @@ func GenerateCommitMessage(diff string) string {
 	// Clean up the response
 	commitMsg = strings.TrimSpace(commitMsg)
 
+	// Remove everything after and including <end_of_turn>
+	if idx := strings.Index(commitMsg, "<end_of_turn>"); idx != -1 {
+		commitMsg = commitMsg[:idx]
+		commitMsg = strings.TrimSpace(commitMsg)
+	}
+
+	// Remove everything before and including <auto>
+	if idx := strings.Index(commitMsg, "<auto>"); idx != -1 {
+		commitMsg = commitMsg[idx+len("<auto>"):]
+		commitMsg = strings.TrimSpace(commitMsg)
+	} else {
+		// If <auto> doesn't exist, try to find common commit prefixes
+		prefixes := []string{"add:", "update:", "remove:", "refactor:", "fix:", "feat:", "docs:", "chore:", "style:", "test:", "perf:"}
+		for _, prefix := range prefixes {
+			if idx := strings.Index(strings.ToLower(commitMsg), prefix); idx != -1 {
+				commitMsg = commitMsg[idx:]
+				break
+			}
+		}
+		commitMsg = strings.TrimSpace(commitMsg)
+	}
+
 	// Remove markdown code blocks if present (```...```)
 	commitMsg = strings.TrimPrefix(commitMsg, "```")
 	commitMsg = strings.TrimSuffix(commitMsg, "```")
@@ -523,14 +544,6 @@ func GenerateCommitMessage(diff string) string {
 	lines := strings.Split(commitMsg, "\n")
 	if len(lines) > 0 {
 		commitMsg = strings.TrimSpace(lines[0])
-	}
-
-	// Remove any language identifiers (like "go", "diff", etc.) that might appear at the start
-	if strings.HasPrefix(commitMsg, "go ") || strings.HasPrefix(commitMsg, "diff ") {
-		parts := strings.SplitN(commitMsg, " ", 2)
-		if len(parts) > 1 {
-			commitMsg = parts[1]
-		}
 	}
 
 	// If the model returned an empty message, use default
