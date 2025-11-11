@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/EasterCompany/dex-cli/cmd"
 	"github.com/EasterCompany/dex-cli/config"
@@ -20,6 +22,9 @@ var (
 )
 
 func main() {
+	// Set up signal handler to ensure clean exit with blank line
+	setupSignalHandler()
+
 	cmd.RunningVersion = version
 	if len(os.Args) > 1 && os.Args[1] != "version" {
 		command := os.Args[1]
@@ -147,6 +152,19 @@ func runCommand(commandFunc func() error) {
 		os.Exit(1)
 	}
 	fmt.Println()
+}
+
+func setupSignalHandler() {
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
+
+	go func() {
+		<-sigChan
+		// Clear any progress indicators and print final blank line
+		ui.ClearLine()
+		fmt.Println()
+		os.Exit(130) // Standard exit code for SIGINT (128 + 2)
+	}()
 }
 
 func printUsage() {
