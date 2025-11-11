@@ -160,6 +160,14 @@ func Build(args []string) error {
 
 	utils.PrintSummaryTable(summaryData)
 
+	// Pull default Ollama models (non-fatal if it fails)
+	fmt.Println()
+	ui.PrintHeader("Syncing Default Ollama Models")
+	if err := utils.PullHardcodedModels(); err != nil {
+		log(fmt.Sprintf("Failed to pull ollama models (non-fatal): %v", err))
+		ui.PrintWarning("Failed to sync Ollama models. This is non-fatal and can be done manually with 'dex ollama pull'.")
+	}
+
 	fmt.Println()
 	ui.PrintSuccess("All services are built.")
 
