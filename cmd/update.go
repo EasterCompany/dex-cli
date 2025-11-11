@@ -23,7 +23,16 @@ func Update(args []string, buildYear string) error {
 		_, _ = fmt.Fprintln(logFile, message)
 	}
 
+	// Pull default Ollama models (non-fatal if it fails)
+	fmt.Println()
+	ui.PrintHeader("Syncing Default Ollama Models")
+	if err := utils.PullHardcodedModels(); err != nil {
+		log(fmt.Sprintf("Failed to pull ollama models (non-fatal): %v", err))
+		ui.PrintWarning("Failed to sync Ollama models. This is non-fatal and can be done manually with 'dex ollama pull'.")
+	}
+
 	log("Updating to latest version...")
+	ui.PrintHeader("Updating Dexter Source Repositories")
 
 	// ---
 	// 1. Get initial versions and sizes
