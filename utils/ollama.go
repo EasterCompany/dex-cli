@@ -13,9 +13,14 @@ import (
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
-const DefaultOllamaURL = "http://localhost:11434"
+const DefaultOllamaURL = "http://127.0.0.1:11434"
 
-var DefaultModels = []string{"codegemma:2b"}
+var DefaultModels = []string{
+	"codegemma:2b",
+	"gemma3:270m",
+	"gemma3:1b",
+	"gemma3:4b",
+}
 
 // ModelInfo reflects a single model entry returned by the /api/tags endpoint.
 type ModelInfo struct {
