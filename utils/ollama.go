@@ -248,8 +248,12 @@ func formatBytes(b int64) string {
 }
 
 // PullHardcodedModels iterates over a hardcoded list of models and pulls them.
+// After pulling, it creates custom forked versions.
 func PullHardcodedModels() error {
 	var errs []error
+
+	// Step 1: Pull base models
+	ui.PrintInfo("Pulling base models...")
 	for _, model := range DefaultModels {
 		if err := PullModel(model); err != nil {
 			errs = append(errs, fmt.Errorf("failed to pull model %s: %v", model, err))
@@ -266,6 +270,172 @@ func PullHardcodedModels() error {
 		}
 		return fmt.Errorf("%s", sb.String())
 	}
+
+	// Step 2: Create custom forked models
+	ui.PrintInfo("Creating custom Dexter models...")
+	if err := CreateCustomModels(); err != nil {
+		ui.PrintWarning(fmt.Sprintf("Failed to create custom models (non-fatal): %v", err))
+	}
+
+	return nil
+}
+
+// CleanupNonDefaultModels removes all models that are not in the default list.
+func CleanupNonDefaultModels() error {
+	models, err := ListModelIDs()
+	if err != nil {
+		return fmt.Errorf("failed to list models: %w", err)
+	}
+
+	// Create a map of default models for quick lookup
+	defaultMap := make(map[string]bool)
+	for _, model := range DefaultModels {
+		defaultMap[model] = true
+	}
+
+	// Also keep our custom dexter models
+	var toDelete []string
+	for _, model := range models {
+		// Skip if it's a default model
+		if defaultMap[model] {
+			continue
+		}
+		// Skip if it's a dexter- prefixed model (our custom models)
+		if strings.HasPrefix(model, "dexter-") {
+			continue
+		}
+		toDelete = append(toDelete, model)
+	}
+
+	// Delete non-default models
+	for _, model := range toDelete {
+		ui.PrintInfo(fmt.Sprintf("  Removing model: %s", model))
+		if err := DeleteModel(model); err != nil {
+			ui.PrintWarning(fmt.Sprintf("  Failed to delete %s: %v", model, err))
+		}
+	}
+
+	if len(toDelete) == 0 {
+		ui.PrintInfo("  No models to clean up.")
+	}
+
+	return nil
+}
+
+// DeleteModel removes a model from Ollama.
+func DeleteModel(modelID string) error {
+	url := DefaultOllamaURL + "/api/delete"
+	reqBody := map[string]string{"name": modelID}
+
+	reqBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal delete request: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, url, bytes.NewBuffer(reqBytes))
+	if err != nil {
+		return fmt.Errorf("failed to create delete request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to delete model: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("delete failed (status %d): %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+	}
+
+	return nil
+}
+
+// CreateCustomModels creates custom Dexter-branded models forked from the base models.
+// Always rebuilds the models to ensure they reflect the latest configuration.
+func CreateCustomModels() error {
+	customModels := map[string]string{
+		"dexter-270m": "gemma3:270m",
+		"dexter-1b":   "gemma3:1b",
+		"dexter-4b":   "gemma3:4b",
+	}
+
+	for customName, baseModel := range customModels {
+		// First, delete the existing custom model if it exists (to force rebuild)
+		ui.PrintInfo(fmt.Sprintf("  Rebuilding %s from %s...", customName, baseModel))
+		_ = DeleteModel(customName) // Ignore error - model might not exist yet
+
+		// Create fresh custom model
+		if err := CreateModelFromBase(customName, baseModel); err != nil {
+			ui.PrintWarning(fmt.Sprintf("  Failed to create %s: %v", customName, err))
+			continue
+		}
+		ui.PrintSuccess(fmt.Sprintf("  Created %s", customName))
+	}
+
+	return nil
+}
+
+// CreateModelFromBase creates a custom model from a base model using a Modelfile.
+func CreateModelFromBase(customName, baseModel string) error {
+	// Create a Modelfile with custom system prompt and parameters
+	modelfile := fmt.Sprintf(`FROM %s
+
+# Dexter AI Assistant - Custom Configuration
+SYSTEM """You are Dexter, an advanced AI assistant created by Easter Company. You are helpful, knowledgeable, and concise in your responses."""
+
+# Parameters for optimal performance
+PARAMETER temperature 0.7
+PARAMETER top_p 0.9
+PARAMETER top_k 40
+`, baseModel)
+
+	url := DefaultOllamaURL + "/api/create"
+	reqBody := map[string]string{
+		"name":      customName,
+		"modelfile": modelfile,
+	}
+
+	reqBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal create request: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(reqBytes))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 60 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to create model: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("create failed (status %d): %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+	}
+
+	// Read the streaming response (model creation sends progress updates)
+	reader := bufio.NewReader(resp.Body)
+	for {
+		line, err := reader.ReadString('\n')
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("error reading create response: %w", err)
+		}
+		// The response is JSON lines with status updates, but we'll just consume them
+		// In the future, we could parse and display progress
+		_ = line
+	}
+
 	return nil
 }
 
