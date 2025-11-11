@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,8 +27,59 @@ func Build(args []string) error {
 		_, _ = fmt.Fprintln(logFile, message)
 	}
 
-	if len(args) > 0 {
-		return fmt.Errorf("build command takes no arguments")
+	// Validate arguments
+	if len(args) > 1 {
+		return fmt.Errorf("build command accepts at most 1 argument (major, minor, or patch)")
+	}
+
+	var incrementType string
+	if len(args) == 1 {
+		incrementType = args[0]
+		if incrementType != "major" && incrementType != "minor" && incrementType != "patch" {
+			return fmt.Errorf("invalid argument '%s': must be 'major', 'minor', or 'patch'", incrementType)
+		}
+	}
+
+	// Fetch current version from URL
+	const versionURL = "https://easter.company/static/bin/dex-cli/latest.txt"
+	var baseMajor, baseMinor, basePatch int
+
+	versionStr, err := git.FetchLatestVersionFromURL(versionURL)
+	if err != nil {
+		if incrementType != "" {
+			// If increment was requested, version fetch failure is fatal
+			return fmt.Errorf("failed to fetch version for increment: %w", err)
+		}
+		// No increment requested, default to 0.0.0
+		ui.PrintWarning(fmt.Sprintf("Could not fetch version from %s, defaulting to 0.0.0", versionURL))
+		baseMajor, baseMinor, basePatch = 0, 0, 0
+	} else {
+		// Parse the fetched version
+		parsedVer, parseErr := git.Parse(versionStr)
+		if parseErr != nil {
+			if incrementType != "" {
+				return fmt.Errorf("failed to parse version '%s': %w", versionStr, parseErr)
+			}
+			ui.PrintWarning(fmt.Sprintf("Could not parse version '%s', defaulting to 0.0.0", versionStr))
+			baseMajor, baseMinor, basePatch = 0, 0, 0
+		} else {
+			baseMajor, _ = strconv.Atoi(parsedVer.Major)
+			baseMinor, _ = strconv.Atoi(parsedVer.Minor)
+			basePatch, _ = strconv.Atoi(parsedVer.Patch)
+		}
+	}
+
+	// Apply increment if requested
+	targetMajor, targetMinor, targetPatch := baseMajor, baseMinor, basePatch
+	if incrementType != "" {
+		targetMajor, targetMinor, targetPatch, err = git.IncrementVersion(baseMajor, baseMinor, basePatch, incrementType)
+		if err != nil {
+			return err
+		}
+		ui.PrintInfo(fmt.Sprintf("Incrementing version: %d.%d.%d -> %d.%d.%d (%s)",
+			baseMajor, baseMinor, basePatch, targetMajor, targetMinor, targetPatch, incrementType))
+	} else {
+		ui.PrintInfo(fmt.Sprintf("Using version: %d.%d.%d (no increment)", targetMajor, targetMinor, targetPatch))
 	}
 
 	// Pull default Ollama models (non-fatal if it fails)
@@ -70,7 +123,7 @@ func Build(args []string) error {
 	// ---
 	oldCliVersion := utils.GetFullServiceVersion(dexCliDef)
 	ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, "# Building cli", ui.ColorReset))
-	if _, err := utils.RunUnifiedBuildPipeline(dexCliDef, log); err != nil {
+	if _, err := utils.RunUnifiedBuildPipeline(dexCliDef, log, targetMajor, targetMinor, targetPatch); err != nil {
 		return err
 	}
 	ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %s!", dexCliDef.ShortName))
@@ -88,7 +141,7 @@ func Build(args []string) error {
 		fmt.Println()
 		ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, fmt.Sprintf("# Building %s", def.ShortName), ui.ColorReset))
 
-		built, err := utils.RunUnifiedBuildPipeline(def, log)
+		built, err := utils.RunUnifiedBuildPipeline(def, log, targetMajor, targetMinor, targetPatch)
 		if err != nil {
 			return err
 		}
@@ -120,7 +173,7 @@ func Build(args []string) error {
 			if def.Type == "os" {
 				continue
 			}
-			if err := gitAddCommitPush(def); err != nil {
+			if err := gitAddCommitPush(def, incrementType, targetMajor, targetMinor, targetPatch); err != nil {
 				return err
 			}
 		}
@@ -173,10 +226,28 @@ func Build(args []string) error {
 	utils.PrintSummaryTable(summaryData)
 	fmt.Println()
 	ui.PrintSuccess("All services are built.")
+
+	// ---
+	// 6. Run release script if version increment was requested
+	// ---
+	if incrementType != "" {
+		fmt.Println()
+		ui.PrintHeader("Publishing Release")
+		ui.PrintInfo("Running release script...")
+		releaseScript := fmt.Sprintf("%s/EasterCompany/easter.company/scripts/release_dex-cli.sh", os.Getenv("HOME"))
+		releaseCmd := exec.Command(releaseScript)
+		releaseCmd.Stdout = os.Stdout
+		releaseCmd.Stderr = os.Stderr
+		if err := releaseCmd.Run(); err != nil {
+			return fmt.Errorf("release script failed: %w", err)
+		}
+		ui.PrintSuccess("Release published successfully!")
+	}
+
 	return nil
 }
 
-func gitAddCommitPush(def config.ServiceDefinition) error {
+func gitAddCommitPush(def config.ServiceDefinition, incrementType string, major, minor, patch int) error {
 	sourcePath, err := config.ExpandPath(def.Source)
 	if err != nil {
 		return fmt.Errorf("failed to expand source path: %w", err)
@@ -230,6 +301,28 @@ func gitAddCommitPush(def config.ServiceDefinition) error {
 	pushCmd.Dir = sourcePath
 	if output, err := pushCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git push failed for %s:\n%s", def.ShortName, string(output))
+	}
+
+	// Create and push tag for minor/major increments
+	if incrementType == "minor" || incrementType == "major" {
+		tagName := fmt.Sprintf("%d.%d.%d", major, minor, patch)
+		ui.PrintInfo(fmt.Sprintf("[%s] Creating tag %s...", def.ShortName, tagName))
+
+		// Create tag
+		tagCmd := exec.Command("git", "tag", tagName)
+		tagCmd.Dir = sourcePath
+		if output, err := tagCmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("git tag failed for %s:\n%s", def.ShortName, string(output))
+		}
+
+		// Push tag
+		pushTagCmd := exec.Command("git", "push", "--tags")
+		pushTagCmd.Dir = sourcePath
+		if output, err := pushTagCmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("git push --tags failed for %s:\n%s", def.ShortName, string(output))
+		}
+
+		ui.PrintSuccess(fmt.Sprintf("[%s] Tag %s created and pushed", def.ShortName, tagName))
 	}
 
 	return nil

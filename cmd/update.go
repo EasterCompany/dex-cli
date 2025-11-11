@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/EasterCompany/dex-cli/config"
@@ -22,6 +23,27 @@ func Update(args []string, buildYear string) error {
 	log := func(message string) {
 		_, _ = fmt.Fprintln(logFile, message)
 	}
+
+	// Fetch current version from URL (for update, we use existing version, no increment)
+	const versionURL = "https://easter.company/static/bin/dex-cli/latest.txt"
+	var targetMajor, targetMinor, targetPatch int
+
+	versionStr, err := git.FetchLatestVersionFromURL(versionURL)
+	if err != nil {
+		ui.PrintWarning(fmt.Sprintf("Could not fetch version from %s, defaulting to 0.0.0", versionURL))
+		targetMajor, targetMinor, targetPatch = 0, 0, 0
+	} else {
+		parsedVer, parseErr := git.Parse(versionStr)
+		if parseErr != nil {
+			ui.PrintWarning(fmt.Sprintf("Could not parse version '%s', defaulting to 0.0.0", versionStr))
+			targetMajor, targetMinor, targetPatch = 0, 0, 0
+		} else {
+			targetMajor, _ = strconv.Atoi(parsedVer.Major)
+			targetMinor, _ = strconv.Atoi(parsedVer.Minor)
+			targetPatch, _ = strconv.Atoi(parsedVer.Patch)
+		}
+	}
+	ui.PrintInfo(fmt.Sprintf("Using version: %d.%d.%d", targetMajor, targetMinor, targetPatch))
 
 	// Pull default Ollama models (non-fatal if it fails)
 	ui.PrintHeader("Syncing Default Ollama Models")
@@ -61,7 +83,7 @@ func Update(args []string, buildYear string) error {
 	if err := utils.GitUpdateService(dexCliDef); err != nil {
 		return fmt.Errorf("failed to update dex-cli source: %w", err)
 	}
-	if _, err := utils.RunUnifiedBuildPipeline(dexCliDef, log); err != nil {
+	if _, err := utils.RunUnifiedBuildPipeline(dexCliDef, log, targetMajor, targetMinor, targetPatch); err != nil {
 		return err
 	}
 	ui.PrintSuccess(fmt.Sprintf("Successfully updated and installed %s!", dexCliDef.ShortName))
@@ -97,7 +119,7 @@ func Update(args []string, buildYear string) error {
 		if err := utils.GitUpdateService(def); err != nil {
 			return err
 		}
-		if _, err := utils.RunUnifiedBuildPipeline(def, log); err != nil {
+		if _, err := utils.RunUnifiedBuildPipeline(def, log, targetMajor, targetMinor, targetPatch); err != nil {
 			return err
 		}
 		if err := utils.InstallSystemdService(def); err != nil {

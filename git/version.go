@@ -2,8 +2,11 @@ package git
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // ... (existing code) ...
@@ -127,4 +130,50 @@ func (v *Version) Compare(other *Version) int {
 	}
 
 	return 0
+}
+
+// FetchLatestVersionFromURL fetches the latest version string from a URL.
+// Returns the full version string (e.g., "0.0.1.main.84a41d9...") or an error.
+func FetchLatestVersionFromURL(url string) (string, error) {
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	resp, err := client.Get(url)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch version from %s: %w", url, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status code %d from %s", resp.StatusCode, url)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	version := strings.TrimSpace(string(body))
+	if version == "" {
+		return "", fmt.Errorf("empty version string from %s", url)
+	}
+
+	return version, nil
+}
+
+// IncrementVersion takes a version and increment type, returns the new incremented version.
+// incrementType can be "major", "minor", or "patch"
+// Returns (newMajor, newMinor, newPatch)
+func IncrementVersion(major, minor, patch int, incrementType string) (int, int, int, error) {
+	switch incrementType {
+	case "major":
+		return major + 1, 0, 0, nil
+	case "minor":
+		return major, minor + 1, 0, nil
+	case "patch":
+		return major, minor, patch + 1, nil
+	default:
+		return 0, 0, 0, fmt.Errorf("invalid increment type: %s (must be 'major', 'minor', or 'patch')", incrementType)
+	}
 }

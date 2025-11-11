@@ -45,7 +45,7 @@ func GitUpdateService(def config.ServiceDefinition) error {
 }
 
 // RunUnifiedBuildPipeline executes the full build pipeline for a service.
-func RunUnifiedBuildPipeline(def config.ServiceDefinition, log func(string)) (bool, error) {
+func RunUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), major, minor, patch int) (bool, error) {
 	sourcePath, err := config.ExpandPath(def.Source)
 	if err != nil {
 		return false, fmt.Errorf("failed to expand source path for %s: %w", def.ShortName, err)
@@ -120,17 +120,7 @@ func RunUnifiedBuildPipeline(def config.ServiceDefinition, log func(string)) (bo
 	}
 
 	var buildCmd *exec.Cmd
-	// Embed version info for all buildable services
-	latestTag, err := git.GetLatestTag(sourcePath)
-	if err != nil {
-		return false, fmt.Errorf("failed to get latest git tag for %s: %w", def.ShortName, err)
-	}
-	major, minor, patch, err := git.ParseVersionTag(latestTag)
-	if err != nil {
-		ui.PrintWarning(fmt.Sprintf("Could not parse tag '%s' for %s, defaulting to 0.0.0. Error: %v", latestTag, def.ShortName, err))
-		major, minor, patch = 0, 0, 0
-	}
-
+	// Use the provided version (major, minor, patch) instead of calculating from tags
 	branch, commit := git.GetVersionInfo(sourcePath)
 	buildDate := time.Now().UTC().Format("2006-01-02-15-04-05") // Hyphenated format
 	buildYear := time.Now().UTC().Format("2006")
@@ -139,7 +129,7 @@ func RunUnifiedBuildPipeline(def config.ServiceDefinition, log func(string)) (bo
 
 	// Format the version string to match the new parsing logic (M.m.p.branch.commit.date.arch.hash)
 	fullVersionStr := fmt.Sprintf("%d.%d.%d.%s.%s.%s.%s.%s",
-		major, minor, patch+1, branch, commit, buildDate, buildArch, buildHash)
+		major, minor, patch, branch, commit, buildDate, buildArch, buildHash)
 
 	ldflags := fmt.Sprintf("-X main.version=%s -X main.branch=%s -X main.commit=%s -X main.buildDate=%s -X main.buildYear=%s -X main.buildHash=%s -X main.arch=%s",
 		fullVersionStr, branch, commit, buildDate, buildYear, buildHash, buildArch)
