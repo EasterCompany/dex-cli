@@ -246,8 +246,6 @@ func formatBytes(b int64) string {
 	return fmt.Sprintf("%.1f %ciB", float64(b)/float64(div), "KMGTPE"[exp])
 }
 
-// PullHardcodedModels iterates over a hardcoded list of models and pulls them.
-// After pulling, it creates custom forked versions.
 func PullHardcodedModels() error {
 	var errs []error
 
@@ -279,7 +277,6 @@ func PullHardcodedModels() error {
 	return nil
 }
 
-// CleanupNonDefaultModels removes all models that are not in the default list.
 func CleanupNonDefaultModels() error {
 	models, err := ListModelIDs()
 	if err != nil {
@@ -321,7 +318,6 @@ func CleanupNonDefaultModels() error {
 	return nil
 }
 
-// DeleteModel removes a model from Ollama.
 func DeleteModel(modelID string) error {
 	url := DefaultOllamaURL + "/api/delete"
 	reqBody := map[string]string{"name": modelID}
@@ -352,15 +348,12 @@ func DeleteModel(modelID string) error {
 	return nil
 }
 
-// CustomModel defines a custom model configuration.
 type CustomModel struct {
 	Name         string
 	BaseModel    string
 	SystemPrompt string
 }
 
-// CreateCustomModels creates custom Dex models forked from base models.
-// Always rebuilds the models to ensure they reflect the latest configuration.
 func CreateCustomModels() error {
 	customModels := []CustomModel{
 		{
