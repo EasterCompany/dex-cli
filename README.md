@@ -1,6 +1,6 @@
 # dex-cli
 
-`dex-cli` is a command-line interface for managing Dexter services and the Dexter ecosystem. It provides a unified tool for building, updating, and controlling your Dexter projects.
+Main application for managing local, cloud, development, and production services in the Dexter ecosystem. Linux (Arch/Debian/Ubuntu) support only.
 
 ## Installation
 
