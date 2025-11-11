@@ -365,7 +365,7 @@ func CreateCustomModels() error {
 	customModels := []CustomModel{
 		{
 			Name:      "dex-commit-model",
-			BaseModel: "gemma3:270m",
+			BaseModel: "gemma3:1b",
 			SystemPrompt: `You are a specialized AI assistant for generating Git commit messages.
 
 Your task is to analyze code changes (diffs) and generate clear, concise, and meaningful commit messages following best practices:
@@ -509,16 +509,11 @@ func GetOllamaStatus() error {
 	return err
 }
 
-// GenerateCommitMessage uses the dex-commit-model to generate a commit message from a git diff.
-// If the diff is empty or the model fails, it returns a default message.
 func GenerateCommitMessage(diff string) string {
-	// If there's no diff, return default message
 	if strings.TrimSpace(diff) == "" {
 		return "dex build: successful build"
 	}
 
-	// Try to generate commit message using the model
-	// The model already has system instructions, so we just provide the diff
 	commitMsg, err := GenerateContent("dex-commit-model", diff)
 	if err != nil {
 		// If model fails, return default message
