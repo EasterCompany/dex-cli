@@ -51,7 +51,6 @@ func Add(args []string) error {
 	// Prompt user to select services
 	reader := bufio.NewReader(os.Stdin)
 	for {
-		fmt.Println()
 		ui.PrintInfo("Available services to add:")
 		for i, service := range availableServices {
 			fmt.Printf("  %d: %s\n", i+1, service.ShortName)
