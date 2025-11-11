@@ -13,32 +13,114 @@ import (
 
 // Remove uninstalls a service.
 func Remove(args []string) error {
-	if len(args) > 0 {
-		return fmt.Errorf("remove command takes no arguments")
-	}
-
 	serviceMap, err := config.LoadServiceMapConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load service-map.json: %w", err)
 	}
 
-	// Collect all installed services
+	// Collect all installed manageable services (excludes cli and os)
 	var installedServices []config.ServiceDefinition
 	for _, serviceList := range serviceMap.Services {
 		for _, serviceEntry := range serviceList {
 			def := config.GetServiceDefinition(serviceEntry.ID)
-			if def.ID != "" {
+			// Only include manageable services (not cli or os)
+			if def.ID != "" && def.IsManageable() {
 				installedServices = append(installedServices, def)
 			}
 		}
 	}
 
 	if len(installedServices) == 0 {
-		ui.PrintInfo("No services are currently installed.")
+		ui.PrintInfo("No manageable services are currently installed.")
 		return nil
 	}
 
-	// Prompt user to select services to remove
+	// If arguments provided, remove services by name
+	if len(args) > 0 {
+		return removeServicesByName(args, installedServices, serviceMap)
+	}
+
+	// Otherwise, show interactive menu
+	return removeServicesInteractive(installedServices, serviceMap)
+}
+
+// removeServicesByName removes services specified by their short names
+func removeServicesByName(names []string, installedServices []config.ServiceDefinition, serviceMap *config.ServiceMapConfig) error {
+	// Build a map of short names to services for quick lookup
+	servicesByName := make(map[string]config.ServiceDefinition)
+	for _, service := range installedServices {
+		servicesByName[service.ShortName] = service
+	}
+
+	// Validate all service names first
+	var invalidNames []string
+	var notInstalled []string
+	var toRemove []config.ServiceDefinition
+
+	for _, name := range names {
+		service, exists := servicesByName[name]
+		if !exists {
+			// Check if it's a valid service but not installed
+			allManageable := config.GetManageableServices()
+			found := false
+			for _, s := range allManageable {
+				if s.ShortName == name {
+					found = true
+					notInstalled = append(notInstalled, name)
+					break
+				}
+			}
+			if !found {
+				invalidNames = append(invalidNames, name)
+			}
+		} else {
+			toRemove = append(toRemove, service)
+		}
+	}
+
+	// Report errors
+	if len(invalidNames) > 0 {
+		ui.PrintError(fmt.Sprintf("Invalid service name(s): %s", strings.Join(invalidNames, ", ")))
+	}
+	if len(notInstalled) > 0 {
+		ui.PrintWarning(fmt.Sprintf("Not installed: %s", strings.Join(notInstalled, ", ")))
+	}
+	if len(invalidNames) > 0 {
+		return fmt.Errorf("some service names are invalid")
+	}
+
+	if len(toRemove) == 0 {
+		ui.PrintInfo("No services to remove.")
+		return nil
+	}
+
+	// Remove all valid services
+	for _, service := range toRemove {
+		ui.PrintInfo(fmt.Sprintf("Removing service: %s", service.ShortName))
+
+		// Remove from service map
+		for serviceType, serviceList := range serviceMap.Services {
+			for i, serviceEntry := range serviceList {
+				if serviceEntry.ID == service.ID {
+					serviceMap.Services[serviceType] = append(serviceList[:i], serviceList[i+1:]...)
+					break
+				}
+			}
+		}
+
+		// TODO: Remove source code, binaries, systemd service, etc.
+	}
+
+	if err := config.SaveServiceMapConfig(serviceMap); err != nil {
+		return fmt.Errorf("failed to save service-map.json: %w", err)
+	}
+
+	ui.PrintSuccess(fmt.Sprintf("Successfully removed %d service(s).", len(toRemove)))
+	return nil
+}
+
+// removeServicesInteractive shows an interactive menu to select services to remove
+func removeServicesInteractive(installedServices []config.ServiceDefinition, serviceMap *config.ServiceMapConfig) error {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		fmt.Println()

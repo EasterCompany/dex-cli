@@ -7,18 +7,31 @@ import (
 	"strings"
 
 	"github.com/EasterCompany/dex-cli/config"
+	"github.com/EasterCompany/dex-cli/git"
 	"github.com/EasterCompany/dex-cli/ui"
 	"github.com/EasterCompany/dex-cli/utils"
 )
 
 // Add installs a new service.
 func Add(args []string) error {
+	// Parse flags
+	cloneSource := false
+	var serviceNames []string
+
+	for _, arg := range args {
+		if arg == "--source" || arg == "-s" {
+			cloneSource = true
+		} else {
+			serviceNames = append(serviceNames, arg)
+		}
+	}
+
 	serviceMap, err := config.LoadServiceMapConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load service-map.json: %w", err)
 	}
 
-	// Find available services to add
+	// Find available services to add (only manageable services - excludes cli and os)
 	allServices := config.GetManageableServices()
 	var availableServices []config.ServiceDefinition
 	for _, service := range allServices {
@@ -44,17 +57,17 @@ func Add(args []string) error {
 		return nil
 	}
 
-	// If arguments provided, add services by name
-	if len(args) > 0 {
-		return addServicesByName(args, availableServices, serviceMap)
+	// If service names provided, add services by name
+	if len(serviceNames) > 0 {
+		return addServicesByName(serviceNames, availableServices, serviceMap, cloneSource)
 	}
 
 	// Otherwise, show interactive menu
-	return addServicesInteractive(availableServices, serviceMap)
+	return addServicesInteractive(availableServices, serviceMap, cloneSource)
 }
 
 // addServicesByName adds services specified by their short names
-func addServicesByName(names []string, availableServices []config.ServiceDefinition, serviceMap *config.ServiceMapConfig) error {
+func addServicesByName(names []string, availableServices []config.ServiceDefinition, serviceMap *config.ServiceMapConfig, cloneSource bool) error {
 	// Build a map of short names to services for quick lookup
 	servicesByName := make(map[string]config.ServiceDefinition)
 	for _, service := range availableServices {
@@ -110,10 +123,16 @@ func addServicesByName(names []string, availableServices []config.ServiceDefinit
 			ui.PrintWarning(fmt.Sprintf("This service has artifacts that will be backed up: %s", strings.Join(service.Backup.Artifacts, ", ")))
 		}
 
+		// Clone source if requested and repo exists
+		if cloneSource && service.Repo != "" && service.Source != "" {
+			if err := cloneServiceSource(service); err != nil {
+				ui.PrintError(fmt.Sprintf("Failed to clone %s: %v", service.ShortName, err))
+				// Continue with other services even if this one fails
+			}
+		}
+
 		// Add to service map
 		serviceMap.Services[service.Type] = append(serviceMap.Services[service.Type], service.ToServiceEntry())
-
-		// TODO: Git clone, etc.
 	}
 
 	if err := config.SaveServiceMapConfig(serviceMap); err != nil {
@@ -125,7 +144,7 @@ func addServicesByName(names []string, availableServices []config.ServiceDefinit
 }
 
 // addServicesInteractive shows an interactive menu to select services
-func addServicesInteractive(availableServices []config.ServiceDefinition, serviceMap *config.ServiceMapConfig) error {
+func addServicesInteractive(availableServices []config.ServiceDefinition, serviceMap *config.ServiceMapConfig, cloneSource bool) error {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		ui.PrintInfo("Available services to add:")
@@ -154,10 +173,16 @@ func addServicesInteractive(availableServices []config.ServiceDefinition, servic
 			service := availableServices[num-1]
 			ui.PrintInfo(fmt.Sprintf("Adding service: %s", service.ShortName))
 
+			// Clone source if requested and repo exists
+			if cloneSource && service.Repo != "" && service.Source != "" {
+				if err := cloneServiceSource(service); err != nil {
+					ui.PrintError(fmt.Sprintf("Failed to clone %s: %v", service.ShortName, err))
+					// Continue with other services even if this one fails
+				}
+			}
+
 			// Add to service map
 			serviceMap.Services[service.Type] = append(serviceMap.Services[service.Type], service.ToServiceEntry())
-
-			// TODO: Git clone, etc.
 		}
 
 		if err := config.SaveServiceMapConfig(serviceMap); err != nil {
@@ -168,5 +193,29 @@ func addServicesInteractive(availableServices []config.ServiceDefinition, servic
 		break
 	}
 
+	return nil
+}
+
+// cloneServiceSource clones the git repository for a service
+func cloneServiceSource(service config.ServiceDefinition) error {
+	// Expand the source path
+	sourcePath, err := config.ExpandPath(service.Source)
+	if err != nil {
+		return fmt.Errorf("failed to expand source path: %w", err)
+	}
+
+	// Check if the directory already exists
+	if _, err := os.Stat(sourcePath); err == nil {
+		ui.PrintWarning(fmt.Sprintf("Directory %s already exists, skipping clone", service.Source))
+		return nil
+	}
+
+	// Clone the repository
+	ui.PrintInfo(fmt.Sprintf("Cloning %s from %s", service.ShortName, service.Repo))
+	if err := git.Clone(service.Repo, sourcePath); err != nil {
+		return err
+	}
+
+	ui.PrintSuccess(fmt.Sprintf("Successfully cloned %s", service.ShortName))
 	return nil
 }
