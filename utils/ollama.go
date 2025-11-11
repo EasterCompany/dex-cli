@@ -365,7 +365,7 @@ func CreateCustomModels() error {
 	customModels := []CustomModel{
 		{
 			Name:      "dex-commit-model",
-			BaseModel: "gemma3:1b",
+			BaseModel: "gemma3:4b",
 			SystemPrompt: `You are a specialized AI assistant for generating Git commit messages.
 
 Your task is to analyze code changes (diffs) and generate clear, concise, and meaningful commit messages following best practices:
