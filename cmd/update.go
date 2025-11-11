@@ -24,7 +24,6 @@ func Update(args []string, buildYear string) error {
 	}
 
 	// Pull default Ollama models (non-fatal if it fails)
-	fmt.Println()
 	ui.PrintHeader("Syncing Default Ollama Models")
 	if err := utils.PullHardcodedModels(); err != nil {
 		log(fmt.Sprintf("Failed to pull ollama models (non-fatal): %v", err))
