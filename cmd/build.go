@@ -12,8 +12,8 @@ import (
 	"github.com/EasterCompany/dex-cli/utils"
 )
 
-// Build compiles all services from their local source.
-// It runs the full (format, lint, test, build, install) pipeline.
+var RunningVersion string
+
 func Build(args []string) error {
 	logFile, err := config.LogFile()
 	if err != nil {
@@ -56,6 +56,14 @@ func Build(args []string) error {
 			}
 			oldSizes[s.ID] = utils.GetBinarySize(s)
 		}
+	}
+
+	// Pull default Ollama models (non-fatal if it fails)
+	fmt.Println()
+	ui.PrintHeader("Syncing Default Ollama Models")
+	if err := utils.PullHardcodedModels(); err != nil {
+		log(fmt.Sprintf("Failed to pull ollama models (non-fatal): %v", err))
+		ui.PrintWarning("Failed to sync Ollama models. This is non-fatal and can be done manually with 'dex ollama pull'.")
 	}
 
 	// ---
@@ -159,18 +167,8 @@ func Build(args []string) error {
 	}
 
 	utils.PrintSummaryTable(summaryData)
-
-	// Pull default Ollama models (non-fatal if it fails)
-	fmt.Println()
-	ui.PrintHeader("Syncing Default Ollama Models")
-	if err := utils.PullHardcodedModels(); err != nil {
-		log(fmt.Sprintf("Failed to pull ollama models (non-fatal): %v", err))
-		ui.PrintWarning("Failed to sync Ollama models. This is non-fatal and can be done manually with 'dex ollama pull'.")
-	}
-
 	fmt.Println()
 	ui.PrintSuccess("All services are built.")
-
 	return nil
 }
 

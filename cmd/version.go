@@ -7,10 +7,6 @@ import (
 	"strings"
 )
 
-// RunningVersion holds the version string of the currently executing dex-cli instance.
-// It is populated at startup in main.go.
-var RunningVersion string
-
 // VersionInfo holds the structured version information.
 type VersionInfo struct {
 	Version   string `json:"version"`
