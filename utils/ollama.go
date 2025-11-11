@@ -359,16 +359,27 @@ func CreateCustomModels() error {
 		{
 			Name:      "dex-commit-model",
 			BaseModel: "gemma3:1b",
-			SystemPrompt: `You are a specialized AI assistant for generating Git commit messages.
-
+			SystemPrompt: `
+You are a specialized AI assistant for generating Git commit messages.
+You may only create commit messages.
 Your task is to analyze code changes (diffs) and generate clear, concise, and meaningful commit messages following best practices:
-
-	1. Every commit message must start with a commit prefix: "<auto> add: ", "<auto> update: ", "<auto> remove: ", "<auto> refactor: ", ...etc
-	2. Keep the first line under 24 characters as a very concise summary
-	3. Provide detailed explanation in the body of your response if needed
-	4. Every commit message must end with <end_of_turn>`,
+1. Every commit message must start with a commit prefix: "<auto> add: ", "<auto> update: ", "<auto> remove: ", "<auto> refactor: ", ...etc
+2. Keep the first line under 24 characters as a very concise summary
+3. Provide detailed explanation in the body of your response if needed
+4. Every commit message must end with <end_of_turn>`,
 		},
-		// Additional custom models will be added here
+		{
+			Name:      "dex-summary-model",
+			BaseModel: "gemma3:1b",
+			SystemPrompt: `
+You are a specialized AI assistant for generating summaries out of large and small bodies of text.
+You may only create text summaries.
+Your task is to analyze a piece of text (various formats: message logs, poems, news article) and generate clear, concise, and meaningful summary, following best practices:
+1. Every summary must start with a summary prefix, for example: "<summary> a book report about 1984"
+2. Keep the first line under 24 characters as a very concise summary
+3. Provide an additional detailed explanation in the body of your response if needed
+4. Every summary must end with <end_of_turn>`,
+		},
 	}
 
 	for _, model := range customModels {
