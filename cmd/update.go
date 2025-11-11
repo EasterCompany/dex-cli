@@ -133,16 +133,24 @@ func Update(args []string, buildYear string) error {
 				}
 
 				oldVer, _ := git.Parse(oldVersionStr)
-				newVer, _ := git.Parse(newVersionStr)
 
+				// Get the latest commit from the repository (not from the embedded version)
+				// This ensures we show the changelog including any commits made during the update
 				var changeLog string
-				if oldVer != nil && newVer != nil && oldVer.Commit != "" && newVer.Commit != "" {
-					if oldVer.Commit == newVer.Commit {
-						changeLog = "N/A"
+				repoPath, pathErr := config.ExpandPath(s.Source)
+				if pathErr == nil {
+					_, latestCommit := git.GetVersionInfo(repoPath)
+					if oldVer != nil && oldVer.Commit != "" && latestCommit != "" && latestCommit != "unknown" {
+						if oldVer.Commit == latestCommit {
+							changeLog = "N/A"
+						} else {
+							changeLog, _ = git.GetCommitLogBetween(repoPath, oldVer.Commit, latestCommit)
+						}
 					} else {
-						repoPath, _ := config.ExpandPath(s.Source)
-						changeLog, _ = git.GetCommitLogBetween(repoPath, oldVer.Commit, newVer.Commit)
+						changeLog = "N/A"
 					}
+				} else {
+					changeLog = "N/A"
 				}
 
 				summaryData = append(summaryData, utils.SummaryInfo{

@@ -144,12 +144,17 @@ func Build(args []string) error {
 				newVersionStr = utils.ParseServiceVersionFromJSON(newVersionStr)
 			}
 
-			newVer, _ := git.Parse(newVersionStr)
-
+			// Get the latest commit message from the repository (not from the embedded version)
+			// This ensures we show the commit message from any automated commits made during the build
 			var commitNote string
-			if newVer != nil && newVer.Commit != "" {
-				repoPath, _ := config.ExpandPath(s.Source)
-				commitNote, _ = git.GetCommitMessage(repoPath, newVer.Commit)
+			repoPath, err := config.ExpandPath(s.Source)
+			if err == nil {
+				_, latestCommit := git.GetVersionInfo(repoPath)
+				if latestCommit != "" && latestCommit != "unknown" {
+					commitNote, _ = git.GetCommitMessage(repoPath, latestCommit)
+				} else {
+					commitNote = "N/A"
+				}
 			} else {
 				commitNote = "N/A"
 			}
