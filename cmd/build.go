@@ -179,13 +179,39 @@ func gitAddCommitPush(def config.ServiceDefinition) error {
 
 	ui.PrintInfo(fmt.Sprintf("[%s] Adding, committing, and pushing changes...", def.ShortName))
 
+	// Add all changes
 	addCmd := exec.Command("git", "add", ".")
 	addCmd.Dir = sourcePath
 	if output, err := addCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git add failed for %s:\n%s", def.ShortName, string(output))
 	}
 
-	commitMsg := "dex build: successful build"
+	// Check if there are changes to commit
+	statusCmd := exec.Command("git", "status", "--porcelain")
+	statusCmd.Dir = sourcePath
+	statusOutput, err := statusCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git status failed for %s:\n%s", def.ShortName, string(statusOutput))
+	}
+
+	// If no changes, skip commit and push
+	if strings.TrimSpace(string(statusOutput)) == "" {
+		ui.PrintInfo(fmt.Sprintf("[%s] No changes to commit", def.ShortName))
+		return nil
+	}
+
+	// Get the diff for commit message generation
+	diffCmd := exec.Command("git", "diff", "--cached")
+	diffCmd.Dir = sourcePath
+	diffOutput, err := diffCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git diff failed for %s:\n%s", def.ShortName, string(diffOutput))
+	}
+
+	// Generate commit message using the Ollama model
+	commitMsg := utils.GenerateCommitMessage(string(diffOutput))
+
+	// Commit with generated message
 	commitCmd := exec.Command("git", "commit", "-m", commitMsg)
 	commitCmd.Dir = sourcePath
 	if output, err := commitCmd.CombinedOutput(); err != nil {
@@ -194,6 +220,7 @@ func gitAddCommitPush(def config.ServiceDefinition) error {
 		}
 	}
 
+	// Push changes
 	pushCmd := exec.Command("git", "push")
 	pushCmd.Dir = sourcePath
 	if output, err := pushCmd.CombinedOutput(); err != nil {

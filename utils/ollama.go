@@ -508,3 +508,30 @@ func GetOllamaStatus() error {
 
 	return err
 }
+
+// GenerateCommitMessage uses the dex-commit-model to generate a commit message from a git diff.
+// If the diff is empty or the model fails, it returns a default message.
+func GenerateCommitMessage(diff string) string {
+	// If there's no diff, return default message
+	if strings.TrimSpace(diff) == "" {
+		return "dex build: successful build"
+	}
+
+	// Try to generate commit message using the model
+	// The model already has system instructions, so we just provide the diff
+	commitMsg, err := GenerateContent("dex-commit-model", diff)
+	if err != nil {
+		// If model fails, return default message
+		return "dex build: successful build"
+	}
+
+	// Clean up the response (remove extra whitespace, newlines at start/end)
+	commitMsg = strings.TrimSpace(commitMsg)
+
+	// If the model returned an empty message, use default
+	if commitMsg == "" {
+		return "dex build: successful build"
+	}
+
+	return commitMsg
+}
