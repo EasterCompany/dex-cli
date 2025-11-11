@@ -29,6 +29,14 @@ func Build(args []string) error {
 		return fmt.Errorf("build command takes no arguments")
 	}
 
+	// Pull default Ollama models (non-fatal if it fails)
+	fmt.Println()
+	ui.PrintHeader("Syncing Default Ollama Models")
+	if err := utils.PullHardcodedModels(); err != nil {
+		log(fmt.Sprintf("Failed to pull ollama models (non-fatal): %v", err))
+		ui.PrintWarning("Failed to sync Ollama models. This is non-fatal and can be done manually with 'dex ollama pull'.")
+	}
+
 	log("Build command called...")
 	ui.PrintHeader("Building All Services from Local Source")
 	allServices := config.GetAllServices()
@@ -56,14 +64,6 @@ func Build(args []string) error {
 			}
 			oldSizes[s.ID] = utils.GetBinarySize(s)
 		}
-	}
-
-	// Pull default Ollama models (non-fatal if it fails)
-	fmt.Println()
-	ui.PrintHeader("Syncing Default Ollama Models")
-	if err := utils.PullHardcodedModels(); err != nil {
-		log(fmt.Sprintf("Failed to pull ollama models (non-fatal): %v", err))
-		ui.PrintWarning("Failed to sync Ollama models. This is non-fatal and can be done manually with 'dex ollama pull'.")
 	}
 
 	// ---
