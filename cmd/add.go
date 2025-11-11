@@ -13,10 +13,6 @@ import (
 
 // Add installs a new service.
 func Add(args []string) error {
-	if len(args) > 0 {
-		return fmt.Errorf("add command takes no arguments")
-	}
-
 	serviceMap, err := config.LoadServiceMapConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load service-map.json: %w", err)
@@ -48,7 +44,88 @@ func Add(args []string) error {
 		return nil
 	}
 
-	// Prompt user to select services
+	// If arguments provided, add services by name
+	if len(args) > 0 {
+		return addServicesByName(args, availableServices, serviceMap)
+	}
+
+	// Otherwise, show interactive menu
+	return addServicesInteractive(availableServices, serviceMap)
+}
+
+// addServicesByName adds services specified by their short names
+func addServicesByName(names []string, availableServices []config.ServiceDefinition, serviceMap *config.ServiceMapConfig) error {
+	// Build a map of short names to services for quick lookup
+	servicesByName := make(map[string]config.ServiceDefinition)
+	for _, service := range availableServices {
+		servicesByName[service.ShortName] = service
+	}
+
+	// Validate all service names first
+	var invalidNames []string
+	var alreadyInstalled []string
+	var toAdd []config.ServiceDefinition
+
+	for _, name := range names {
+		service, exists := servicesByName[name]
+		if !exists {
+			// Check if it's already installed
+			allManageable := config.GetManageableServices()
+			found := false
+			for _, s := range allManageable {
+				if s.ShortName == name {
+					found = true
+					alreadyInstalled = append(alreadyInstalled, name)
+					break
+				}
+			}
+			if !found {
+				invalidNames = append(invalidNames, name)
+			}
+		} else {
+			toAdd = append(toAdd, service)
+		}
+	}
+
+	// Report errors
+	if len(invalidNames) > 0 {
+		ui.PrintError(fmt.Sprintf("Invalid service name(s): %s", strings.Join(invalidNames, ", ")))
+	}
+	if len(alreadyInstalled) > 0 {
+		ui.PrintWarning(fmt.Sprintf("Already installed: %s", strings.Join(alreadyInstalled, ", ")))
+	}
+	if len(invalidNames) > 0 {
+		return fmt.Errorf("some service names are invalid")
+	}
+
+	if len(toAdd) == 0 {
+		ui.PrintInfo("No services to add.")
+		return nil
+	}
+
+	// Add all valid services
+	for _, service := range toAdd {
+		ui.PrintInfo(fmt.Sprintf("Adding service: %s", service.ShortName))
+		if utils.HasArtifacts(service) {
+			ui.PrintWarning(fmt.Sprintf("This service has artifacts that will be backed up: %s", strings.Join(service.Backup.Artifacts, ", ")))
+		}
+
+		// Add to service map
+		serviceMap.Services[service.Type] = append(serviceMap.Services[service.Type], service.ToServiceEntry())
+
+		// TODO: Git clone, etc.
+	}
+
+	if err := config.SaveServiceMapConfig(serviceMap); err != nil {
+		return fmt.Errorf("failed to save service-map.json: %w", err)
+	}
+
+	ui.PrintSuccess(fmt.Sprintf("Successfully added %d service(s).", len(toAdd)))
+	return nil
+}
+
+// addServicesInteractive shows an interactive menu to select services
+func addServicesInteractive(availableServices []config.ServiceDefinition, serviceMap *config.ServiceMapConfig) error {
 	reader := bufio.NewReader(os.Stdin)
 	for {
 		ui.PrintInfo("Available services to add:")
