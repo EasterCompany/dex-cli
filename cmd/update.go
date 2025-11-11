@@ -114,7 +114,6 @@ func Update(args []string, buildYear string) error {
 	// 4. Final Summary
 	// ---
 	log("Update complete.")
-	fmt.Println()
 	ui.PrintHeader("Complete")
 	time.Sleep(2 * time.Second)
 
@@ -159,7 +158,6 @@ func Update(args []string, buildYear string) error {
 	}
 
 	utils.PrintSummaryTable(summaryData)
-
 	fmt.Println()
 	ui.PrintSuccess("All services are up to date.")
 
