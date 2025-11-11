@@ -9,7 +9,7 @@ GOFMT=$(GOCMD) fmt
 GOLINT=golangci-lint
 
 # Build information
-VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0-dev")
+VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo "0.0.0")
 BRANCH := $(shell git rev-parse --abbrev-ref HEAD)
 COMMIT := $(shell git rev-parse --short HEAD)
 BUILD_DATE := $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
