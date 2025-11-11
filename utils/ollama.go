@@ -525,8 +525,27 @@ func GenerateCommitMessage(diff string) string {
 		return "dex build: successful build"
 	}
 
-	// Clean up the response (remove extra whitespace, newlines at start/end)
+	// Clean up the response
 	commitMsg = strings.TrimSpace(commitMsg)
+
+	// Remove markdown code blocks if present (```...```)
+	commitMsg = strings.TrimPrefix(commitMsg, "```")
+	commitMsg = strings.TrimSuffix(commitMsg, "```")
+	commitMsg = strings.TrimSpace(commitMsg)
+
+	// If response contains multiple lines, take only the first line as the commit message
+	lines := strings.Split(commitMsg, "\n")
+	if len(lines) > 0 {
+		commitMsg = strings.TrimSpace(lines[0])
+	}
+
+	// Remove any language identifiers (like "go", "diff", etc.) that might appear at the start
+	if strings.HasPrefix(commitMsg, "go ") || strings.HasPrefix(commitMsg, "diff ") {
+		parts := strings.SplitN(commitMsg, " ", 2)
+		if len(parts) > 1 {
+			commitMsg = parts[1]
+		}
+	}
 
 	// If the model returned an empty message, use default
 	if commitMsg == "" {
