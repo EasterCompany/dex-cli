@@ -363,10 +363,9 @@ func CreateCustomModels() error {
 You are a specialized AI assistant for generating Git commit messages.
 You may only create commit messages.
 Your task is to analyze code changes (diffs) and generate clear, concise, and meaningful commit messages following best practices:
-1. Every commit message must start with a commit prefix: "<start_of_turn> add: ", "<start_of_turn> update: ", "<start_of_turn> remove: ", "<start_of_turn> refactor: ", ...etc
-2. Keep the first line under 24 characters as a very concise summary
-3. Provide detailed explanation in the body of your response if needed
-4. Every commit message must end with <end_of_turn>`,
+1. Every commit message must start with a commit prefix: "<summary> add: ", "<summary> update: ", "<summary> remove: ", "<summary> refactor: ", ...etc
+2. Keep entire output to one line under 64 characters as a very concise summary.
+3. Every commit message / output / response, must end with either <end_of_turn> or </summary>`,
 		},
 		{
 			Name:      "dex-summary-model",
@@ -374,11 +373,11 @@ Your task is to analyze code changes (diffs) and generate clear, concise, and me
 			SystemPrompt: `
 You are a specialized AI assistant for generating summaries out of large and small bodies of text.
 You may only create text summaries.
-Your task is to analyze a piece of text (various formats: message logs, poems, news article) and generate clear, concise, and meaningful summary, following best practices:
-1. Every summary must start with a summary prefix '<start_of_turn>', for example: "<start_of_turn> a book report about..."
-2. Keep the first line under 24 characters as a very concise summary
-3. Provide an additional detailed explanation in the body of your response if needed
-4. Every summary must end with summary suffix '<end_of_turn >', for example: " and that was that. <end_of_turn>" `,
+Your task is to analyze a piece of text (various formats: message logs, poems, news article) and generate clear, concise, and meaningful summary,
+following best practices:
+1. Every summary must start with a summary prefix '<summary>', for example: "<summary> a book report about..."
+2. Keep entire output to one line under 64 characters as a very concise summary.
+3. Every summary must end with summary suffix '</summary>', for example: " and that was that. </summary>" `,
 		},
 	}
 
@@ -521,28 +520,21 @@ func GenerateCommitMessage(diff string) string {
 		return "dex build: successful build"
 	}
 
-	// Clean up the response
-	commitMsg = strings.TrimSpace(commitMsg)
+	// Clean up the response - force to lowercase first to simplify tag matching
+	commitMsg = strings.ToLower(strings.TrimSpace(commitMsg))
 
-	// Remove everything after and including <end_of_turn>
-	if idx := strings.Index(commitMsg, "<end_of_turn>"); idx != -1 {
+	// Remove everything after and including </summary> or <end_of_turn>
+	if idx := strings.Index(commitMsg, "</summary>"); idx != -1 {
+		commitMsg = commitMsg[:idx]
+		commitMsg = strings.TrimSpace(commitMsg)
+	} else if idx := strings.Index(commitMsg, "<end_of_turn>"); idx != -1 {
 		commitMsg = commitMsg[:idx]
 		commitMsg = strings.TrimSpace(commitMsg)
 	}
 
-	// Remove everything before and including <auto>
-	if idx := strings.Index(commitMsg, "<auto>"); idx != -1 {
-		commitMsg = commitMsg[idx+len("<auto>"):]
-		commitMsg = strings.TrimSpace(commitMsg)
-	} else {
-		// If <auto> doesn't exist, try to find common commit prefixes
-		prefixes := []string{"add:", "update:", "remove:", "refactor:", "fix:", "feat:", "docs:", "chore:", "style:", "test:", "perf:"}
-		for _, prefix := range prefixes {
-			if idx := strings.Index(strings.ToLower(commitMsg), prefix); idx != -1 {
-				commitMsg = commitMsg[idx:]
-				break
-			}
-		}
+	// Remove everything before and including <summary>
+	if idx := strings.Index(commitMsg, "<summary>"); idx != -1 {
+		commitMsg = commitMsg[idx+len("<summary>"):]
 		commitMsg = strings.TrimSpace(commitMsg)
 	}
 
