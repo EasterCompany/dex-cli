@@ -363,13 +363,11 @@ func CreateCustomModels() error {
 
 Your task is to analyze code changes (diffs) and generate clear, concise, and meaningful commit messages following best practices:
 
-1. Use the imperative mood (e.g., "Add feature" not "Added feature")
-2. Keep the first line under 50 characters as a summary
-3. Provide detailed explanation in the body if needed
-4. Focus on the "why" of changes, not just the "what"
-5. Follow conventional commits format when applicable (feat:, fix:, docs:, refactor:, etc.)
+	1. Every response must start with a commit prefix: "add: ", "update: ", "remove: ", "refactor: ", ...etc
+	2. Keep the first line under 24 characters as a very concise summary
+	3. Provide detailed explanation in the body of your response if needed
 
-Analyze the provided diff and generate an appropriate commit message.`,
+Analyze the provided diff and generate an appropriate commit message as your response/output.`,
 		},
 		// Additional custom models will be added here
 	}
