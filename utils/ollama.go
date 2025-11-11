@@ -16,7 +16,6 @@ import (
 const DefaultOllamaURL = "http://127.0.0.1:11434"
 
 var DefaultModels = []string{
-	"codegemma:2b",
 	"gemma3:270m",
 	"gemma3:1b",
 	"gemma3:4b",
@@ -293,15 +292,15 @@ func CleanupNonDefaultModels() error {
 		defaultMap[model] = true
 	}
 
-	// Also keep our custom dexter models
+	// Also keep our custom dex models
 	var toDelete []string
 	for _, model := range models {
 		// Skip if it's a default model
 		if defaultMap[model] {
 			continue
 		}
-		// Skip if it's a dexter- prefixed model (our custom models)
-		if strings.HasPrefix(model, "dexter-") {
+		// Skip if it's a dex- prefixed model (our custom models)
+		if strings.HasPrefix(model, "dex-") {
 			continue
 		}
 		toDelete = append(toDelete, model)
@@ -353,49 +352,60 @@ func DeleteModel(modelID string) error {
 	return nil
 }
 
-// CreateCustomModels creates custom Dexter-branded models forked from the base models.
+// CustomModel defines a custom model configuration.
+type CustomModel struct {
+	Name         string
+	BaseModel    string
+	SystemPrompt string
+}
+
+// CreateCustomModels creates custom Dex models forked from base models.
 // Always rebuilds the models to ensure they reflect the latest configuration.
 func CreateCustomModels() error {
-	customModels := map[string]string{
-		"dexter-270m": "gemma3:270m",
-		"dexter-1b":   "gemma3:1b",
-		"dexter-4b":   "gemma3:4b",
+	customModels := []CustomModel{
+		{
+			Name:      "dex-commit-model",
+			BaseModel: "gemma3:270m",
+			SystemPrompt: `You are a specialized AI assistant for generating Git commit messages.
+
+Your task is to analyze code changes (diffs) and generate clear, concise, and meaningful commit messages following best practices:
+
+1. Use the imperative mood (e.g., "Add feature" not "Added feature")
+2. Keep the first line under 50 characters as a summary
+3. Provide detailed explanation in the body if needed
+4. Focus on the "why" of changes, not just the "what"
+5. Follow conventional commits format when applicable (feat:, fix:, docs:, refactor:, etc.)
+
+Analyze the provided diff and generate an appropriate commit message.`,
+		},
+		// Additional custom models will be added here
 	}
 
-	for customName, baseModel := range customModels {
+	for _, model := range customModels {
 		// First, delete the existing custom model if it exists (to force rebuild)
-		ui.PrintInfo(fmt.Sprintf("  Rebuilding %s from %s...", customName, baseModel))
-		_ = DeleteModel(customName) // Ignore error - model might not exist yet
+		ui.PrintInfo(fmt.Sprintf("  Rebuilding %s from %s...", model.Name, model.BaseModel))
+		_ = DeleteModel(model.Name) // Ignore error - model might not exist yet
 
 		// Create fresh custom model
-		if err := CreateModelFromBase(customName, baseModel); err != nil {
-			ui.PrintWarning(fmt.Sprintf("  Failed to create %s: %v", customName, err))
+		if err := CreateModelFromBase(model.Name, model.BaseModel, model.SystemPrompt); err != nil {
+			ui.PrintWarning(fmt.Sprintf("  Failed to create %s: %v", model.Name, err))
 			continue
 		}
-		ui.PrintSuccess(fmt.Sprintf("  Created %s", customName))
+		ui.PrintSuccess(fmt.Sprintf("  Created %s", model.Name))
 	}
 
 	return nil
 }
 
-// CreateModelFromBase creates a custom model from a base model using a Modelfile.
-func CreateModelFromBase(customName, baseModel string) error {
-	// Create a Modelfile with custom system prompt and parameters
-	modelfile := fmt.Sprintf(`FROM %s
-
-# Dexter AI Assistant - Custom Configuration
-SYSTEM """You are Dexter, an advanced AI assistant created by Easter Company. You are helpful, knowledgeable, and concise in your responses."""
-
-# Parameters for optimal performance
-PARAMETER temperature 0.7
-PARAMETER top_p 0.9
-PARAMETER top_k 40
-`, baseModel)
-
+// CreateModelFromBase creates a custom model from a base model using the Ollama API.
+func CreateModelFromBase(customName, baseModel, systemPrompt string) error {
+	// Use explicit API fields instead of a modelfile string
 	url := DefaultOllamaURL + "/api/create"
-	reqBody := map[string]string{
-		"name":      customName,
-		"modelfile": modelfile,
+	reqBody := map[string]interface{}{
+		"name":   customName,
+		"from":   baseModel,
+		"system": systemPrompt,
+		"stream": false,
 	}
 
 	reqBytes, err := json.Marshal(reqBody)
