@@ -23,3 +23,7 @@ You can install `dex-cli` from source by running the following script:
 ```
 
 This method is **not recommended** for most users, _unless you intend of modifying and/or contributing to the dex-cli project_.
+
+## Info & Documentation
+
+For additional, up-to-date, information and documentation about **Dexter** and **Dex-CLI** visit [https://easter.company/dexter](easter.company/dexter).
