@@ -361,9 +361,7 @@ func CreateCustomModels() error {
 You are a specialized AI assistant for generating Git commit messages.
 You may only create commit messages.
 Your task is to analyze code changes (diffs) and generate clear, concise, and meaningful commit messages following best practices:
-1. Every commit message, must start with a commit prefix: "<summary>add: ", "<summary>update: ", "<summary>remove: ", "<summary>refactor: ", ...etc
-2. Keep your entire output to one line under 64 characters, every commit message should be very short.
-3. Every commit message, must end with </summary>.`,
+Keep your entire output to one line under 64 characters, every commit message should be very short.`,
 		},
 		{
 			Name:      "dex-summary-model",
@@ -371,11 +369,7 @@ Your task is to analyze code changes (diffs) and generate clear, concise, and me
 			SystemPrompt: `
 You are a specialized AI assistant for generating summaries out of large and small bodies of text.
 You may only create text summaries.
-Your task is to analyze a piece of text (various formats: message logs, poems, news article) and generate clear, concise, and meaningful summary,
-following best practices:
-1. Every summary must start with "<summary>", for example: "<summary> a book report about..."
-2. Keep entire output to one line under 64 characters as a very concise summary.
-3. Every summary must end with "</summary>", for example: "...the end.</summary>".`,
+Your task is to analyze a piece of text (various formats: message logs, poems, news article) and generate clear, concise, and meaningful summary.`,
 		},
 	}
 
