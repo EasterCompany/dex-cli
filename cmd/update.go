@@ -79,7 +79,7 @@ func Update(args []string, buildYear string) error {
 	// ---
 	// 2. Process dex-cli FIRST (always)
 	// ---
-	ui.PrintInfo(ui.Colorize(fmt.Sprintf("# Updating %s", dexCliDef.ShortName), ui.ColorCyan))
+	ui.PrintInfo(ui.Colorize(fmt.Sprintf("Updating %s", dexCliDef.ShortName), ui.ColorCyan))
 	if err := utils.GitUpdateService(dexCliDef); err != nil {
 		return fmt.Errorf("failed to update dex-cli source: %w", err)
 	}
@@ -114,7 +114,7 @@ func Update(args []string, buildYear string) error {
 			continue
 		}
 
-		ui.PrintInfo(ui.Colorize(fmt.Sprintf("# Updating %s", def.ShortName), ui.ColorCyan))
+		ui.PrintInfo(ui.Colorize(fmt.Sprintf("Updating %s", def.ShortName), ui.ColorCyan))
 
 		if err := utils.GitUpdateService(def); err != nil {
 			return err

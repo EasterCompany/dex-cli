@@ -122,7 +122,7 @@ func Build(args []string) error {
 	// 2. Process cli FIRST
 	// ---
 	oldCliVersion := utils.GetFullServiceVersion(dexCliDef)
-	ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, "# Building cli", ui.ColorReset))
+	ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, "Building cli", ui.ColorReset))
 	if _, err := utils.RunUnifiedBuildPipeline(dexCliDef, log, targetMajor, targetMinor, targetPatch); err != nil {
 		return err
 	}
@@ -161,7 +161,7 @@ func Build(args []string) error {
 	// 4. Git Add, Commit, Push
 	// ---
 	fmt.Println()
-	ui.PrintInfo(ui.Colorize("# Git version control", ui.ColorCyan))
+	ui.PrintInfo(ui.Colorize("Git version control", ui.ColorCyan))
 	serviceMap, err := config.LoadServiceMapConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load service-map.json: %w", err)

@@ -96,7 +96,7 @@ func Test(args []string) error {
 	// Test each service
 	for _, def := range servicesToTest {
 		fmt.Println()
-		ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, fmt.Sprintf("# Testing %s", def.ShortName), ui.ColorReset))
+		ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, fmt.Sprintf("Testing %s", def.ShortName), ui.ColorReset))
 
 		sourcePath, err := config.ExpandPath(def.Source)
 		if err != nil {
