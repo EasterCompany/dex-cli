@@ -82,13 +82,6 @@ func Build(args []string) error {
 		ui.PrintInfo(fmt.Sprintf("Using version: %d.%d.%d (no increment)", targetMajor, targetMinor, targetPatch))
 	}
 
-	// Pull default Ollama models (non-fatal if it fails)
-	ui.PrintHeader("Syncing Default Ollama Models")
-	if err := utils.PullHardcodedModels(); err != nil {
-		log(fmt.Sprintf("Failed to pull ollama models (non-fatal): %v", err))
-		ui.PrintWarning("Failed to sync Ollama models. This is non-fatal and can be done manually with 'dex ollama pull'.")
-	}
-
 	log("Build command called...")
 	ui.PrintHeader("Building All Services from Local Source")
 	allServices := config.GetAllServices()
