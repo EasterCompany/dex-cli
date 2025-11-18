@@ -5,13 +5,11 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/EasterCompany/dex-cli/ui"
 	"github.com/EasterCompany/dex-cli/utils"
 )
 
 func Ollama(args []string) error {
 	if len(args) == 1 && args[0] == "pull" {
-		ui.PrintInfo("No model specified for 'ollama pull'. Starting hardcoded model synchronization.")
 		return utils.PullHardcodedModels()
 	}
 
