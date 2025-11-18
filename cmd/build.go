@@ -115,7 +115,7 @@ func Build(args []string) error {
 	// 2. Process cli FIRST
 	// ---
 	oldCliVersion := utils.GetFullServiceVersion(dexCliDef)
-	ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, "Building cli", ui.ColorReset))
+	ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, "# Building cli", ui.ColorReset))
 	if _, err := utils.RunUnifiedBuildPipeline(dexCliDef, log, targetMajor, targetMinor, targetPatch); err != nil {
 		return err
 	}
