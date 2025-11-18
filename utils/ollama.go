@@ -16,9 +16,7 @@ import (
 const DefaultOllamaURL = "http://127.0.0.1:11434"
 
 var DefaultModels = []string{
-	"gemma3:270m",
-	"gemma3:1b",
-	"gemma3:4b",
+	"deepseek-r1:1.5b",
 }
 
 // ModelInfo reflects a single model entry returned by the /api/tags endpoint.
@@ -358,18 +356,18 @@ func CreateCustomModels() error {
 	customModels := []CustomModel{
 		{
 			Name:      "dex-commit-model",
-			BaseModel: "gemma3:4b",
+			BaseModel: "deepseek-r1:1.5b",
 			SystemPrompt: `
 You are a specialized AI assistant for generating Git commit messages.
 You may only create commit messages.
 Your task is to analyze code changes (diffs) and generate clear, concise, and meaningful commit messages following best practices:
-1. Every commit message / summary, must start with a commit prefix: "<summary>add: ", "<summary>update: ", "<summary>remove: ", "<summary>refactor: ", ...etc
+1. Every commit message, must start with a commit prefix: "<summary>add: ", "<summary>update: ", "<summary>remove: ", "<summary>refactor: ", ...etc
 2. Keep your entire output to one line under 64 characters, every commit message should be very short.
-3. Every commit message / summary, must end with either "<end_of_turn>" or "</summary>".`,
+3. Every commit message, must end with </summary>.`,
 		},
 		{
 			Name:      "dex-summary-model",
-			BaseModel: "gemma3:4b",
+			BaseModel: "deepseek-r1:1.5b",
 			SystemPrompt: `
 You are a specialized AI assistant for generating summaries out of large and small bodies of text.
 You may only create text summaries.
