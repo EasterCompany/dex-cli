@@ -164,15 +164,10 @@ func getServiceFullVersion(service config.ServiceDefinition) string {
 		return "unknown"
 	}
 
-	// Parse output - format is "dex version X.Y.Z...."
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	for _, line := range lines {
-		if strings.Contains(line, "version") {
-			parts := strings.Fields(line)
-			if len(parts) >= 2 {
-				return parts[len(parts)-1] // Return the last field (full version string)
-			}
-		}
+	// Parse output - the output is expected to be just the version string
+	fullVersion := strings.TrimSpace(string(output))
+	if fullVersion != "" {
+		return fullVersion
 	}
 
 	return "unknown"
