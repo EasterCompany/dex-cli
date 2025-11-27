@@ -43,6 +43,47 @@ func getServiceVersion(def config.ServiceDefinition) (major, minor, patch int, e
 	return major, minor, patch, nil
 }
 
+// hasUncommittedChanges checks if a service has uncommitted changes
+func hasUncommittedChanges(def config.ServiceDefinition) bool {
+	sourcePath, err := config.ExpandPath(def.Source)
+	if err != nil {
+		return false
+	}
+
+	cmd := exec.Command("git", "status", "--porcelain")
+	cmd.Dir = sourcePath
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return false
+	}
+
+	return strings.TrimSpace(string(output)) != ""
+}
+
+// getHighestMajorMinor returns the highest major.minor version across all buildable services
+func getHighestMajorMinor(services []config.ServiceDefinition) (int, int, error) {
+	maxMajor := 0
+	maxMinor := 0
+
+	for _, s := range services {
+		if !s.IsBuildable() {
+			continue
+		}
+
+		major, minor, _, err := getServiceVersion(s)
+		if err != nil {
+			return 0, 0, err
+		}
+
+		if major > maxMajor || (major == maxMajor && minor > maxMinor) {
+			maxMajor = major
+			maxMinor = minor
+		}
+	}
+
+	return maxMajor, maxMinor, nil
+}
+
 func Build(args []string) error {
 	logFile, err := config.LogFile()
 	if err != nil {
@@ -59,29 +100,76 @@ func Build(args []string) error {
 		return fmt.Errorf("build command accepts at most 1 argument (major, minor, or patch)")
 	}
 
-	var incrementType string
+	var requestedIncrement string
 	if len(args) == 1 {
-		incrementType = args[0]
-		if incrementType != "major" && incrementType != "minor" && incrementType != "patch" {
-			return fmt.Errorf("invalid argument '%s': must be 'major', 'minor', or 'patch'", incrementType)
+		requestedIncrement = args[0]
+		if requestedIncrement != "major" && requestedIncrement != "minor" && requestedIncrement != "patch" {
+			return fmt.Errorf("invalid argument '%s': must be 'major', 'minor', or 'patch'", requestedIncrement)
 		}
 	} else {
-		// Default to patch increment if not specified
-		incrementType = "patch"
-		ui.PrintInfo("No increment specified, defaulting to patch increment")
+		requestedIncrement = "auto"
 	}
 
 	log("Build command called...")
 	ui.PrintHeader("Building All Services from Local Source")
 	allServices := config.GetAllServices()
 
-	// Find dex-cli definition
-	var dexCliDef config.ServiceDefinition
+	// ---
+	// THE LAW OF VERSION: Determine versioning strategy
+	// ---
+	var servicesWithChanges []config.ServiceDefinition
 	for _, s := range allServices {
-		if s.ShortName == "cli" {
-			dexCliDef = s
-			break
+		if s.IsBuildable() && hasUncommittedChanges(s) {
+			servicesWithChanges = append(servicesWithChanges, s)
 		}
+	}
+
+	var incrementType string
+	var buildAllServices bool
+	var targetMajorAll, targetMinorAll, targetPatchAll int
+
+	switch requestedIncrement {
+	case "major":
+		// LAW 3: Major increment - force ALL services to same major version
+		ui.PrintInfo("Major release: incrementing ALL services to same major version")
+		highestMajor, _, err := getHighestMajorMinor(allServices)
+		if err != nil {
+			return err
+		}
+		targetMajorAll = highestMajor + 1
+		targetMinorAll = 0
+		targetPatchAll = 0
+		incrementType = "major"
+		buildAllServices = true
+
+	case "minor":
+		// LAW 2: Minor increment - force ALL services to same minor version
+		ui.PrintInfo("Minor release: incrementing ALL services to same minor version")
+		highestMajor, highestMinor, err := getHighestMajorMinor(allServices)
+		if err != nil {
+			return err
+		}
+		targetMajorAll = highestMajor
+		targetMinorAll = highestMinor + 1
+		targetPatchAll = 0
+		incrementType = "minor"
+		buildAllServices = true
+
+	case "patch", "auto":
+		// LAW 1: Any repo with changes increments only its own patch
+		if len(servicesWithChanges) == 0 {
+			ui.PrintWarning("No uncommitted changes detected in any service")
+			return nil
+		}
+
+		if len(servicesWithChanges) == 1 {
+			ui.PrintInfo(fmt.Sprintf("Building %s with patch increment", servicesWithChanges[0].ShortName))
+		} else {
+			ui.PrintInfo(fmt.Sprintf("Building %d services with individual patch increments", len(servicesWithChanges)))
+		}
+
+		incrementType = "patch"
+		buildAllServices = false
 	}
 
 	// ---
@@ -101,88 +189,110 @@ func Build(args []string) error {
 	}
 
 	// ---
-	// 2. Process cli FIRST
+	// 2. Build services based on versioning strategy
 	// ---
-	oldCliVersion := utils.GetFullServiceVersion(dexCliDef)
-	ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, "# Building cli", ui.ColorReset))
-
-	// Get current version for cli from its git tags
-	baseMajor, baseMinor, basePatch, err := getServiceVersion(dexCliDef)
-	if err != nil {
-		return fmt.Errorf("failed to get version for %s: %w", dexCliDef.ShortName, err)
+	type buildTask struct {
+		service                               config.ServiceDefinition
+		targetMajor, targetMinor, targetPatch int
 	}
-	targetMajor, targetMinor, targetPatch, err := git.IncrementVersion(baseMajor, baseMinor, basePatch, incrementType)
-	if err != nil {
-		return err
-	}
-	ui.PrintInfo(fmt.Sprintf("Incrementing version: %d.%d.%d -> %d.%d.%d (%s)",
-		baseMajor, baseMinor, basePatch, targetMajor, targetMinor, targetPatch, incrementType))
 
-	if _, err := utils.RunUnifiedBuildPipeline(dexCliDef, log, targetMajor, targetMinor, targetPatch); err != nil {
-		return err
-	}
-	ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %s!", dexCliDef.ShortName))
-	ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, oldCliVersion, ui.ColorReset))
-	ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.GetFullServiceVersion(dexCliDef), ui.ColorReset))
+	var buildTasks []buildTask
 
-	// ---
-	// 3. Process all OTHER services
-	// ---
-	for _, def := range allServices {
-		if !def.IsManageable() || def.ShortName == "cli" {
+	// Determine which services to build and their target versions
+	for _, s := range allServices {
+		if !s.IsBuildable() {
 			continue
 		}
 
-		fmt.Println()
-		ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, fmt.Sprintf("# Building %s", def.ShortName), ui.ColorReset))
+		// Skip if not building all services and this service has no changes
+		if !buildAllServices {
+			hasChanges := false
+			for _, changed := range servicesWithChanges {
+				if changed.ID == s.ID {
+					hasChanges = true
+					break
+				}
+			}
+			if !hasChanges {
+				continue
+			}
+		}
 
-		// Get current version for this service from its git tags
-		baseMajor, baseMinor, basePatch, versionErr := getServiceVersion(def)
-		if versionErr != nil {
-			return fmt.Errorf("failed to get version for %s: %w", def.ShortName, versionErr)
+		var targetMajor, targetMinor, targetPatch int
+
+		if buildAllServices {
+			// Use the shared version for all services
+			targetMajor = targetMajorAll
+			targetMinor = targetMinorAll
+			targetPatch = targetPatchAll
+		} else {
+			// Individual patch increment
+			baseMajor, baseMinor, basePatch, err := getServiceVersion(s)
+			if err != nil {
+				return fmt.Errorf("failed to get version for %s: %w", s.ShortName, err)
+			}
+			targetMajor = baseMajor
+			targetMinor = baseMinor
+			targetPatch = basePatch + 1
 		}
-		targetMajor, targetMinor, targetPatch, versionErr := git.IncrementVersion(baseMajor, baseMinor, basePatch, incrementType)
-		if versionErr != nil {
-			return versionErr
+
+		buildTasks = append(buildTasks, buildTask{
+			service:     s,
+			targetMajor: targetMajor,
+			targetMinor: targetMinor,
+			targetPatch: targetPatch,
+		})
+	}
+
+	// Execute build tasks
+	for i, task := range buildTasks {
+		if i > 0 {
+			fmt.Println()
 		}
+
+		s := task.service
+		ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, fmt.Sprintf("# Building %s", s.ShortName), ui.ColorReset))
+
+		baseMajor, baseMinor, basePatch, err := getServiceVersion(s)
+		if err != nil {
+			return fmt.Errorf("failed to get version for %s: %w", s.ShortName, err)
+		}
+
 		ui.PrintInfo(fmt.Sprintf("Incrementing version: %d.%d.%d -> %d.%d.%d (%s)",
-			baseMajor, baseMinor, basePatch, targetMajor, targetMinor, targetPatch, incrementType))
+			baseMajor, baseMinor, basePatch, task.targetMajor, task.targetMinor, task.targetPatch, incrementType))
 
-		built, buildErr := utils.RunUnifiedBuildPipeline(def, log, targetMajor, targetMinor, targetPatch)
+		built, buildErr := utils.RunUnifiedBuildPipeline(s, log, task.targetMajor, task.targetMinor, task.targetPatch)
 		if buildErr != nil {
 			return buildErr
 		}
 
 		if built {
-			if err := utils.InstallSystemdService(def); err != nil {
+			if err := utils.InstallSystemdService(s); err != nil {
 				return err
 			}
-			ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %s!", def.ShortName))
-			parsedOldVersion := utils.ParseServiceVersionFromJSON(oldVersions[def.ID])
-			ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, parsedOldVersion, ui.ColorReset))
-			ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.ParseServiceVersionFromJSON(utils.GetFullServiceVersion(def)), ui.ColorReset))
+			ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %s!", s.ShortName))
+
+			if s.ShortName == "cli" {
+				oldVersion := oldVersions[s.ID]
+				ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, oldVersion, ui.ColorReset))
+				ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.GetFullServiceVersion(s), ui.ColorReset))
+			} else {
+				parsedOldVersion := utils.ParseServiceVersionFromJSON(oldVersions[s.ID])
+				ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, parsedOldVersion, ui.ColorReset))
+				ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.ParseServiceVersionFromJSON(utils.GetFullServiceVersion(s)), ui.ColorReset))
+			}
 		}
 	}
 
 	// ---
-	// 4. Git Add, Commit, Push
+	// 3. Git Add, Commit, Push (only for built services)
 	// ---
 	fmt.Println()
 	ui.PrintInfo(ui.Colorize("Git version control", ui.ColorCyan))
-	serviceMap, err := config.LoadServiceMapConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load service-map.json: %w", err)
-	}
 
-	for _, serviceList := range serviceMap.Services {
-		for _, serviceEntry := range serviceList {
-			def := config.GetServiceDefinition(serviceEntry.ID)
-			if def.Type == "os" {
-				continue
-			}
-			if err := gitAddCommitPush(def, incrementType, targetMajor, targetMinor, targetPatch); err != nil {
-				return err
-			}
+	for _, task := range buildTasks {
+		if err := gitAddCommitPush(task.service, incrementType, task.targetMajor, task.targetMinor, task.targetPatch); err != nil {
+			return err
 		}
 	}
 
