@@ -16,7 +16,7 @@ import (
 const DefaultOllamaURL = "http://127.0.0.1:11434"
 
 var DefaultModels = []string{
-	"deepseek-r1:1.5b",
+	"gpt-oss:20b",
 }
 
 // ModelInfo reflects a single model entry returned by the /api/tags endpoint.
@@ -356,16 +356,21 @@ func CreateCustomModels() error {
 	customModels := []CustomModel{
 		{
 			Name:      "dex-commit-model",
-			BaseModel: "deepseek-r1:1.5b",
-			SystemPrompt: `
-You are a specialized AI assistant for generating Git commit messages.
-You may only create commit messages.
-Your task is to analyze code changes (diffs) and generate clear, concise, and meaningful commit messages following best practices:
-Keep your entire output to one line under 64 characters, every commit message should be very short.`,
+			BaseModel: "gpt-oss:20b",
+			SystemPrompt: `You are a git commit message generator. Analyze the diff and output ONE line only.
+
+Format: "verb: short description"
+Verbs: add, update, remove, refactor, fix, docs, test, style, chore
+
+Rules:
+- Output ONLY the commit message, nothing else
+- Keep it under 50 characters
+- Be specific but concise
+- No quotes, no extra text, no explanations`,
 		},
 		{
 			Name:      "dex-summary-model",
-			BaseModel: "deepseek-r1:1.5b",
+			BaseModel: "gpt-oss:20b",
 			SystemPrompt: `
 You are a specialized AI assistant for generating summaries out of large and small bodies of text.
 You may only create text summaries.
@@ -503,47 +508,55 @@ func GetOllamaStatus() error {
 
 func GenerateCommitMessage(diff string) string {
 	if strings.TrimSpace(diff) == "" {
-		return "dex build: successful build"
+		return "chore: successful build"
+	}
+
+	// Truncate diff if too long (keep first 2000 chars for context)
+	if len(diff) > 2000 {
+		diff = diff[:2000] + "\n...(truncated)"
 	}
 
 	commitMsg, err := GenerateContent("dex-commit-model", diff)
 	if err != nil {
-		// If model fails, return default message
-		return "dex build: successful build"
+		return "chore: successful build"
 	}
 
-	// Clean up the response - force to lowercase first to simplify tag matching
-	commitMsg = strings.ToLower(strings.TrimSpace(commitMsg))
-
-	// Remove everything after and including </summary> or <end_of_turn>
-	if idx := strings.Index(commitMsg, "</summary>"); idx != -1 {
-		commitMsg = commitMsg[:idx]
-		commitMsg = strings.TrimSpace(commitMsg)
-	} else if idx := strings.Index(commitMsg, "<end_of_turn>"); idx != -1 {
-		commitMsg = commitMsg[:idx]
-		commitMsg = strings.TrimSpace(commitMsg)
-	}
-
-	// Remove everything before and including <summary>
-	if idx := strings.Index(commitMsg, "<summary>"); idx != -1 {
-		commitMsg = commitMsg[idx+len("<summary>"):]
-		commitMsg = strings.TrimSpace(commitMsg)
-	}
-
-	// Remove markdown code blocks if present (```...```)
-	commitMsg = strings.TrimPrefix(commitMsg, "```")
-	commitMsg = strings.TrimSuffix(commitMsg, "```")
+	// Clean up the response
 	commitMsg = strings.TrimSpace(commitMsg)
 
-	// If response contains multiple lines, take only the first line as the commit message
+	// Remove thinking blocks (models may output "Thinking..." sections)
+	// The actual commit message is usually the last non-empty line
 	lines := strings.Split(commitMsg, "\n")
-	if len(lines) > 0 {
-		commitMsg = strings.TrimSpace(lines[0])
+	var finalMsg string
+	for i := len(lines) - 1; i >= 0; i-- {
+		line := strings.TrimSpace(lines[i])
+		// Skip empty lines and thinking markers
+		if line != "" && !strings.HasPrefix(strings.ToLower(line), "thinking") && !strings.Contains(strings.ToLower(line), "done thinking") {
+			finalMsg = line
+			break
+		}
+	}
+	commitMsg = finalMsg
+
+	// Remove common prefixes that models sometimes add
+	commitMsg = strings.TrimPrefix(commitMsg, "git commit -m ")
+	commitMsg = strings.TrimPrefix(commitMsg, "commit message: ")
+	commitMsg = strings.Trim(commitMsg, "\"'`")
+	commitMsg = strings.TrimSpace(commitMsg)
+
+	// Validate format: should contain a colon
+	if !strings.Contains(commitMsg, ":") {
+		return "update: " + commitMsg
 	}
 
-	// If the model returned an empty message, use default
+	// Limit length
+	if len(commitMsg) > 72 {
+		commitMsg = commitMsg[:69] + "..."
+	}
+
+	// If empty after cleanup, use default
 	if commitMsg == "" {
-		return "dex build: successful build"
+		return "chore: successful build"
 	}
 
 	return commitMsg
