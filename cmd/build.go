@@ -341,16 +341,6 @@ func Build(args []string) error {
 				return err
 			}
 			ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %s!", s.ShortName))
-
-			if s.ShortName == "cli" {
-				oldVersion := oldVersions[s.ID]
-				ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, oldVersion, ui.ColorReset))
-				ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.GetFullServiceVersion(s), ui.ColorReset))
-			} else {
-				parsedOldVersion := utils.ParseServiceVersionFromJSON(oldVersions[s.ID])
-				ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, parsedOldVersion, ui.ColorReset))
-				ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.ParseServiceVersionFromJSON(utils.GetFullServiceVersion(s)), ui.ColorReset))
-			}
 		}
 	}
 
