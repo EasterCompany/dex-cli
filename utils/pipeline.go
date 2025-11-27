@@ -131,15 +131,42 @@ func RunUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), maj
 	fullVersionStr := fmt.Sprintf("%d.%d.%d.%s.%s.%s.%s.%s",
 		major, minor, patch, branch, commit, buildDate, buildArch, buildHash)
 
-	ldflags := fmt.Sprintf("-X main.version=%s -X main.branch=%s -X main.commit=%s -X main.buildDate=%s -X main.buildYear=%s -X main.buildHash=%s -X main.arch=%s",
-		fullVersionStr, branch, commit, buildDate, buildYear, buildHash, buildArch)
-	buildCmd = exec.Command("go", "build", "-ldflags", ldflags, "-o", outputPath, ".")
-	buildCmd.Dir = sourcePath
-	buildCmd.Stdout = os.Stdout
-	buildCmd.Stderr = os.Stderr
-	if err := buildCmd.Run(); err != nil {
-		log(fmt.Sprintf("%s 'go build' failed: %v", def.ShortName, err))
-		return false, fmt.Errorf("%s 'go build' failed: %w", def.ShortName, err)
+	// Check if service has a Makefile (new universal standard)
+	makefilePath := filepath.Join(sourcePath, "Makefile")
+	if _, err := os.Stat(makefilePath); err == nil {
+		// Makefile exists - use it for building
+		log(fmt.Sprintf("%s Using Makefile for build", def.ShortName))
+
+		// Export build variables for Makefile to use
+		ldflags := fmt.Sprintf("-X main.version=%s -X main.branch=%s -X main.commit=%s -X main.buildDate=%s -X main.buildYear=%s -X main.buildHash=%s -X main.arch=%s",
+			fullVersionStr, branch, commit, buildDate, buildYear, buildHash, buildArch)
+
+		buildCmd = exec.Command("make", "build")
+		buildCmd.Dir = sourcePath
+		buildCmd.Env = append(os.Environ(),
+			fmt.Sprintf("LDFLAGS=%s", ldflags),
+			fmt.Sprintf("VERSION=%s", fullVersionStr),
+			fmt.Sprintf("BUILD_DATE=%s", buildDate),
+		)
+		buildCmd.Stdout = os.Stdout
+		buildCmd.Stderr = os.Stderr
+		if err := buildCmd.Run(); err != nil {
+			log(fmt.Sprintf("%s 'make build' failed: %v", def.ShortName, err))
+			return false, fmt.Errorf("%s 'make build' failed: %w", def.ShortName, err)
+		}
+	} else {
+		// No Makefile - use standard Go build
+		log(fmt.Sprintf("%s Using standard go build", def.ShortName))
+		ldflags := fmt.Sprintf("-X main.version=%s -X main.branch=%s -X main.commit=%s -X main.buildDate=%s -X main.buildYear=%s -X main.buildHash=%s -X main.arch=%s",
+			fullVersionStr, branch, commit, buildDate, buildYear, buildHash, buildArch)
+		buildCmd = exec.Command("go", "build", "-ldflags", ldflags, "-o", outputPath, ".")
+		buildCmd.Dir = sourcePath
+		buildCmd.Stdout = os.Stdout
+		buildCmd.Stderr = os.Stderr
+		if err := buildCmd.Run(); err != nil {
+			log(fmt.Sprintf("%s 'go build' failed: %v", def.ShortName, err))
+			return false, fmt.Errorf("%s 'go build' failed: %w", def.ShortName, err)
+		}
 	}
 
 	return true, nil
