@@ -10,6 +10,7 @@ import (
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/git"
+	"github.com/EasterCompany/dex-cli/release"
 	"github.com/EasterCompany/dex-cli/ui"
 	"github.com/EasterCompany/dex-cli/utils"
 )
@@ -84,7 +85,67 @@ func getHighestMajorMinor(services []config.ServiceDefinition) (int, int, error)
 	return maxMajor, maxMinor, nil
 }
 
+// verifyDeveloperAccess checks if this is a developer environment with source code access
+func verifyDeveloperAccess() error {
+	easterCompanyDir := fmt.Sprintf("%s/EasterCompany", os.Getenv("HOME"))
+	if _, err := os.Stat(easterCompanyDir); os.IsNotExist(err) {
+		return fmt.Errorf("build command is only available for Easter Company developers with source code access")
+	}
+	return nil
+}
+
+// verifyGitHubAccess performs a one-time check to verify GitHub access to EasterCompany org
+func verifyGitHubAccess() error {
+	cacheFile := fmt.Sprintf("%s/.cache/dex-cli/github-access-verified", os.Getenv("HOME"))
+
+	// Check if already verified
+	if _, err := os.Stat(cacheFile); err == nil {
+		return nil
+	}
+
+	ui.PrintInfo("Verifying GitHub access to EasterCompany organization...")
+
+	// Try SSH first (preferred for devs)
+	sshCmd := exec.Command("ssh", "-T", "git@github.com")
+	sshOutput, sshErr := sshCmd.CombinedOutput()
+
+	hasSSH := sshErr == nil || strings.Contains(string(sshOutput), "successfully authenticated")
+
+	// Try HTTPS as fallback
+	httpsCmd := exec.Command("git", "ls-remote", "--exit-code", "https://github.com/EasterCompany/dex-cli.git", "HEAD")
+	httpsErr := httpsCmd.Run()
+
+	if !hasSSH && httpsErr != nil {
+		return fmt.Errorf("cannot access GitHub EasterCompany organization - check your SSH keys or network connection")
+	}
+
+	// Cache the verification
+	_ = os.MkdirAll(fmt.Sprintf("%s/.cache/dex-cli", os.Getenv("HOME")), 0755)
+	if err := os.WriteFile(cacheFile, []byte(time.Now().Format(time.RFC3339)), 0644); err != nil {
+		// Non-fatal, just skip caching
+		ui.PrintWarning("Could not cache GitHub access verification")
+	}
+
+	if hasSSH {
+		ui.PrintSuccess("GitHub SSH access verified")
+	} else {
+		ui.PrintSuccess("GitHub HTTPS access verified")
+	}
+
+	return nil
+}
+
 func Build(args []string) error {
+	// Verify this is a developer environment
+	if err := verifyDeveloperAccess(); err != nil {
+		return err
+	}
+
+	// Verify GitHub access (one-time check)
+	if err := verifyGitHubAccess(); err != nil {
+		return err
+	}
+
 	logFile, err := config.LogFile()
 	if err != nil {
 		return fmt.Errorf("failed to get log file: %w", err)
@@ -302,6 +363,31 @@ func Build(args []string) error {
 	for _, task := range buildTasks {
 		if err := gitAddCommitPush(task.service, incrementType, task.targetMajor, task.targetMinor, task.targetPatch); err != nil {
 			return err
+		}
+	}
+
+	// ---
+	// 4. Publish to easter.company (major/minor only, NOT patch)
+	// ---
+	if incrementType == "major" || incrementType == "minor" {
+		fmt.Println()
+		ui.PrintHeader("Publishing Release")
+
+		// Get list of built services
+		var builtServices []config.ServiceDefinition
+		for _, task := range buildTasks {
+			builtServices = append(builtServices, task.service)
+		}
+
+		// Get short version (e.g., "2.1.0")
+		shortVersion := fmt.Sprintf("%d.%d.%d", targetMajorAll, targetMinorAll, targetPatchAll)
+
+		// Publish binaries and update data.json
+		if err := release.PublishRelease("", shortVersion, incrementType, builtServices); err != nil {
+			ui.PrintError(fmt.Sprintf("Failed to publish release: %v", err))
+			ui.PrintWarning("Binaries are built and committed, but not published to easter.company")
+		} else {
+			ui.PrintSuccess(fmt.Sprintf("Release %s published to https://easter.company", shortVersion))
 		}
 	}
 

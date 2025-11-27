@@ -61,7 +61,7 @@ func main() {
 
 	switch command {
 	case "update":
-		runCommand(func() error { return cmd.Update(os.Args[2:], buildYear) })
+		runCommand(func() error { return cmd.Update(os.Args[2:]) })
 
 	case "system":
 		runCommand(func() error { return cmd.System(os.Args[2:]) })

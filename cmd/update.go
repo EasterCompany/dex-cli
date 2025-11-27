@@ -1,195 +1,283 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
-	"strconv"
-	"time"
+	"io"
+	"net/http"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strings"
 
 	"github.com/EasterCompany/dex-cli/config"
-	"github.com/EasterCompany/dex-cli/git"
+	"github.com/EasterCompany/dex-cli/release"
 	"github.com/EasterCompany/dex-cli/ui"
-	"github.com/EasterCompany/dex-cli/utils"
 )
 
-// Update manages the unified update process for dex-cli and all other services.
-// It fetches, builds, and installs all services, one by one.
-func Update(args []string, buildYear string) error {
-	logFile, err := config.LogFile()
+const (
+	DataJSONURL = "https://easter.company/bin/data.json"
+	TempDir     = "/tmp/dex-update"
+)
+
+// Update performs different update strategies based on environment
+func Update(args []string) error {
+	// Check if this is a developer environment
+	isDev := isDeveloperEnvironment()
+
+	if isDev {
+		return updateDeveloper()
+	}
+	return updateUser()
+}
+
+// isDeveloperEnvironment checks if ~/EasterCompany exists
+func isDeveloperEnvironment() bool {
+	easterCompanyDir := fmt.Sprintf("%s/EasterCompany", os.Getenv("HOME"))
+	_, err := os.Stat(easterCompanyDir)
+	return err == nil
+}
+
+// updateDeveloper performs nuclear fresh install from source
+// SCORCHED EARTH: Clone fresh → build via Makefile → install ALL binaries
+func updateDeveloper() error {
+	ui.PrintHeader("Developer Update - Nuclear Fresh Install")
+	ui.PrintWarning("Cloning fresh source and rebuilding everything from scratch...")
+
+	// Fetch data.json
+	ui.PrintInfo("Fetching latest dev version from easter.company...")
+	data, err := fetchReleaseData()
 	if err != nil {
-		return fmt.Errorf("failed to get log file: %w", err)
-	}
-	defer func() { _ = logFile.Close() }()
-
-	log := func(message string) {
-		_, _ = fmt.Fprintln(logFile, message)
+		return fmt.Errorf("failed to fetch release data: %w", err)
 	}
 
-	// Fetch current version from URL (for update, we use existing version, no increment)
-	const versionURL = "https://easter.company/static/bin/dex-cli/latest.txt"
-	var targetMajor, targetMinor, targetPatch int
-
-	versionStr, err := git.FetchLatestVersionFromURL(versionURL)
-	if err != nil {
-		ui.PrintWarning(fmt.Sprintf("Could not fetch version from %s, defaulting to 0.0.0", versionURL))
-		targetMajor, targetMinor, targetPatch = 0, 0, 0
-	} else {
-		parsedVer, parseErr := git.Parse(versionStr)
-		if parseErr != nil {
-			ui.PrintWarning(fmt.Sprintf("Could not parse version '%s', defaulting to 0.0.0", versionStr))
-			targetMajor, targetMinor, targetPatch = 0, 0, 0
-		} else {
-			targetMajor, _ = strconv.Atoi(parsedVer.Major)
-			targetMinor, _ = strconv.Atoi(parsedVer.Minor)
-			targetPatch, _ = strconv.Atoi(parsedVer.Patch)
-		}
-	}
-	ui.PrintInfo(fmt.Sprintf("Using version: %d.%d.%d", targetMajor, targetMinor, targetPatch))
-
-	// Pull default Ollama models (non-fatal if it fails)
-	ui.PrintHeader("Syncing Default Ollama Models")
-	if err := utils.PullHardcodedModels(); err != nil {
-		log(fmt.Sprintf("Failed to pull ollama models (non-fatal): %v", err))
-		ui.PrintWarning("Failed to sync Ollama models. This is non-fatal and can be done manually with 'dex ollama pull'.")
+	if data.Latest.Dev == "" {
+		return fmt.Errorf("no dev version found in data.json")
 	}
 
-	log("Updating to latest version...")
-	ui.PrintHeader("Updating Dexter Source Repositories")
+	ui.PrintInfo(fmt.Sprintf("Latest dev version: %s", data.Latest.Dev))
 
-	// ---
-	// 1. Get initial versions and sizes
-	// ---
-	allServices := config.GetAllServices()
-	oldVersions := make(map[string]string)
-	oldSizes := make(map[string]int64)
-	for _, s := range allServices {
-		if s.IsBuildable() {
-			oldVersions[s.ID] = utils.GetServiceVersion(s)
-			oldSizes[s.ID] = utils.GetBinarySize(s)
+	// Get list of services to update
+	services := config.GetAllServices()
+	var buildableServices []config.ServiceDefinition
+	for _, s := range services {
+		if s.IsBuildable() && s.Type != "os" {
+			buildableServices = append(buildableServices, s)
 		}
 	}
 
-	var dexCliDef config.ServiceDefinition
-	for _, s := range allServices {
-		if s.ShortName == "cli" {
-			dexCliDef = s
-			break
+	ui.PrintInfo(fmt.Sprintf("Updating %d services from source...", len(buildableServices)))
+
+	// Clean temp directory
+	_ = os.RemoveAll(TempDir)
+	if err := os.MkdirAll(TempDir, 0755); err != nil {
+		return fmt.Errorf("failed to create temp directory: %w", err)
+	}
+	defer func() { _ = os.RemoveAll(TempDir) }()
+
+	// Process each service
+	for _, service := range buildableServices {
+		if err := updateServiceFromSource(service); err != nil {
+			ui.PrintWarning(fmt.Sprintf("Failed to update %s: %v", service.ShortName, err))
+			ui.PrintWarning("Continuing with other services...")
 		}
 	}
 
-	// ---
-	// 2. Process dex-cli FIRST (always)
-	// ---
-	ui.PrintInfo(ui.Colorize(fmt.Sprintf("Updating %s", dexCliDef.ShortName), ui.ColorCyan))
-	if err := utils.GitUpdateService(dexCliDef); err != nil {
-		return fmt.Errorf("failed to update dex-cli source: %w", err)
-	}
-	if _, err := utils.RunUnifiedBuildPipeline(dexCliDef, log, targetMajor, targetMinor, targetPatch); err != nil {
-		return err
-	}
-	ui.PrintSuccess(fmt.Sprintf("Successfully updated and installed %s!", dexCliDef.ShortName))
-	ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, oldVersions[dexCliDef.ID], ui.ColorReset))
-	ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.GetFullServiceVersion(dexCliDef), ui.ColorReset))
-
-	// ---
-	// 3. Process all OTHER installed services
-	// ---
-	serviceMap, err := config.LoadServiceMapConfig()
-	if err != nil {
-		return fmt.Errorf("failed to load service-map.json: %w", err)
-	}
-
-	installedServices := make(map[string]bool)
-	for _, serviceList := range serviceMap.Services {
-		for _, serviceEntry := range serviceList {
-			installedServices[serviceEntry.ID] = true
-		}
-	}
-
-	for _, def := range allServices {
-		if !def.IsManageable() || def.ShortName == "cli" {
-			continue
-		}
-		if _, isInstalled := installedServices[def.ID]; !isInstalled {
-			log(fmt.Sprintf("Skipping %s (not in service-map.json)", def.ShortName))
-			continue
-		}
-
-		ui.PrintInfo(ui.Colorize(fmt.Sprintf("Updating %s", def.ShortName), ui.ColorCyan))
-
-		if err := utils.GitUpdateService(def); err != nil {
-			return err
-		}
-		if _, err := utils.RunUnifiedBuildPipeline(def, log, targetMajor, targetMinor, targetPatch); err != nil {
-			return err
-		}
-		if err := utils.InstallSystemdService(def); err != nil {
-			return err
-		}
-
-		ui.PrintSuccess(fmt.Sprintf("Successfully updated and installed %s!", def.ShortName))
-		parsedOldVersion := utils.ParseServiceVersionFromJSON(oldVersions[def.ID])
-		ui.PrintInfo(fmt.Sprintf("%s  Previous Version: %s%s", ui.ColorDarkGray, parsedOldVersion, ui.ColorReset))
-		ui.PrintInfo(fmt.Sprintf("%s  Current Version:  %s%s", ui.ColorDarkGray, utils.ParseServiceVersionFromJSON(utils.GetFullServiceVersion(def)), ui.ColorReset))
-	}
-
-	// ---
-	// 4. Final Summary
-	// ---
-	log("Update complete.")
-	ui.PrintHeader("Complete")
-	time.Sleep(2 * time.Second)
-
-	var summaryData []utils.SummaryInfo
-	configuredServices, err := utils.GetConfiguredServices()
-	if err != nil {
-		ui.PrintWarning(fmt.Sprintf("Could not load configured services for final summary: %v", err))
-	} else {
-		for _, s := range configuredServices {
-			if s.IsBuildable() {
-				oldVersionStr := oldVersions[s.ID]
-				newVersionStr := utils.GetServiceVersion(s)
-
-				if s.Type != "cli" {
-					oldVersionStr = utils.ParseServiceVersionFromJSON(oldVersionStr)
-					newVersionStr = utils.ParseServiceVersionFromJSON(newVersionStr)
-				}
-
-				oldVer, _ := git.Parse(oldVersionStr)
-
-				// Get the latest commit from the repository (not from the embedded version)
-				// This ensures we show the changelog including any commits made during the update
-				var changeLog string
-				repoPath, pathErr := config.ExpandPath(s.Source)
-				if pathErr == nil {
-					_, latestCommit := git.GetVersionInfo(repoPath)
-					if oldVer != nil && oldVer.Commit != "" && latestCommit != "" && latestCommit != "unknown" {
-						if oldVer.Commit == latestCommit {
-							changeLog = "N/A"
-						} else {
-							changeLog, _ = git.GetCommitLogBetween(repoPath, oldVer.Commit, latestCommit)
-						}
-					} else {
-						changeLog = "N/A"
-					}
-				} else {
-					changeLog = "N/A"
-				}
-
-				summaryData = append(summaryData, utils.SummaryInfo{
-					Service:       s,
-					OldVersion:    oldVersionStr,
-					NewVersion:    newVersionStr,
-					OldSize:       oldSizes[s.ID],
-					NewSize:       utils.GetBinarySize(s),
-					ChangeSummary: changeLog,
-				})
-			}
-		}
-	}
-
-	utils.PrintSummaryTable(summaryData)
-	fmt.Println()
-	ui.PrintSuccess("All services are up to date.")
+	ui.PrintSuccess("Update complete!")
+	ui.PrintInfo("Run 'dex version' to verify")
 
 	return nil
+}
+
+// updateServiceFromSource clones, builds via Makefile, and installs ALL binaries
+func updateServiceFromSource(service config.ServiceDefinition) error {
+	ui.PrintInfo(fmt.Sprintf("Updating %s...", service.ShortName))
+
+	// Construct GitHub URL
+	repoURL := fmt.Sprintf("https://github.com/EasterCompany/%s.git", service.ID)
+	tempServiceDir := filepath.Join(TempDir, service.ID)
+
+	// Clone fresh (depth 1 for speed)
+	ui.PrintInfo(fmt.Sprintf("  Cloning %s...", service.ID))
+	cloneCmd := exec.Command("git", "clone", "--depth", "1", repoURL, tempServiceDir)
+	if output, err := cloneCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("git clone failed:\n%s", string(output))
+	}
+
+	// Build via Makefile (source of truth for ALL binaries)
+	ui.PrintInfo(fmt.Sprintf("  Building %s via Makefile...", service.ShortName))
+	buildCmd := exec.Command("make", "build")
+	buildCmd.Dir = tempServiceDir
+	buildCmd.Env = append(os.Environ(), fmt.Sprintf("BIN_DIR=%s/Dexter/bin", os.Getenv("HOME")))
+	if output, err := buildCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("make build failed:\n%s", string(output))
+	}
+
+	// Makefile's "make install" target handles copying ALL binaries to ~/Dexter/bin
+	// So if the build succeeded, binaries are already installed!
+
+	ui.PrintSuccess(fmt.Sprintf("  ✓ %s updated (all binaries installed)", service.ShortName))
+	return nil
+}
+
+// updateUser downloads and installs binaries from easter.company
+func updateUser() error {
+	ui.PrintHeader("User Update - Download Latest Release")
+
+	// Fetch data.json
+	ui.PrintInfo("Checking for updates...")
+	data, err := fetchReleaseData()
+	if err != nil {
+		return fmt.Errorf("failed to fetch release data: %w", err)
+	}
+
+	if data.Latest.User == "" {
+		return fmt.Errorf("no user version found in data.json")
+	}
+
+	// Get current version
+	currentVersion := RunningVersion
+	latestVersion := data.Latest.User
+
+	ui.PrintInfo(fmt.Sprintf("Current version: %s", currentVersion))
+	ui.PrintInfo(fmt.Sprintf("Latest version:  %s", latestVersion))
+
+	// Compare versions
+	if currentVersion == latestVersion {
+		ui.PrintSuccess("Already running the latest version!")
+		return nil
+	}
+
+	ui.PrintInfo("Update available! Downloading binaries...")
+
+	// Extract short version (e.g., "2.1.0" from full version string)
+	shortVersion := extractShortVersion(latestVersion)
+	if shortVersion == "" {
+		return fmt.Errorf("failed to parse version: %s", latestVersion)
+	}
+
+	// Get release info to find all binaries
+	releaseInfo, exists := data.Releases[shortVersion]
+	if !exists {
+		return fmt.Errorf("release %s not found in data.json", shortVersion)
+	}
+
+	// Download and install each binary from the release
+	for serviceName, platforms := range releaseInfo.Binaries {
+		// We only support linux-amd64
+		binary, exists := platforms["linux-amd64"]
+		if !exists {
+			ui.PrintWarning(fmt.Sprintf("No linux-amd64 binary for %s", serviceName))
+			continue
+		}
+
+		if err := downloadAndInstallBinary(serviceName, binary.Path, binary.Checksum); err != nil {
+			ui.PrintWarning(fmt.Sprintf("Failed to update %s: %v", serviceName, err))
+		}
+	}
+
+	ui.PrintSuccess("Update complete!")
+	ui.PrintInfo("Run 'dex version' to verify")
+
+	return nil
+}
+
+// downloadAndInstallBinary downloads and installs a single binary with checksum verification
+func downloadAndInstallBinary(serviceName, binaryPath, expectedChecksum string) error {
+	ui.PrintInfo(fmt.Sprintf("Downloading %s...", serviceName))
+
+	// Construct download URL
+	url := fmt.Sprintf("https://easter.company%s", binaryPath)
+
+	// Download to temp file
+	binaryName := filepath.Base(binaryPath)
+	tempFile := filepath.Join(os.TempDir(), binaryName)
+	if err := downloadFile(url, tempFile); err != nil {
+		return err
+	}
+	defer func() { _ = os.Remove(tempFile) }()
+
+	// Verify checksum
+	actualChecksum, err := release.CalculateChecksum(tempFile)
+	if err != nil {
+		return fmt.Errorf("failed to calculate checksum: %w", err)
+	}
+
+	if actualChecksum != expectedChecksum {
+		return fmt.Errorf("checksum mismatch (expected %s, got %s)", expectedChecksum, actualChecksum)
+	}
+
+	// Install to ~/Dexter/bin
+	destPath := filepath.Join(os.Getenv("HOME"), "Dexter", "bin", binaryName)
+	if err := copyFile(tempFile, destPath); err != nil {
+		return err
+	}
+
+	// Make executable
+	if err := os.Chmod(destPath, 0755); err != nil {
+		return err
+	}
+
+	ui.PrintSuccess(fmt.Sprintf("  ✓ %s updated", binaryName))
+	return nil
+}
+
+// fetchReleaseData fetches data.json from easter.company
+func fetchReleaseData() (*release.ReleaseData, error) {
+	resp, err := http.Get(DataJSONURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch data.json: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("server returned status %d", resp.StatusCode)
+	}
+
+	var data release.ReleaseData
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return nil, fmt.Errorf("failed to parse data.json: %w", err)
+	}
+
+	return &data, nil
+}
+
+// downloadFile downloads a file from a URL
+func downloadFile(url, destination string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("server returned status %d", resp.StatusCode)
+	}
+
+	out, err := os.Create(destination)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = out.Close() }()
+
+	_, err = io.Copy(out, resp.Body)
+	return err
+}
+
+// copyFile copies a file from src to dst
+func copyFile(src, dst string) error {
+	input, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, input, 0755)
+}
+
+// extractShortVersion extracts "X.Y.Z" from full version string
+func extractShortVersion(fullVersion string) string {
+	parts := strings.Split(fullVersion, ".")
+	if len(parts) >= 3 {
+		return strings.Join(parts[0:3], ".")
+	}
+	return ""
 }
