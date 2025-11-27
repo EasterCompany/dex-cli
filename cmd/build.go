@@ -204,6 +204,15 @@ func Build(args []string) error {
 			continue
 		}
 
+		// Check if source code exists
+		sourcePath, err := config.ExpandPath(s.Source)
+		if err != nil || sourcePath == "" {
+			continue
+		}
+		if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
+			continue
+		}
+
 		// Skip if not building all services and this service has no changes
 		if !buildAllServices {
 			hasChanges := false
