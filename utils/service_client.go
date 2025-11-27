@@ -12,7 +12,9 @@ import (
 
 // GetHTTPVersion fetches the version from a service's HTTP endpoint.
 func GetHTTPVersion(service config.ServiceDefinition) (string, error) {
-	body, statusCode, err := GetHTTPBody(service.GetHTTP("/service"))
+	// Append ?format=version to get the raw version string
+	url := service.GetHTTP("/service") + "?format=version"
+	body, statusCode, err := GetHTTPBody(url)
 	if err != nil {
 		return "N/A", fmt.Errorf("failed to connect to %s: %w", service.ShortName, err)
 	}
