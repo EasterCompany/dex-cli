@@ -16,6 +16,33 @@ import (
 
 var RunningVersion string
 
+// getServiceVersion gets the current version for a service from its git tags
+func getServiceVersion(def config.ServiceDefinition) (major, minor, patch int, err error) {
+	sourcePath, expandErr := config.ExpandPath(def.Source)
+	if expandErr != nil {
+		return 0, 0, 0, fmt.Errorf("failed to expand source path: %w", expandErr)
+	}
+
+	// Get latest tag from the service's git repo
+	tag, tagErr := git.GetLatestTag(sourcePath)
+	if tagErr != nil {
+		// No tags found, start at 0.0.0
+		return 0, 0, 0, nil
+	}
+
+	// Parse the tag
+	parsedVer, parseErr := git.Parse(tag)
+	if parseErr != nil {
+		// Invalid tag format, start at 0.0.0
+		return 0, 0, 0, nil
+	}
+
+	major, _ = strconv.Atoi(parsedVer.Major)
+	minor, _ = strconv.Atoi(parsedVer.Minor)
+	patch, _ = strconv.Atoi(parsedVer.Patch)
+	return major, minor, patch, nil
+}
+
 func Build(args []string) error {
 	logFile, err := config.LogFile()
 	if err != nil {
@@ -38,48 +65,10 @@ func Build(args []string) error {
 		if incrementType != "major" && incrementType != "minor" && incrementType != "patch" {
 			return fmt.Errorf("invalid argument '%s': must be 'major', 'minor', or 'patch'", incrementType)
 		}
-	}
-
-	// Fetch current version from URL
-	const versionURL = "https://easter.company/static/bin/dex-cli/latest.txt"
-	var baseMajor, baseMinor, basePatch int
-
-	versionStr, err := git.FetchLatestVersionFromURL(versionURL)
-	if err != nil {
-		if incrementType != "" {
-			// If increment was requested, version fetch failure is fatal
-			return fmt.Errorf("failed to fetch version for increment: %w", err)
-		}
-		// No increment requested, default to 0.0.0
-		ui.PrintWarning(fmt.Sprintf("Could not fetch version from %s, defaulting to 0.0.0", versionURL))
-		baseMajor, baseMinor, basePatch = 0, 0, 0
 	} else {
-		// Parse the fetched version
-		parsedVer, parseErr := git.Parse(versionStr)
-		if parseErr != nil {
-			if incrementType != "" {
-				return fmt.Errorf("failed to parse version '%s': %w", versionStr, parseErr)
-			}
-			ui.PrintWarning(fmt.Sprintf("Could not parse version '%s', defaulting to 0.0.0", versionStr))
-			baseMajor, baseMinor, basePatch = 0, 0, 0
-		} else {
-			baseMajor, _ = strconv.Atoi(parsedVer.Major)
-			baseMinor, _ = strconv.Atoi(parsedVer.Minor)
-			basePatch, _ = strconv.Atoi(parsedVer.Patch)
-		}
-	}
-
-	// Apply increment if requested
-	targetMajor, targetMinor, targetPatch := baseMajor, baseMinor, basePatch
-	if incrementType != "" {
-		targetMajor, targetMinor, targetPatch, err = git.IncrementVersion(baseMajor, baseMinor, basePatch, incrementType)
-		if err != nil {
-			return err
-		}
-		ui.PrintInfo(fmt.Sprintf("Incrementing version: %d.%d.%d -> %d.%d.%d (%s)",
-			baseMajor, baseMinor, basePatch, targetMajor, targetMinor, targetPatch, incrementType))
-	} else {
-		ui.PrintInfo(fmt.Sprintf("Using version: %d.%d.%d (no increment)", targetMajor, targetMinor, targetPatch))
+		// Default to patch increment if not specified
+		incrementType = "patch"
+		ui.PrintInfo("No increment specified, defaulting to patch increment")
 	}
 
 	log("Build command called...")
@@ -116,6 +105,19 @@ func Build(args []string) error {
 	// ---
 	oldCliVersion := utils.GetFullServiceVersion(dexCliDef)
 	ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, "# Building cli", ui.ColorReset))
+
+	// Get current version for cli from its git tags
+	baseMajor, baseMinor, basePatch, err := getServiceVersion(dexCliDef)
+	if err != nil {
+		return fmt.Errorf("failed to get version for %s: %w", dexCliDef.ShortName, err)
+	}
+	targetMajor, targetMinor, targetPatch, err := git.IncrementVersion(baseMajor, baseMinor, basePatch, incrementType)
+	if err != nil {
+		return err
+	}
+	ui.PrintInfo(fmt.Sprintf("Incrementing version: %d.%d.%d -> %d.%d.%d (%s)",
+		baseMajor, baseMinor, basePatch, targetMajor, targetMinor, targetPatch, incrementType))
+
 	if _, err := utils.RunUnifiedBuildPipeline(dexCliDef, log, targetMajor, targetMinor, targetPatch); err != nil {
 		return err
 	}
@@ -134,9 +136,21 @@ func Build(args []string) error {
 		fmt.Println()
 		ui.PrintInfo(fmt.Sprintf("%s%s%s", ui.ColorCyan, fmt.Sprintf("# Building %s", def.ShortName), ui.ColorReset))
 
-		built, err := utils.RunUnifiedBuildPipeline(def, log, targetMajor, targetMinor, targetPatch)
-		if err != nil {
-			return err
+		// Get current version for this service from its git tags
+		baseMajor, baseMinor, basePatch, versionErr := getServiceVersion(def)
+		if versionErr != nil {
+			return fmt.Errorf("failed to get version for %s: %w", def.ShortName, versionErr)
+		}
+		targetMajor, targetMinor, targetPatch, versionErr := git.IncrementVersion(baseMajor, baseMinor, basePatch, incrementType)
+		if versionErr != nil {
+			return versionErr
+		}
+		ui.PrintInfo(fmt.Sprintf("Incrementing version: %d.%d.%d -> %d.%d.%d (%s)",
+			baseMajor, baseMinor, basePatch, targetMajor, targetMinor, targetPatch, incrementType))
+
+		built, buildErr := utils.RunUnifiedBuildPipeline(def, log, targetMajor, targetMinor, targetPatch)
+		if buildErr != nil {
+			return buildErr
 		}
 
 		if built {
@@ -296,18 +310,20 @@ func gitAddCommitPush(def config.ServiceDefinition, incrementType string, major,
 		return fmt.Errorf("git push failed for %s:\n%s", def.ShortName, string(output))
 	}
 
-	// Create and push tag for minor/major increments
-	if incrementType == "minor" || incrementType == "major" {
-		tagName := fmt.Sprintf("%d.%d.%d", major, minor, patch)
-		ui.PrintInfo(fmt.Sprintf("[%s] Creating tag %s...", def.ShortName, tagName))
+	// Create and push tag for ALL builds (to track version history)
+	tagName := fmt.Sprintf("%d.%d.%d", major, minor, patch)
+	ui.PrintInfo(fmt.Sprintf("[%s] Creating tag %s...", def.ShortName, tagName))
 
-		// Create tag
-		tagCmd := exec.Command("git", "tag", tagName)
-		tagCmd.Dir = sourcePath
-		if output, err := tagCmd.CombinedOutput(); err != nil {
+	// Create tag
+	tagCmd := exec.Command("git", "tag", tagName)
+	tagCmd.Dir = sourcePath
+	if output, err := tagCmd.CombinedOutput(); err != nil {
+		// If tag already exists, that's okay
+		if !strings.Contains(string(output), "already exists") {
 			return fmt.Errorf("git tag failed for %s:\n%s", def.ShortName, string(output))
 		}
-
+		ui.PrintWarning(fmt.Sprintf("[%s] Tag %s already exists", def.ShortName, tagName))
+	} else {
 		// Push tag
 		pushTagCmd := exec.Command("git", "push", "--tags")
 		pushTagCmd.Dir = sourcePath
