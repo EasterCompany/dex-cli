@@ -240,15 +240,24 @@ func Build(args []string) error {
 	if incrementType != "" {
 		fmt.Println()
 		ui.PrintHeader("Publishing Release")
-		ui.PrintInfo("Running release script...")
 		releaseScript := fmt.Sprintf("%s/EasterCompany/easter.company/scripts/release_dex-cli.sh", os.Getenv("HOME"))
-		releaseCmd := exec.Command(releaseScript)
-		releaseCmd.Stdout = os.Stdout
-		releaseCmd.Stderr = os.Stderr
-		if err := releaseCmd.Run(); err != nil {
-			return fmt.Errorf("release script failed: %w", err)
+
+		// Check if release script exists
+		if _, err := os.Stat(releaseScript); err == nil {
+			ui.PrintInfo("Running release script...")
+			releaseCmd := exec.Command(releaseScript)
+			releaseCmd.Stdout = os.Stdout
+			releaseCmd.Stderr = os.Stderr
+			if err := releaseCmd.Run(); err != nil {
+				ui.PrintWarning(fmt.Sprintf("Release script failed: %v", err))
+				ui.PrintInfo("Version tags have been created and pushed successfully.")
+			} else {
+				ui.PrintSuccess("Release published successfully!")
+			}
+		} else {
+			ui.PrintInfo("No release script found, skipping publish step.")
+			ui.PrintInfo("Version tags have been created and pushed successfully.")
 		}
-		ui.PrintSuccess("Release published successfully!")
 	}
 
 	return nil
