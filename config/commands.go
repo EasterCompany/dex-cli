@@ -127,6 +127,11 @@ func GetCommandRequirements() map[string]CommandRequirement {
 			Description: "Show the service-map.json config for a service",
 			Check:       func() bool { return true }, // Always available
 		},
+		"whisper": {
+			Name:        "whisper",
+			Description: "Speech-to-text transcription with Whisper",
+			Check:       func() bool { return true }, // Always available
+		},
 	}
 }
 

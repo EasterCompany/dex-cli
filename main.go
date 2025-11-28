@@ -133,6 +133,9 @@ func main() {
 	case "config":
 		runCommand(func() error { return cmd.Config(os.Args[2:]) })
 
+	case "whisper":
+		runCommand(func() error { return cmd.Whisper(os.Args[2:]) })
+
 	case "help", "-h", "--help":
 		printUsage()
 
@@ -224,6 +227,9 @@ func printUsage() {
 	}
 	if config.IsCommandAvailable("ollama") {
 		ui.PrintInfo("ollama     | Access the system ollama executable")
+	}
+	if config.IsCommandAvailable("whisper") {
+		ui.PrintInfo("whisper    | Speech-to-text transcription with Whisper")
 	}
 	ui.PrintSubHeader("Service Commands")
 	if config.IsCommandAvailable("event") {
