@@ -156,6 +156,18 @@ func Build(args []string) error {
 		_, _ = fmt.Fprintln(logFile, message)
 	}
 
+	// Check for --force flag
+	forceRebuild := false
+	var filteredArgs []string
+	for _, arg := range args {
+		if arg == "--force" || arg == "-f" {
+			forceRebuild = true
+		} else {
+			filteredArgs = append(filteredArgs, arg)
+		}
+	}
+	args = filteredArgs
+
 	// Validate arguments
 	if len(args) > 1 {
 		return fmt.Errorf("build command accepts at most 1 argument (major, minor, or patch)")
@@ -219,8 +231,18 @@ func Build(args []string) error {
 	case "patch", "auto":
 		// LAW 1: Any repo with changes increments only its own patch
 		if len(servicesWithChanges) == 0 {
-			ui.PrintWarning("No uncommitted changes detected in any service")
-			return nil
+			if !forceRebuild {
+				ui.PrintWarning("No uncommitted changes detected in any service")
+				return nil
+			}
+			// Force rebuild all services if --force is specified
+			ui.PrintInfo("Force rebuild: building all services without version increment")
+			servicesWithChanges = []config.ServiceDefinition{}
+			for _, s := range allServices {
+				if s.IsBuildable() {
+					servicesWithChanges = append(servicesWithChanges, s)
+				}
+			}
 		}
 
 		if len(servicesWithChanges) == 1 {
