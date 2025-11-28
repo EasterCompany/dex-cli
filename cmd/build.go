@@ -497,10 +497,36 @@ func Build(args []string) error {
 
 	utils.PrintSummaryTable(summaryData)
 	fmt.Println()
+
+	// ---
+	// 8. Ollama Model Sync (runs after all builds and installs are complete)
+	// ---
+	// This uses the *newly-built* dex-cli binary to ensure its own models are in sync.
+	if len(builtServices) > 0 {
+		fmt.Println()
+		ui.PrintHeader("Ollama Model Sync")
+		ui.PrintInfo("Ensuring custom Ollama models are up-to-date...")
+
+		dexCliPath := fmt.Sprintf("%s/Dexter/bin/dex-cli", os.Getenv("HOME"))
+		if _, err := os.Stat(dexCliPath); os.IsNotExist(err) {
+			ui.PrintWarning("Newly built dex-cli not found, skipping model sync.")
+		} else {
+			modelSyncCmd := exec.Command(dexCliPath, "ollama", "pull")
+			modelSyncCmd.Stdout = os.Stdout
+			modelSyncCmd.Stderr = os.Stderr
+			if err := modelSyncCmd.Run(); err != nil {
+				ui.PrintWarning(fmt.Sprintf("Ollama model sync failed: %v", err))
+				ui.PrintInfo("This may be because the Ollama service is not running. You can run 'dex ollama pull' manually later.")
+			} else {
+				ui.PrintSuccess("Ollama models are up-to-date.")
+			}
+		}
+	}
+
 	ui.PrintSuccess("Build complete.")
 
 	// ---
-	// 8. Run release script if version increment was requested (post-build actions)
+	// 9. Run release script if version increment was requested (post-build actions)
 	// ---
 	if incrementType != "" && len(builtServices) > 0 {
 		fmt.Println()

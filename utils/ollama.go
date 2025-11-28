@@ -357,16 +357,16 @@ func CreateCustomModels() error {
 		{
 			Name:      "dex-commit-model",
 			BaseModel: "gpt-oss:20b",
-			SystemPrompt: `You are a git commit message generator. Analyze the diff and output ONE line only.
+			SystemPrompt: `You are a git commit message generator. Analyze the provided diff and generate a concise, one-line commit message.
 
-Format: "verb: short description"
+Format: <answer>verb: short description</answer>
 Verbs: add, update, remove, refactor, fix, docs, test, style, chore
 
 Rules:
-- Output ONLY the commit message, nothing else
-- Keep it under 50 characters
-- Be specific but concise
-- No quotes, no extra text, no explanations`,
+- Output ONLY the single-line commit message inside <answer> tags.
+- DO NOT include any other text, reasoning, or explanations outside the tags.
+- The description must be under 50 characters.
+- Be specific and concise.`,
 		},
 		{
 			Name:      "dex-summary-model",
@@ -511,9 +511,10 @@ func GenerateCommitMessage(diff string) string {
 		return "chore: successful build"
 	}
 
-	// Truncate diff if too long (keep first 2000 chars for context)
-	if len(diff) > 2000 {
-		diff = diff[:2000] + "\n...(truncated)"
+	// Truncate diff if too long (use a larger portion of context window)
+	const maxDiffLength = 6000
+	if len(diff) > maxDiffLength {
+		diff = diff[:maxDiffLength] + "\n...(truncated)"
 	}
 
 	commitMsg, err := GenerateContent("dex-commit-model", diff)
@@ -521,43 +522,27 @@ func GenerateCommitMessage(diff string) string {
 		return "chore: successful build"
 	}
 
-	// Clean up the response
-	commitMsg = strings.TrimSpace(commitMsg)
+	// New parsing logic: extract content from <answer> tags
+	startTag := "<answer>"
+	endTag := "</answer>"
+	startIndex := strings.Index(commitMsg, startTag)
+	endIndex := strings.Index(commitMsg, endTag)
 
-	// Remove thinking blocks (models may output "Thinking..." sections)
-	// The actual commit message is usually the last non-empty line
-	lines := strings.Split(commitMsg, "\n")
-	var finalMsg string
-	for i := len(lines) - 1; i >= 0; i-- {
-		line := strings.TrimSpace(lines[i])
-		// Skip empty lines and thinking markers
-		if line != "" && !strings.HasPrefix(strings.ToLower(line), "thinking") && !strings.Contains(strings.ToLower(line), "done thinking") {
-			finalMsg = line
-			break
+	if startIndex != -1 && endIndex != -1 && endIndex > startIndex {
+		// Extract the content and clean it up
+		finalMsg := commitMsg[startIndex+len(startTag) : endIndex]
+		finalMsg = strings.TrimSpace(finalMsg)
+
+		// Basic validation
+		if finalMsg != "" && strings.Contains(finalMsg, ":") {
+			// Limit length
+			if len(finalMsg) > 72 {
+				finalMsg = finalMsg[:69] + "..."
+			}
+			return finalMsg
 		}
 	}
-	commitMsg = finalMsg
 
-	// Remove common prefixes that models sometimes add
-	commitMsg = strings.TrimPrefix(commitMsg, "git commit -m ")
-	commitMsg = strings.TrimPrefix(commitMsg, "commit message: ")
-	commitMsg = strings.Trim(commitMsg, "\"'`")
-	commitMsg = strings.TrimSpace(commitMsg)
-
-	// Validate format: should contain a colon
-	if !strings.Contains(commitMsg, ":") {
-		return "update: " + commitMsg
-	}
-
-	// Limit length
-	if len(commitMsg) > 72 {
-		commitMsg = commitMsg[:69] + "..."
-	}
-
-	// If empty after cleanup, use default
-	if commitMsg == "" {
-		return "chore: successful build"
-	}
-
-	return commitMsg
+	// Fallback if tags are not found or content is invalid
+	return "chore: successful build"
 }
