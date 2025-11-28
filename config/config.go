@@ -157,14 +157,6 @@ func healOptionsConfig(userOpts *OptionsConfig, defaultOpts *OptionsConfig) bool
 		userOpts.Discord.DebugChannelID = defaultOpts.Discord.DebugChannelID
 	}
 
-	// Check Command Permissions
-	if userOpts.CommandPermissions.AllowedRoles == nil {
-		userOpts.CommandPermissions.AllowedRoles = defaultOpts.CommandPermissions.AllowedRoles
-	}
-	if userOpts.CommandPermissions.UserWhitelist == nil {
-		userOpts.CommandPermissions.UserWhitelist = defaultOpts.CommandPermissions.UserWhitelist
-	}
-
 	// Server Map
 	_, serverMapErr := LoadServerMapConfig()
 	if serverMapErr != nil {

@@ -9,12 +9,11 @@ import (
 
 // OptionsConfig represents the structure of options.json
 type OptionsConfig struct {
-	Doc                string             `json:"_doc"`
-	Editor             string             `json:"editor"`
-	Theme              string             `json:"theme"`
-	Logging            bool               `json:"logging"`
-	Discord            DiscordOptions     `json:"discord"`
-	CommandPermissions CommandPermissions `json:"command_permissions"`
+	Doc     string         `json:"_doc"`
+	Editor  string         `json:"editor"`
+	Theme   string         `json:"theme"`
+	Logging bool           `json:"logging"`
+	Discord DiscordOptions `json:"discord"`
 }
 
 // DiscordOptions holds discord specific configurations
@@ -22,13 +21,6 @@ type DiscordOptions struct {
 	Token          string `json:"token"`
 	ServerID       string `json:"server_id"`
 	DebugChannelID string `json:"debug_channel_id"`
-}
-
-// CommandPermissions defines who can issue commands
-type CommandPermissions struct {
-	DefaultLevel  int      `json:"default_level"`
-	AllowedRoles  []string `json:"allowed_roles"`
-	UserWhitelist []string `json:"user_whitelist"`
 }
 
 // DefaultOptionsConfig returns the default options configuration
@@ -42,11 +34,6 @@ func DefaultOptionsConfig() *OptionsConfig {
 			Token:          "YOUR_DISCORD_BOT_TOKEN_HERE",
 			ServerID:       "YOUR_DISCORD_SERVER_ID_HERE",
 			DebugChannelID: "YOUR_DISCORD_DEBUG_CHANNEL_ID_HERE",
-		},
-		CommandPermissions: CommandPermissions{
-			DefaultLevel:  1,
-			AllowedRoles:  []string{},
-			UserWhitelist: []string{},
 		},
 	}
 }
