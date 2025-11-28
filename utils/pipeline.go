@@ -59,6 +59,15 @@ func RunUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), maj
 	log(fmt.Sprintf("Building %s from local source...", def.ShortName))
 
 	// ---
+	// 0. Stop service if running (to avoid "Text file busy" error)
+	// ---
+	if def.IsManageable() {
+		ui.PrintInfo("Stopping service if running...")
+		stopCmd := exec.Command("systemctl", "--user", "stop", def.SystemdName)
+		_ = stopCmd.Run() // Ignore errors - service might not be running
+	}
+
+	// ---
 	// 1. Tidy
 	// ---
 	ui.PrintInfo("Ensuring Go modules are tidy...")
