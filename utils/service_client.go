@@ -28,6 +28,21 @@ func GetHTTPVersion(service config.ServiceDefinition) (string, error) {
 	return status, nil
 }
 
+// GetHTTPServiceReport retrieves the full JSON service report from /service endpoint
+func GetHTTPServiceReport(service config.ServiceDefinition) (string, error) {
+	url := service.GetHTTP("/service")
+	body, statusCode, err := GetHTTPBody(url)
+	if err != nil {
+		return "", fmt.Errorf("failed to connect to %s: %w", service.ShortName, err)
+	}
+
+	if statusCode != http.StatusOK {
+		return "", fmt.Errorf("%s returned status: %d", service.ShortName, statusCode)
+	}
+
+	return string(body), nil
+}
+
 // GetHTTPBody fetches the raw body from an HTTP endpoint.
 func GetHTTPBody(url string) ([]byte, int, error) {
 	client := &http.Client{

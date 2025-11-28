@@ -46,6 +46,12 @@ func Version(jsonOutput bool, version, branch, commit, buildDate, buildYear, bui
 
 // FormatVersion constructs the full version string from build-time variables.
 func FormatVersion(version, branch, commit, buildDate, buildHash string) string {
-	// The 'version' variable from ldflags is now the full 8-part string.
-	return version
+	// Format: major.minor.patch.branch.commit.buildDate.arch.buildHash
+	arch := fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH)
+
+	// Parse version to extract major.minor.patch
+	versionClean := strings.TrimPrefix(version, "v")
+
+	return fmt.Sprintf("%s.%s.%s.%s.%s.%s",
+		versionClean, branch, commit, buildDate, arch, buildHash)
 }

@@ -457,8 +457,8 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 		}
 	}
 
-	// Get the raw JSON response from the service
-	jsonResponse, err := utils.GetHTTPVersion(service)
+	// Get the full JSON service report
+	jsonResponse, err := utils.GetHTTPServiceReport(service)
 	if err != nil {
 		return badStatusRow()
 	}
