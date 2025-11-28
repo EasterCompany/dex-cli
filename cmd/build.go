@@ -507,7 +507,7 @@ func Build(args []string) error {
 		ui.PrintHeader("Ollama Model Sync")
 		ui.PrintInfo("Ensuring custom Ollama models are up-to-date...")
 
-		dexCliPath := fmt.Sprintf("%s/Dexter/bin/dex-cli", os.Getenv("HOME"))
+		dexCliPath := fmt.Sprintf("%s/Dexter/bin/dex", os.Getenv("HOME"))
 		if _, err := os.Stat(dexCliPath); os.IsNotExist(err) {
 			ui.PrintWarning("Newly built dex-cli not found, skipping model sync.")
 		} else {
