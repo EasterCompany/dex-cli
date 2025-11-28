@@ -199,8 +199,8 @@ func copyEventHandlers(versionDir, shortVersion, platform string, data *ReleaseD
 func getServiceFullVersion(service config.ServiceDefinition) string {
 	binPath := filepath.Join("/home/owen/Dexter/bin", getBinaryName(service))
 
-	// Run the binary with --version to get full version
-	cmd := exec.Command(binPath, "--version")
+	// Run the binary with 'version' argument to get full version
+	cmd := exec.Command(binPath, "version")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return "unknown"
