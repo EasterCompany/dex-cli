@@ -18,9 +18,10 @@ type OptionsConfig struct {
 
 // DiscordOptions holds discord specific configurations
 type DiscordOptions struct {
-	Token          string `json:"token"`
-	ServerID       string `json:"server_id"`
-	DebugChannelID string `json:"debug_channel_id"`
+	Token             string `json:"token"`
+	ServerID          string `json:"server_id"`
+	DebugChannelID    string `json:"debug_channel_id"`
+	MasterDiscordUser string `json:"master_discord_user"`
 }
 
 // DefaultOptionsConfig returns the default options configuration
@@ -31,9 +32,10 @@ func DefaultOptionsConfig() *OptionsConfig {
 		Theme:   "dark",
 		Logging: true,
 		Discord: DiscordOptions{
-			Token:          "YOUR_DISCORD_BOT_TOKEN_HERE",
-			ServerID:       "YOUR_DISCORD_SERVER_ID_HERE",
-			DebugChannelID: "YOUR_DISCORD_DEBUG_CHANNEL_ID_HERE",
+			Token:             "YOUR_DISCORD_BOT_TOKEN_HERE",
+			ServerID:          "YOUR_DISCORD_SERVER_ID_HERE",
+			DebugChannelID:    "YOUR_DISCORD_DEBUG_CHANNEL_ID_HERE",
+			MasterDiscordUser: "313071000877137920",
 		},
 	}
 }
