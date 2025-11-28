@@ -130,7 +130,7 @@ func GetCommandRequirements() map[string]CommandRequirement {
 		"whisper": {
 			Name:        "whisper",
 			Description: "Speech-to-text transcription with Whisper",
-			Check:       func() bool { return true }, // Always available
+			Check:       HasPythonVenv,
 		},
 	}
 }
