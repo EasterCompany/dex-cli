@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -49,6 +51,25 @@ func GetServiceVersion(service config.ServiceDefinition) string {
 		}
 		return version
 	}
+}
+
+// GetBinaryVersion gets the version by executing the binary with 'version' argument
+// This is used during build to get the version of a newly-built binary
+func GetBinaryVersion(service config.ServiceDefinition) string {
+	var binPath string
+	if service.ShortName == "cli" {
+		binPath = filepath.Join(os.Getenv("HOME"), "Dexter", "bin", "dex")
+	} else {
+		binPath = filepath.Join(os.Getenv("HOME"), "Dexter", "bin", service.ID)
+	}
+
+	cmd := exec.Command(binPath, "version")
+	output, err := cmd.Output()
+	if err != nil {
+		return "N/A"
+	}
+
+	return strings.TrimSpace(string(output))
 }
 
 // GetFullServiceVersion returns the full, untruncated version of a service.

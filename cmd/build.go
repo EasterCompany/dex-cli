@@ -414,11 +414,12 @@ func Build(args []string) error {
 	for _, s := range allServices {
 		if s.IsBuildable() {
 			oldVersionStr := oldVersions[s.ID]
-			newVersionStr := utils.GetServiceVersion(s)
+			// Get version from the newly-built binary, not the running service
+			newVersionStr := utils.GetBinaryVersion(s)
 
 			if s.Type != "cli" {
 				oldVersionStr = utils.ParseServiceVersionFromJSON(oldVersionStr)
-				newVersionStr = utils.ParseServiceVersionFromJSON(newVersionStr)
+				// newVersionStr is already the plain version string from binary
 			}
 
 			// Get the latest commit message from the repository (not from the embedded version)
