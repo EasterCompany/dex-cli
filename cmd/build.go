@@ -256,17 +256,15 @@ func Build(args []string) error {
 	}
 
 	// ---
-	// 1. Get initial versions and sizes
+	// 1. Capture "before" state: Get versions and sizes by executing binaries
 	// ---
+	ui.PrintInfo("Capturing current versions...")
 	oldVersions := make(map[string]string)
 	oldSizes := make(map[string]int64)
 	for _, s := range allServices {
 		if s.IsBuildable() {
-			if s.ShortName == "cli" {
-				oldVersions[s.ID] = RunningVersion
-			} else {
-				oldVersions[s.ID] = utils.GetServiceVersion(s)
-			}
+			// Single source of truth: execute binary with 'version' argument
+			oldVersions[s.ID] = utils.GetBinaryVersion(s)
 			oldSizes[s.ID] = utils.GetBinarySize(s)
 		}
 	}
@@ -336,7 +334,12 @@ func Build(args []string) error {
 		})
 	}
 
-	// Execute build tasks
+	// ---
+	// 2. Build Phase: Build each service
+	// ---
+	ui.PrintHeader("Build Phase")
+	var builtServices []config.ServiceDefinition
+
 	for i, task := range buildTasks {
 		if i > 0 {
 			fmt.Println()
@@ -359,37 +362,71 @@ func Build(args []string) error {
 		}
 
 		if built {
+			builtServices = append(builtServices, s)
+			ui.PrintSuccess(fmt.Sprintf("Successfully built %s!", s.ShortName))
+		}
+	}
+
+	// ---
+	// 3. Install Phase: Install each built service
+	// ---
+	if len(builtServices) > 0 {
+		fmt.Println()
+		ui.PrintHeader("Install Phase")
+
+		for _, s := range builtServices {
 			if err := utils.InstallSystemdService(s); err != nil {
 				return err
 			}
-			ui.PrintSuccess(fmt.Sprintf("Successfully built and installed %s!", s.ShortName))
+			ui.PrintSuccess(fmt.Sprintf("Successfully installed %s!", s.ShortName))
 		}
 	}
 
 	// ---
-	// 3. Git Add, Commit, Push (only for built services)
+	// 4. Capture "after" state: Get versions by executing newly-built binaries
 	// ---
 	fmt.Println()
-	ui.PrintInfo(ui.Colorize("Git version control", ui.ColorCyan))
+	ui.PrintInfo("Capturing new versions...")
+	newVersions := make(map[string]string)
+	newSizes := make(map[string]int64)
+	for _, s := range builtServices {
+		// Single source of truth: execute newly-built binary with 'version' argument
+		newVersions[s.ID] = utils.GetBinaryVersion(s)
+		newSizes[s.ID] = utils.GetBinarySize(s)
+	}
 
-	for _, task := range buildTasks {
-		if err := gitAddCommitPush(task.service, incrementType, task.targetMajor, task.targetMinor, task.targetPatch); err != nil {
-			return err
+	// ---
+	// 5. Git Phase: ALL git operations for ALL built services
+	// ---
+	if len(builtServices) > 0 {
+		fmt.Println()
+		ui.PrintHeader("Git Phase")
+
+		for _, task := range buildTasks {
+			// Only do git operations for services that were actually built
+			wasBuilt := false
+			for _, built := range builtServices {
+				if built.ID == task.service.ID {
+					wasBuilt = true
+					break
+				}
+			}
+			if !wasBuilt {
+				continue
+			}
+
+			if err := gitAddCommitPush(task.service, incrementType, task.targetMajor, task.targetMinor, task.targetPatch); err != nil {
+				return err
+			}
 		}
 	}
 
 	// ---
-	// 4. Publish to easter.company (major/minor only, NOT patch)
+	// 6. Publish to easter.company (major/minor only, NOT patch)
 	// ---
 	if incrementType == "major" || incrementType == "minor" {
 		fmt.Println()
-		ui.PrintHeader("Publishing Release")
-
-		// Get list of built services
-		var builtServices []config.ServiceDefinition
-		for _, task := range buildTasks {
-			builtServices = append(builtServices, task.service)
-		}
+		ui.PrintHeader("Publish Phase")
 
 		// Get short version (e.g., "2.1.0")
 		shortVersion := fmt.Sprintf("%d.%d.%d", targetMajorAll, targetMinorAll, targetPatchAll)
@@ -404,32 +441,42 @@ func Build(args []string) error {
 	}
 
 	// ---
-	// 5. Final Summary
+	// 7. Summary
 	// ---
 	fmt.Println()
-	ui.PrintHeader("Complete")
-	time.Sleep(2 * time.Second)
+	ui.PrintHeader("Summary")
+	time.Sleep(1 * time.Second)
 
 	var summaryData []utils.SummaryInfo
 	for _, s := range allServices {
 		if s.IsBuildable() {
 			oldVersionStr := oldVersions[s.ID]
-			// Get version from the newly-built binary, not the running service
-			newVersionStr := utils.GetBinaryVersion(s)
+			newVersionStr := oldVersionStr // Default to old version if not built
+			oldSize := oldSizes[s.ID]
+			newSize := oldSize // Default to old size if not built
 
-			if s.Type != "cli" {
-				oldVersionStr = utils.ParseServiceVersionFromJSON(oldVersionStr)
-				// newVersionStr is already the plain version string from binary
+			// Check if this service was built
+			wasBuilt := false
+			for _, built := range builtServices {
+				if built.ID == s.ID {
+					wasBuilt = true
+					newVersionStr = newVersions[s.ID]
+					newSize = newSizes[s.ID]
+					break
+				}
 			}
 
-			// Get the latest commit message from the repository (not from the embedded version)
-			// This ensures we show the commit message from any automated commits made during the build
+			// Get the latest commit message from the repository
 			var commitNote string
-			repoPath, err := config.ExpandPath(s.Source)
-			if err == nil {
-				_, latestCommit := git.GetVersionInfo(repoPath)
-				if latestCommit != "" && latestCommit != "unknown" {
-					commitNote, _ = git.GetCommitMessage(repoPath, latestCommit)
+			if wasBuilt {
+				repoPath, err := config.ExpandPath(s.Source)
+				if err == nil {
+					_, latestCommit := git.GetVersionInfo(repoPath)
+					if latestCommit != "" && latestCommit != "unknown" {
+						commitNote, _ = git.GetCommitMessage(repoPath, latestCommit)
+					} else {
+						commitNote = "N/A"
+					}
 				} else {
 					commitNote = "N/A"
 				}
@@ -441,8 +488,8 @@ func Build(args []string) error {
 				Service:       s,
 				OldVersion:    oldVersionStr,
 				NewVersion:    newVersionStr,
-				OldSize:       oldSizes[s.ID],
-				NewSize:       utils.GetBinarySize(s),
+				OldSize:       oldSize,
+				NewSize:       newSize,
 				ChangeSummary: commitNote,
 			})
 		}
@@ -450,14 +497,14 @@ func Build(args []string) error {
 
 	utils.PrintSummaryTable(summaryData)
 	fmt.Println()
-	ui.PrintSuccess("All services are built.")
+	ui.PrintSuccess("Build complete.")
 
 	// ---
-	// 6. Run release script if version increment was requested
+	// 8. Run release script if version increment was requested (post-build actions)
 	// ---
-	if incrementType != "" {
+	if incrementType != "" && len(builtServices) > 0 {
 		fmt.Println()
-		ui.PrintHeader("Publishing Release")
+		ui.PrintHeader("Post-Build Actions")
 		releaseScript := fmt.Sprintf("%s/EasterCompany/easter.company/scripts/release_dex-cli.sh", os.Getenv("HOME"))
 
 		// Check if release script exists
