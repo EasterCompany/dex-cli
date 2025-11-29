@@ -92,7 +92,7 @@ func Status(serviceShortName string) error {
 }
 
 // checkServiceStatus acts as a dispatcher, routing to the correct status checker based on service type.
-// All handlers must return exactly 8 columns: SERVICE, ADDRESS, VERSION, BRANCH, COMMIT, STATUS, UPTIME, SOURCE.
+// All handlers must return exactly 9 columns: SERVICE, ADDRESS, VERSION, BRANCH, COMMIT, STATUS, UPTIME, CPU, MEM.
 func checkServiceStatus(service config.ServiceDefinition) ui.TableRow {
 	serviceID := ui.Truncate(service.ShortName, maxServiceLen)
 	address := ui.Truncate(service.GetHost(), maxAddressLen)
@@ -139,7 +139,7 @@ func formatUptime(seconds int) string {
 }
 
 // checkCLIStatus checks if the CLI tool is installed and working
-// Returns 8 columns: SERVICE, ADDRESS, VERSION, BRANCH, COMMIT, STATUS, UPTIME, SOURCE
+// Returns 9 columns: SERVICE, ADDRESS, VERSION, BRANCH, COMMIT, STATUS, UPTIME, CPU, MEM
 func checkCLIStatus(service config.ServiceDefinition, serviceID, address string) ui.TableRow {
 	cmd := exec.Command("dex", "version")
 	output, err := cmd.CombinedOutput()
@@ -172,7 +172,9 @@ func checkCLIStatus(service config.ServiceDefinition, serviceID, address string)
 		colorizeNA(branch),
 		colorizeNA(commit),
 		colorizeStatus(status),
-		colorizeNA("N/A"),
+		colorizeNA("N/A"), // UPTIME
+		colorizeNA("N/A"), // CPU
+		colorizeNA("N/A"), // MEM
 	}
 }
 
@@ -238,8 +240,106 @@ func getSystemdServiceUptime(serviceName string) string {
 	return formatUptime(uptimeSeconds)
 }
 
+// getSystemdServiceMemory gets the memory usage percentage of a systemd service
+func getSystemdServiceMemory(serviceName string) string {
+	cmd := exec.Command("systemctl", "show", serviceName, "--property=MemoryCurrent")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "N/A"
+	}
+
+	line := strings.TrimSpace(string(output))
+	if !strings.HasPrefix(line, "MemoryCurrent=") {
+		return "N/A"
+	}
+
+	memoryStr := strings.TrimPrefix(line, "MemoryCurrent=")
+	var memoryBytes int64
+	_, err = fmt.Sscanf(memoryStr, "%d", &memoryBytes)
+	if err != nil || memoryBytes <= 0 {
+		return "N/A"
+	}
+
+	// Get total system memory
+	totalMemory, err := getTotalSystemMemory()
+	if err != nil {
+		return "N/A"
+	}
+
+	// Calculate percentage
+	percentage := (float64(memoryBytes) / float64(totalMemory)) * 100
+	return fmt.Sprintf("%.1f%%", percentage)
+}
+
+// getSystemdServiceCPU gets the average CPU usage of a systemd service
+func getSystemdServiceCPU(serviceName string) string {
+	// Get CPU usage and uptime
+	cmd := exec.Command("systemctl", "show", serviceName, "--property=CPUUsageNSec", "--property=ActiveEnterTimestamp")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "N/A"
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	var cpuNanoseconds int64
+	var startTime time.Time
+
+	for _, line := range lines {
+		if strings.HasPrefix(line, "CPUUsageNSec=") {
+			cpuStr := strings.TrimPrefix(line, "CPUUsageNSec=")
+			_, _ = fmt.Sscanf(cpuStr, "%d", &cpuNanoseconds)
+		} else if strings.HasPrefix(line, "ActiveEnterTimestamp=") {
+			timestampStr := strings.TrimPrefix(line, "ActiveEnterTimestamp=")
+			if timestampStr != "" {
+				layout := "Mon 2006-01-02 15:04:05 MST"
+				startTime, _ = time.Parse(layout, timestampStr)
+			}
+		}
+	}
+
+	if cpuNanoseconds <= 0 || startTime.IsZero() {
+		return "N/A"
+	}
+
+	// Calculate elapsed time in nanoseconds
+	elapsedNanoseconds := time.Since(startTime).Nanoseconds()
+	if elapsedNanoseconds <= 0 {
+		return "N/A"
+	}
+
+	// Calculate average CPU percentage
+	// CPU time / elapsed time * 100 = percentage
+	percentage := (float64(cpuNanoseconds) / float64(elapsedNanoseconds)) * 100
+	return fmt.Sprintf("%.1f%%", percentage)
+}
+
+// getTotalSystemMemory reads the total system memory from /proc/meminfo
+func getTotalSystemMemory() (int64, error) {
+	cmd := exec.Command("grep", "MemTotal", "/proc/meminfo")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return 0, err
+	}
+
+	// Parse output like: MemTotal:       131825740 kB
+	line := strings.TrimSpace(string(output))
+	fields := strings.Fields(line)
+	if len(fields) < 2 {
+		return 0, fmt.Errorf("unexpected format")
+	}
+
+	var memoryKB int64
+	_, err = fmt.Sscanf(fields[1], "%d", &memoryKB)
+	if err != nil {
+		return 0, err
+	}
+
+	// Convert KB to bytes
+	return memoryKB * 1024, nil
+}
+
 // checkOllamaStatus checks an Ollama service via its HTTP API
-// Returns 8 columns: SERVICE, ADDRESS, VERSION, BRANCH, COMMIT, STATUS, UPTIME, SOURCE
+// Returns 9 columns: SERVICE, ADDRESS, VERSION, BRANCH, COMMIT, STATUS, UPTIME, CPU, MEM
 func checkOllamaStatus(service config.ServiceDefinition, serviceID, address string) ui.TableRow {
 	badStatusRow := func() ui.TableRow {
 		return []string{
@@ -250,6 +350,8 @@ func checkOllamaStatus(service config.ServiceDefinition, serviceID, address stri
 			colorizeNA("--"),      // COMMIT
 			colorizeStatus("BAD"), // STATUS
 			colorizeNA("N/A"),     // UPTIME
+			colorizeNA("N/A"),     // CPU
+			colorizeNA("N/A"),     // MEM
 		}
 	}
 
@@ -271,10 +373,14 @@ func checkOllamaStatus(service config.ServiceDefinition, serviceID, address stri
 		return badStatusRow()
 	}
 
-	// Get uptime from systemd if this is a local service
+	// Get uptime, CPU, and memory from systemd if this is a local service
 	uptime := "N/A"
+	cpu := "N/A"
+	mem := "N/A"
 	if isLocalAddress(service.Domain) {
 		uptime = getSystemdServiceUptime("ollama")
+		cpu = getSystemdServiceCPU("ollama")
+		mem = getSystemdServiceMemory("ollama")
 	}
 
 	// Successful status row
@@ -286,11 +392,13 @@ func checkOllamaStatus(service config.ServiceDefinition, serviceID, address stri
 		colorizeNA("--"), // COMMIT
 		colorizeStatus("OK"),
 		colorizeNA(uptime),
+		colorizeNA(cpu),
+		colorizeNA(mem),
 	}
 }
 
 // checkCacheStatus checks a cache/db service (Redis/Valkey) with a simplified PING command.
-// Returns 8 columns: SERVICE, ADDRESS, VERSION, BRANCH, COMMIT, STATUS, UPTIME, SOURCE
+// Returns 9 columns: SERVICE, ADDRESS, VERSION, BRANCH, COMMIT, STATUS, UPTIME, CPU, MEM
 func checkCacheStatus(service config.ServiceDefinition, serviceID, address string) ui.TableRow {
 	badStatusRow := func(reason string) ui.TableRow {
 		// Log the failure reason for debugging
@@ -306,6 +414,8 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 			colorizeNA("--"),      // COMMIT
 			colorizeStatus("BAD"), // STATUS
 			colorizeNA("N/A"),     // UPTIME
+			colorizeNA("N/A"),     // CPU
+			colorizeNA("N/A"),     // MEM
 		}
 	}
 
@@ -415,6 +525,20 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 		}
 	}
 
+	// Get CPU and memory from systemd for local Redis services
+	cpu := "N/A"
+	mem := "N/A"
+	if isLocalAddress(service.Domain) {
+		// Try common Redis systemd service names
+		cpu = getSystemdServiceCPU("redis")
+		mem = getSystemdServiceMemory("redis")
+		// If "redis" doesn't work, try "redis-server"
+		if cpu == "N/A" {
+			cpu = getSystemdServiceCPU("redis-server")
+			mem = getSystemdServiceMemory("redis-server")
+		}
+	}
+
 	// Successful status row
 	return []string{
 		serviceID,
@@ -424,11 +548,13 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 		colorizeNA("--"), // COMMIT
 		colorizeStatus("OK"),
 		colorizeNA(uptime),
+		colorizeNA(cpu),
+		colorizeNA(mem),
 	}
 }
 
 // checkHTTPStatus checks a service via its new, unified /service endpoint
-// Returns 8 columns: SERVICE, ADDRESS, VERSION, BRANCH, COMMIT, STATUS, UPTIME, SOURCE
+// Returns 9 columns: SERVICE, ADDRESS, VERSION, BRANCH, COMMIT, STATUS, UPTIME, CPU, MEM
 func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string) ui.TableRow {
 	// A struct to unmarshal the necessary fields for the status table
 	type serviceReport struct {
@@ -443,6 +569,14 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 			Status string `json:"status"`
 			Uptime string `json:"uptime"`
 		} `json:"health"`
+		Metrics struct {
+			CPU struct {
+				Avg float64 `json:"avg"`
+			} `json:"cpu"`
+			Memory struct {
+				Avg float64 `json:"avg"`
+			} `json:"memory"`
+		} `json:"metrics"`
 	}
 
 	badStatusRow := func() ui.TableRow {
@@ -454,6 +588,8 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 			colorizeNA("--"),      // COMMIT
 			colorizeStatus("BAD"), // STATUS
 			colorizeNA("N/A"),     // UPTIME
+			colorizeNA("N/A"),     // CPU
+			colorizeNA("N/A"),     // MEM
 		}
 	}
 
@@ -479,6 +615,16 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 	// Cleanup Uptime for display
 	uptime := ui.Truncate(report.Health.Uptime, maxUptimeLen)
 
+	// Format CPU and Memory metrics
+	cpu := "N/A"
+	mem := "N/A"
+	if report.Metrics.CPU.Avg > 0 {
+		cpu = fmt.Sprintf("%.1f%%", report.Metrics.CPU.Avg)
+	}
+	if report.Metrics.Memory.Avg > 0 {
+		mem = fmt.Sprintf("%.1f%%", report.Metrics.Memory.Avg)
+	}
+
 	return []string{
 		serviceID,
 		address,
@@ -487,6 +633,8 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 		colorizeNA(ui.Truncate(commit, maxCommitLen)),
 		colorizeStatus(strings.ToUpper(report.Health.Status)),
 		colorizeNA(uptime),
+		colorizeNA(cpu),
+		colorizeNA(mem),
 	}
 }
 
