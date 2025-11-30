@@ -508,7 +508,7 @@ func GetOllamaStatus() error {
 
 func GenerateCommitMessage(diff string) string {
 	if strings.TrimSpace(diff) == "" {
-		return "chore: successful build"
+		return "chore: code clean up"
 	}
 
 	// Truncate diff if too long (use a larger portion of context window)
@@ -524,7 +524,7 @@ func GenerateCommitMessage(diff string) string {
 
 	commitMsg, err := GenerateContent("dex-commit-model", diff)
 	if err != nil {
-		return "chore: successful build"
+		return "chore: code clean up"
 	}
 
 	// Log raw output for debugging
@@ -554,5 +554,5 @@ func GenerateCommitMessage(diff string) string {
 	}
 
 	// Fallback if tags are not found or content is invalid
-	return "chore: successful build"
+	return "chore: code clean up"
 }
