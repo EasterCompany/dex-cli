@@ -130,6 +130,9 @@ func main() {
 	case "event":
 		runCommand(func() error { return cmd.Event(os.Args[2:]) })
 
+	case "discord":
+		runCommand(func() error { return cmd.Discord(os.Args[2:]) })
+
 	case "config":
 		runCommand(func() error { return cmd.Config(os.Args[2:]) })
 

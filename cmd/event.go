@@ -2,6 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"strings"
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/ui"
@@ -9,9 +12,10 @@ import (
 )
 
 func handleDefaultEventOutput() error {
-	fmt.Println("Event Command Usage:")
-	fmt.Println("  event              Show default event information (e.g., summary or help)")
-	fmt.Println("  event service      Show the raw status from the /service endpoint")
+	ui.PrintHeader("Event Command Usage")
+	ui.PrintInfo("event service          | Show the raw status from the /service endpoint")
+	ui.PrintInfo("event log              | Show the last 10 human-readable event logs")
+	ui.PrintInfo("event delete <pattern> | Delete events matching a pattern (e.g., 'event delete *')")
 	return nil
 }
 
@@ -30,19 +34,59 @@ func handleEventServiceStatus() error {
 	return nil
 }
 
+func handleEventDelete(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("missing pattern for event delete. Usage: event delete <pattern>")
+	}
+
+	eventServicePath, err := config.ExpandPath("~/Dexter/bin/dex-event-service")
+	if err != nil {
+		return err
+	}
+
+	cmdArgs := append([]string{"-delete"}, args...)
+	cmd := exec.Command(eventServicePath, cmdArgs...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}
+
+func handleEventLog() error {
+	def, err := config.Resolve("event")
+	if err != nil {
+		return err
+	}
+
+	logs, _, err := utils.GetHTTPBody(def.GetHTTP("/events?ml=10&format=text"))
+	if err != nil {
+		return fmt.Errorf("failed to get event logs: %w", err)
+	}
+
+	if strings.TrimSpace(string(logs)) == "" {
+		ui.PrintInfo("No events found.")
+		return nil
+	}
+
+	ui.PrintSubHeader("Last 10 Events")
+	fmt.Println(string(logs))
+	return nil
+}
+
 func Event(args []string) error {
 	if len(args) == 0 {
-		// Case 1: `event` (no args) -> default output
 		return handleDefaultEventOutput()
 	}
 
 	subcommand := args[0]
 	switch subcommand {
 	case "service":
-		// Case 2: `event service` -> shows the status from the /service endpoint
 		return handleEventServiceStatus()
+	case "delete":
+		return handleEventDelete(args[1:])
+	case "log":
+		return handleEventLog()
 	default:
-		// Handle unknown subcommands
-		return fmt.Errorf("unknown event subcommand: %s\n\nUsage:\n  event\n  event service", subcommand)
+		return fmt.Errorf("unknown event subcommand: %s", subcommand)
 	}
 }
