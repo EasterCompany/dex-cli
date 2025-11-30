@@ -113,7 +113,10 @@ func checkServiceStatus(service config.ServiceDefinition) ui.TableRow {
 
 // colorizeNA colors "N/A" values dark gray, and leaves other values as-is.
 func colorizeNA(value string) string {
-	if value == "N/A" || value == "--" || value == "" {
+	if value == "N/A" {
+		value = "--"
+	}
+	if value == "--" || value == "" {
 		return fmt.Sprintf("%s%s%s", ui.ColorDarkGray, value, ui.ColorReset)
 	}
 	return value
