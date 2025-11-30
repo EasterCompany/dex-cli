@@ -283,19 +283,19 @@ func HasModelService() bool {
 	return false
 }
 
-// HasDiscordService checks if dex-event-service is in service-map.json
+// HasDiscordService checks if dex-discord-service is in service-map.json
 func HasDiscordService() bool {
 	serviceMap, err := LoadServiceMapConfig()
 	if err != nil {
 		return false // If we can't load the map, don't show the command
 	}
 
-	coreServices, ok := serviceMap.Services["cs"]
+	thirdPartyServices, ok := serviceMap.Services["th"]
 	if !ok {
 		return false
 	}
 
-	for _, service := range coreServices {
+	for _, service := range thirdPartyServices {
 		if service.ID == "dex-discord-service" {
 			return true
 		}
