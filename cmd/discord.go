@@ -9,8 +9,8 @@ import (
 )
 
 func handleDefaultDiscordOutput() error {
-	fmt.Println("Discord Command Usage:")
-	fmt.Println("  discord service      Show the raw status from the /service endpoint")
+	ui.PrintHeader("Event Command Usage")
+	ui.PrintInfo("  discord service          | Show the raw status from the /service endpoint")
 	return nil
 }
 
