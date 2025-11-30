@@ -517,10 +517,20 @@ func GenerateCommitMessage(diff string) string {
 		diff = diff[:maxDiffLength] + "\n...(truncated)"
 	}
 
+	// Log raw input for debugging
+	fmt.Println("--- LLM Input (Diff) ---")
+	fmt.Println(diff)
+	fmt.Println("------------------------")
+
 	commitMsg, err := GenerateContent("dex-commit-model", diff)
 	if err != nil {
 		return "chore: successful build"
 	}
+
+	// Log raw output for debugging
+	fmt.Println("--- LLM Raw Output ---")
+	fmt.Println(commitMsg)
+	fmt.Println("----------------------")
 
 	// New parsing logic: extract content from <answer> tags
 	startTag := "<answer>"
