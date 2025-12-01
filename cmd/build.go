@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -92,6 +93,28 @@ func verifyDeveloperAccess() error {
 		return fmt.Errorf("build command is only available for Easter Company developers with source code access")
 	}
 	return nil
+}
+
+// buildFrontendService executes the build.sh script for a frontend service like easter.company
+func buildFrontendService(def config.ServiceDefinition, log func(message string)) (bool, error) {
+	sourcePath, err := config.ExpandPath(def.Source)
+	if err != nil {
+		return false, fmt.Errorf("failed to expand source path for %s: %w", def.ShortName, err)
+	}
+
+	buildScriptPath := filepath.Join(sourcePath, "scripts", "build.sh")
+
+	log(fmt.Sprintf("[%s] Running frontend build script: %s", def.ShortName, buildScriptPath))
+	cmd := exec.Command("bash", buildScriptPath)
+	cmd.Dir = sourcePath // Execute the script from the service's source directory
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return false, fmt.Errorf("failed to build frontend service %s: %w", def.ShortName, err)
+	}
+
+	return true, nil
 }
 
 // verifyGitHubAccess performs a one-time check to verify GitHub access to EasterCompany org
@@ -356,7 +379,14 @@ func Build(args []string) error {
 		ui.PrintInfo(fmt.Sprintf("Incrementing version: %d.%d.%d -> %d.%d.%d (%s)",
 			baseMajor, baseMinor, basePatch, task.targetMajor, task.targetMinor, task.targetPatch, incrementType))
 
-		built, buildErr := utils.RunUnifiedBuildPipeline(s, log, task.targetMajor, task.targetMinor, task.targetPatch)
+		var built bool
+		var buildErr error
+		if s.Type == "fe" { // Check if it's a frontend service
+			built, buildErr = buildFrontendService(s, log)
+		} else {
+			built, buildErr = utils.RunUnifiedBuildPipeline(s, log, task.targetMajor, task.targetMinor, task.targetPatch)
+		}
+
 		if buildErr != nil {
 			return buildErr
 		}
@@ -375,6 +405,11 @@ func Build(args []string) error {
 		ui.PrintHeader("Install Phase")
 
 		for _, s := range builtServices {
+			// Frontend services don't have a systemd service to install
+			if s.SystemdName == "" {
+				ui.PrintInfo(fmt.Sprintf("Skipping systemd installation for frontend service %s", s.ShortName))
+				continue
+			}
 			if err := utils.InstallSystemdService(s); err != nil {
 				return err
 			}

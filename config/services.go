@@ -174,6 +174,17 @@ var serviceDefinitions = []ServiceDefinition{
 		Domain:      "0.0.0.0",
 		Port:        "8300",
 	},
+	// Frontend (fe)
+	{
+		ID:          "easter-company",
+		ShortName:   "web",
+		SystemdName: "", // Frontend doesn't typically have a systemd service
+		Type:        "fe",
+		Repo:        "git@github.com:EasterCompany/easter.company.git",
+		Source:      "~/EasterCompany/easter.company",
+		Domain:      "0.0.0.0",
+		Port:        "80",
+	},
 	// OS Services (os)
 	{
 		ID:        "local-cache-0",
@@ -346,8 +357,8 @@ func DefaultServiceMapConfig() *ServiceMapConfig {
 	// Create the map from the hardcoded definitions
 	services := make(map[string][]ServiceEntry)
 	for _, def := range serviceDefinitions {
-		// Only "cli" and "os" types are in the map by default
-		if def.Type == "cli" || def.Type == "os" {
+		// Only "cli", "fe" and "os" types are in the map by default
+		if def.Type == "cli" || def.Type == "fe" || def.Type == "os" {
 			services[def.Type] = append(services[def.Type], def.ToServiceEntry())
 		} else {
 			// Ensure other types have at least an empty slice
