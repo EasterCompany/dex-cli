@@ -178,7 +178,7 @@ var serviceDefinitions = []ServiceDefinition{
 	{
 		ID:          "easter-company",
 		ShortName:   "web",
-		SystemdName: "", // Frontend doesn't typically have a systemd service
+		SystemdName: "easter-company.service", // Frontend now has a systemd service
 		Type:        "fe",
 		Repo:        "git@github.com:EasterCompany/easter.company.git",
 		Source:      "~/EasterCompany/easter.company",

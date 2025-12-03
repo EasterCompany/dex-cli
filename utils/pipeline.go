@@ -212,6 +212,25 @@ func InstallSystemdService(def config.ServiceDefinition) error {
 		return fmt.Errorf("could not create log directory: %w", err)
 	}
 
+	var execStartCommand string
+	if def.Type == "fe" {
+		// For frontend services, execute `dex serve`
+		// GetServiceDefinition returns a value, so take its address to call pointer method GetBinaryPath
+		cliServiceDef := config.GetServiceDefinition("dex-cli")
+		dexBinaryPath, err := config.ExpandPath((&cliServiceDef).GetBinaryPath())
+		if err != nil {
+			return fmt.Errorf("could not get dex-cli binary path: %w", err)
+		}
+		sourcePath, err := config.ExpandPath(def.Source)
+		if err != nil {
+			return fmt.Errorf("could not expand source path for %s: %w", def.ShortName, err)
+		}
+		execStartCommand = fmt.Sprintf("%s serve --dir %s --port %s", dexBinaryPath, sourcePath, def.Port)
+	} else {
+		// For other services, execute their own binary
+		execStartCommand = executablePath
+	}
+
 	// Create service file content
 	serviceFileContent := fmt.Sprintf(`[Unit]
 Description=%s
@@ -226,7 +245,7 @@ StandardError=append:%s
 
 [Install]
 WantedBy=default.target
-`, def.ID, executablePath, logPath, logPath)
+`, def.ID, execStartCommand, logPath, logPath)
 
 	// Write the service file
 	if err := os.WriteFile(serviceFilePath, []byte(serviceFileContent), 0644); err != nil {
