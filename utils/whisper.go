@@ -1,12 +1,13 @@
 package utils
 
 import (
-	"encoding/base64"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 
+	"github.com/EasterCompany/dex-cli/cache"
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/ui"
 )
@@ -212,26 +213,21 @@ except Exception as e:
 	return nil
 }
 
-// TranscribeBytes transcribes raw audio data (base64 encoded)
-func TranscribeBytes(encodedData string) error {
-	ui.PrintHeader("Transcribing audio data")
+// TranscribeRedisKey transcribes audio stored in Redis
+func TranscribeRedisKey(key string) error {
+	ui.PrintHeader(fmt.Sprintf("Transcribing from Redis Key: %s", key))
 
-	// Get python paths
-	_, pythonExecutable, _, _, err := getPythonPaths()
+	ctx := context.Background()
+	rdb, err := cache.GetLocalClient(ctx)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to connect to Redis: %w", err)
 	}
+	defer func() { _ = rdb.Close() }()
 
-	// Get model path
-	modelPath, err := getWhisperModelPath()
+	// Fetch audio data
+	audioData, err := rdb.Get(ctx, key).Bytes()
 	if err != nil {
-		return err
-	}
-	modelDir := filepath.Join(modelPath, "large-v3-turbo")
-
-	// Check if model exists
-	if _, err := os.Stat(modelDir); err != nil {
-		return fmt.Errorf("whisper model not found at %s. Run 'dex whisper init' first", modelDir)
+		return fmt.Errorf("failed to fetch audio from Redis: %w", err)
 	}
 
 	// Create temporary file for the audio data
@@ -243,12 +239,6 @@ func TranscribeBytes(encodedData string) error {
 		_ = os.Remove(tmpFile.Name())
 	}()
 
-	// Decode base64 data
-	audioData, err := base64.StdEncoding.DecodeString(encodedData)
-	if err != nil {
-		return fmt.Errorf("failed to decode audio data: %w", err)
-	}
-
 	// Write to temporary file
 	if _, err := tmpFile.Write(audioData); err != nil {
 		return fmt.Errorf("failed to write audio data: %w", err)
@@ -257,64 +247,6 @@ func TranscribeBytes(encodedData string) error {
 		return fmt.Errorf("failed to close temporary file: %w", err)
 	}
 
-	// Create transcription script using transformers
-	transcribeScript := fmt.Sprintf(`
-import sys
-import torch
-from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
-
-try:
-    # Set device
-    device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
-
-    print("Loading Whisper model from local path...", file=sys.stderr)
-    model_path = "%s"
-
-    # Load model and processor from local directory
-    model = AutoModelForSpeechSeq2Seq.from_pretrained(
-        model_path,
-        torch_dtype=torch_dtype,
-        low_cpu_mem_usage=True,
-        use_safetensors=True,
-        local_files_only=True
-    )
-    model.to(device)
-
-    processor = AutoProcessor.from_pretrained(model_path, local_files_only=True)
-
-    # Create pipeline
-    pipe = pipeline(
-        "automatic-speech-recognition",
-        model=model,
-        tokenizer=processor.tokenizer,
-        feature_extractor=processor.feature_extractor,
-        max_new_tokens=128,
-        torch_dtype=torch_dtype,
-        device=device,
-    )
-
-    print("Transcribing audio...", file=sys.stderr)
-    result = pipe("%s")
-
-    # Output the transcription
-    print(result["text"])
-
-except Exception as e:
-    print(f"Error: {e}", file=sys.stderr)
-    import traceback
-    traceback.print_exc(file=sys.stderr)
-    sys.exit(1)
-`, modelDir, tmpFile.Name())
-
-	ui.PrintInfo("Loading model and transcribing...")
-	cmd := exec.Command(pythonExecutable, "-c", transcribeScript)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("transcription failed: %w", err)
-	}
-
-	ui.PrintSuccess("Transcription complete!")
-	return nil
+	// Reuse TranscribeFile logic
+	return TranscribeFile(tmpFile.Name())
 }

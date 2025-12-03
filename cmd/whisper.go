@@ -33,22 +33,22 @@ func Whisper(args []string) error {
 			filePath := args[2]
 			return utils.TranscribeFile(filePath)
 
-		case "-b", "--bytes":
+		case "-k", "--key":
 			if len(args) < 3 {
-				return fmt.Errorf("-b flag requires base64 encoded audio data")
+				return fmt.Errorf("-k flag requires a Redis key argument")
 			}
-			encodedData := args[2]
-			return utils.TranscribeBytes(encodedData)
+			redisKey := args[2]
+			return utils.TranscribeRedisKey(redisKey)
 
 		default:
-			return fmt.Errorf("unknown flag: %s. Use -f <file_path> or -b <base64_data>", flag)
+			return fmt.Errorf("unknown flag: %s. Use -f <file_path> or -k <redis_key>", flag)
 		}
 
 	default:
 		fmt.Println("Available commands:")
 		fmt.Println("  dex whisper init                    # Install whisper and download models")
 		fmt.Println("  dex whisper transcribe -f <path>    # Transcribe an audio file")
-		fmt.Println("  dex whisper transcribe -b <data>    # Transcribe base64 encoded audio data")
+		fmt.Println("  dex whisper transcribe -k <key>     # Transcribe audio from Redis key")
 		return fmt.Errorf("unknown whisper subcommand: %s", subcommand)
 	}
 }
