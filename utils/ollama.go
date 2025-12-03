@@ -88,7 +88,7 @@ func doOllamaRequest(method, endpoint string, reqBody interface{}) ([]byte, erro
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{Timeout: 120 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Ollama at %s: %w", url, err)
@@ -359,13 +359,13 @@ func CreateCustomModels() error {
 			BaseModel: "gpt-oss:20b",
 			SystemPrompt: `You are a git commit message generator. Analyze the provided diff and generate a concise, one-line commit message.
 
-Format: <answer>verb: short description</answer>
-Verbs: add, update, remove, refactor, fix, docs, test, style, chore
+Format: <type>: <description>
+Types: add, update, remove, refactor, fix, docs, test, style, chore
 
 Rules:
-- Output ONLY the single-line commit message inside <answer> tags.
-- DO NOT include any other text, reasoning, or explanations outside the tags.
-- The description must be under 50 characters.
+- Output ONLY the single-line commit message.
+- DO NOT include any other text, reasoning, or explanations.
+- The description must be under 72 characters.
 - Be specific and concise.`,
 		},
 		{
@@ -524,6 +524,7 @@ func GenerateCommitMessage(diff string) string {
 
 	commitMsg, err := GenerateContent("dex-commit-model", diff)
 	if err != nil {
+		fmt.Printf("LLM Generation Error: %v\n", err)
 		return "chore: code clean up"
 	}
 
@@ -532,27 +533,37 @@ func GenerateCommitMessage(diff string) string {
 	fmt.Println(commitMsg)
 	fmt.Println("----------------------")
 
-	// New parsing logic: extract content from <answer> tags
+	// Clean up the message
+	finalMsg := strings.TrimSpace(commitMsg)
+
+	// If the model wrapped it in quotes, remove them
+	finalMsg = strings.Trim(finalMsg, "\"'")
+
+	// If the model still used XML tags despite instructions, strip them
 	startTag := "<answer>"
 	endTag := "</answer>"
-	startIndex := strings.Index(commitMsg, startTag)
-	endIndex := strings.Index(commitMsg, endTag)
-
-	if startIndex != -1 && endIndex != -1 && endIndex > startIndex {
-		// Extract the content and clean it up
-		finalMsg := commitMsg[startIndex+len(startTag) : endIndex]
+	if strings.Contains(finalMsg, startTag) && strings.Contains(finalMsg, endTag) {
+		startIndex := strings.Index(finalMsg, startTag)
+		endIndex := strings.Index(finalMsg, endTag)
+		finalMsg = finalMsg[startIndex+len(startTag) : endIndex]
 		finalMsg = strings.TrimSpace(finalMsg)
-
-		// Basic validation
-		if finalMsg != "" && strings.Contains(finalMsg, ":") {
-			// Limit length
-			if len(finalMsg) > 72 {
-				finalMsg = finalMsg[:69] + "..."
-			}
-			return finalMsg
-		}
 	}
 
-	// Fallback if tags are not found or content is invalid
+	// Basic validation: Look for the colon separator "type: description"
+	if finalMsg != "" {
+		// Ensure it starts with a known type or looks like "type: "
+		// If it doesn't contain a colon, it might just be a description
+		if !strings.Contains(finalMsg, ":") {
+			finalMsg = "update: " + finalMsg
+		}
+
+		// Limit length (standard git shortlog)
+		if len(finalMsg) > 72 {
+			finalMsg = finalMsg[:69] + "..."
+		}
+		return finalMsg
+	}
+
+	// Fallback
 	return "chore: code clean up"
 }
