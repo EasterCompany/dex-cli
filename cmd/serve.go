@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/EasterCompany/dex-cli/health"
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
@@ -58,25 +57,30 @@ func Serve(args []string) error {
 	// Register standard service health endpoint
 	mux.HandleFunc("/service", func(w http.ResponseWriter, r *http.Request) {
 		// Log the request
-		log.Printf("ACCESS: %s %s %s %s", r.RemoteAddr, r.Method, r.URL.Path, time.Since(startTime)) // Approximate duration
+		log.Printf("ACCESS: %s %s %s %s", r.RemoteAddr, r.Method, r.URL.Path, time.Since(startTime))
 
-		// Construct report
-		uptime := time.Since(startTime).Seconds()
-
-		// Create a report that matches what status.go expects
-		// We reuse the health package struct
-		report := health.ServiceReport{
-			Status: "OK",
-			Health: health.Health{
-				Timestamp: time.Now().Unix(),
-				Uptime:    uptime,
-				Metrics: health.Metrics{
-					Goroutines: 0, // Not tracking goroutines for static server
-				},
-			},
+		// Local struct to match what 'dex status' expects (specifically Uptime as string)
+		type serviceHealth struct {
+			Timestamp int64  `json:"timestamp"`
+			Uptime    string `json:"uptime"`
 		}
 
-		// Fill in version info if available (RunningVersion is in cmd package, assume global)
+		type serviceReport struct {
+			Version struct {
+				Str string `json:"str"`
+			} `json:"version"`
+			Status string        `json:"status"`
+			Health serviceHealth `json:"health"`
+		}
+
+		// Construct report
+		report := serviceReport{
+			Status: "OK",
+			Health: serviceHealth{
+				Timestamp: time.Now().Unix(),
+				Uptime:    time.Since(startTime).String(),
+			},
+		}
 		report.Version.Str = RunningVersion
 
 		w.Header().Set("Content-Type", "application/json")
