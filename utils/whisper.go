@@ -120,7 +120,7 @@ func InitWhisper() error {
 
 // TranscribeFile transcribes an audio file using whisper
 func TranscribeFile(filePath string) error {
-	ui.PrintHeader(fmt.Sprintf("Transcribing: %s", filePath))
+	fmt.Fprintf(os.Stderr, "\n=== Transcribing: %s ===\n", filePath)
 
 	// Get python paths
 	_, pythonExecutable, _, _, err := getPythonPaths()
@@ -201,7 +201,7 @@ except Exception as e:
     sys.exit(1)
 `, modelDir, absPath)
 
-	ui.PrintInfo("Loading model and transcribing...")
+	fmt.Fprintf(os.Stderr, "Loading model and transcribing...\n")
 	cmd := exec.Command(pythonExecutable, "-c", transcribeScript)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -209,13 +209,13 @@ except Exception as e:
 		return fmt.Errorf("transcription failed: %w", err)
 	}
 
-	ui.PrintSuccess("Transcription complete!")
+	fmt.Fprintf(os.Stderr, "Transcription complete!\n")
 	return nil
 }
 
 // TranscribeRedisKey transcribes audio stored in Redis
 func TranscribeRedisKey(key string) error {
-	ui.PrintHeader(fmt.Sprintf("Transcribing from Redis Key: %s", key))
+	fmt.Fprintf(os.Stderr, "\n=== Transcribing from Redis Key: %s ===\n", key)
 
 	ctx := context.Background()
 	rdb, err := cache.GetLocalClient(ctx)
