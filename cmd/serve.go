@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/EasterCompany/dex-cli/health"
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
@@ -48,8 +50,42 @@ func Serve(args []string) error {
 	addr := fmt.Sprintf(":%d", port)
 	ui.PrintInfo(fmt.Sprintf("Starting static file server for directory '%s' on %s", absDir, addr))
 
-	// Create a custom ServeMux to add logging
+	startTime := time.Now()
+
+	// Create a custom ServeMux to add logging and health check
 	mux := http.NewServeMux()
+
+	// Register standard service health endpoint
+	mux.HandleFunc("/service", func(w http.ResponseWriter, r *http.Request) {
+		// Log the request
+		log.Printf("ACCESS: %s %s %s %s", r.RemoteAddr, r.Method, r.URL.Path, time.Since(startTime)) // Approximate duration
+
+		// Construct report
+		uptime := time.Since(startTime).Seconds()
+
+		// Create a report that matches what status.go expects
+		// We reuse the health package struct
+		report := health.ServiceReport{
+			Status: "OK",
+			Health: health.Health{
+				Timestamp: time.Now().Unix(),
+				Uptime:    uptime,
+				Metrics: health.Metrics{
+					Goroutines: 0, // Not tracking goroutines for static server
+				},
+			},
+		}
+
+		// Fill in version info if available (RunningVersion is in cmd package, assume global)
+		report.Version.Str = RunningVersion
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(report); err != nil {
+			log.Printf("ERROR: Failed to encode service report: %v", err)
+		}
+	})
+
+	// Serve static files for all other routes
 	mux.Handle("/", loggingMiddleware(http.FileServer(http.Dir(absDir))))
 
 	srv := &http.Server{
