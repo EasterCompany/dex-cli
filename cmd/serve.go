@@ -125,8 +125,35 @@ func Serve(args []string, version, branch, commit, buildDate string) error {
 		}
 	})
 
-	// Serve static files for all other routes
-	mux.Handle("/", loggingMiddleware(http.FileServer(http.Dir(absDir))))
+	// Serve static files for all other routes with custom 404 support
+	fileServer := http.FileServer(http.Dir(absDir))
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Check if file exists using the http.FileSystem interface
+		// This ensures we follow the same path resolution rules as the FileServer
+		f, err := http.Dir(absDir).Open(r.URL.Path)
+		if err != nil {
+			// File likely doesn't exist or other error
+			serve404(w, r, absDir)
+			return
+		}
+		defer func() { _ = f.Close() }()
+
+		// If it is a directory, ensure index.html exists, otherwise 404
+		info, err := f.Stat()
+		if err == nil && info.IsDir() {
+			indexFile, err := http.Dir(absDir).Open(filepath.Join(r.URL.Path, "index.html"))
+			if err != nil {
+				// No index.html in directory -> treat as 404 (disable dir listing)
+				serve404(w, r, absDir)
+				return
+			}
+			_ = indexFile.Close()
+		}
+
+		fileServer.ServeHTTP(w, r)
+	})
+
+	mux.Handle("/", loggingMiddleware(handler))
 
 	srv := &http.Server{
 		Addr:         addr,
@@ -141,6 +168,16 @@ func Serve(args []string, version, branch, commit, buildDate string) error {
 		return fmt.Errorf("ERROR: Server failed to start: %w", err)
 	}
 	return nil
+}
+
+func serve404(w http.ResponseWriter, r *http.Request, root string) {
+	fourOhFourPath := filepath.Join(root, "404.html")
+	if _, err := os.Stat(fourOhFourPath); err == nil {
+		w.WriteHeader(http.StatusNotFound)
+		http.ServeFile(w, r, fourOhFourPath)
+	} else {
+		http.NotFound(w, r)
+	}
 }
 
 // loggingMiddleware logs every HTTP request.
