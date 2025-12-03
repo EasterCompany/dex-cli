@@ -8,13 +8,14 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
 // Serve starts a static file server for frontend projects.
-func Serve(args []string) error {
+func Serve(args []string, version, branch, commit, buildDate string) error {
 	var dir string
 	var port int
 
@@ -59,29 +60,64 @@ func Serve(args []string) error {
 		// Log the request
 		log.Printf("ACCESS: %s %s %s %s", r.RemoteAddr, r.Method, r.URL.Path, time.Since(startTime))
 
-		// Local struct to match what 'dex status' expects (specifically Uptime as string)
+		// Local struct to match what 'dex status' expects
 		type serviceHealth struct {
-			Timestamp int64  `json:"timestamp"`
-			Uptime    string `json:"uptime"`
+			Status string `json:"status"`
+			Uptime string `json:"uptime"`
+		}
+
+		type metricValue struct {
+			Avg float64 `json:"avg"`
+		}
+
+		type serviceMetrics struct {
+			CPU    metricValue `json:"cpu"`
+			Memory metricValue `json:"memory"`
+		}
+
+		type versionObj struct {
+			Branch    string `json:"branch"`
+			Commit    string `json:"commit"`
+			BuildDate string `json:"build_date"`
+		}
+
+		type serviceVersion struct {
+			Str string     `json:"str"`
+			Obj versionObj `json:"obj"`
 		}
 
 		type serviceReport struct {
-			Version struct {
-				Str string `json:"str"`
-			} `json:"version"`
-			Status string        `json:"status"`
-			Health serviceHealth `json:"health"`
+			Version serviceVersion `json:"version"`
+			Health  serviceHealth  `json:"health"`
+			Metrics serviceMetrics `json:"metrics"`
 		}
+
+		// Collect simple metrics
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
+		memUsage := float64(m.Alloc) / 1024 / 1024 // MB
+		// Simple CPU proxy: NumGoroutine
+		cpuUsage := float64(runtime.NumGoroutine())
 
 		// Construct report
 		report := serviceReport{
-			Status: "OK",
+			Version: serviceVersion{
+				Str: version,
+				Obj: versionObj{
+					Branch:    branch,
+					Commit:    commit,
+					BuildDate: buildDate,
+				},
+			},
 			Health: serviceHealth{
-				Timestamp: time.Now().Unix(),
-				Uptime:    time.Since(startTime).String(),
+				Status: "OK",
+				Uptime: time.Since(startTime).String(),
+			},
+			Metrics: serviceMetrics{
+				CPU:    metricValue{Avg: cpuUsage},
+				Memory: metricValue{Avg: memUsage},
 			},
 		}
-		report.Version.Str = RunningVersion
 
 		w.Header().Set("Content-Type", "application/json")
 		if err := json.NewEncoder(w).Encode(report); err != nil {

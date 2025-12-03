@@ -141,7 +141,7 @@ func main() {
 		runCommand(func() error { return cmd.Whisper(os.Args[2:]) })
 
 	case "serve": // New serve command
-		runCommand(func() error { return cmd.Serve(os.Args[2:]) })
+		runCommand(func() error { return cmd.Serve(os.Args[2:], version, branch, commit, buildDate) })
 
 	case "help", "-h", "--help":
 		printUsage()
