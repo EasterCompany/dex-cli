@@ -119,8 +119,7 @@ var serviceDefinitions = []ServiceDefinition{
 		Type:        "cs",
 		Repo:        "git@github.com:EasterCompany/dex-event-service.git",
 		Source:      "~/EasterCompany/dex-event-service",
-		Domain:      "0.0.0.0",
-		Port:        "8100",
+		Domain:      "127.0.0.1", Port: "8100",
 	},
 	{
 		ID:          "dex-model-service",
@@ -129,8 +128,7 @@ var serviceDefinitions = []ServiceDefinition{
 		Type:        "cs",
 		Repo:        "git@github.com:EasterCompany/dex-model-service.git",
 		Source:      "~/EasterCompany/dex-model-service",
-		Domain:      "0.0.0.0",
-		Port:        "8101",
+		Domain:      "127.0.0.1", Port: "8101",
 	},
 	// Backend Services (be)
 	{
@@ -140,8 +138,7 @@ var serviceDefinitions = []ServiceDefinition{
 		Type:        "be",
 		Repo:        "git@github.com:EasterCompany/dex-chat-service.git",
 		Source:      "~/EasterCompany/dex-chat-service",
-		Domain:      "0.0.0.0",
-		Port:        "8200",
+		Domain:      "127.0.0.1", Port: "8200",
 	},
 	{
 		ID:          "dex-tts-service",
@@ -150,8 +147,7 @@ var serviceDefinitions = []ServiceDefinition{
 		Type:        "be",
 		Repo:        "git@github.com:EasterCompany/dex-tts-service.git",
 		Source:      "~/EasterCompany/dex-tts-service",
-		Domain:      "0.0.0.0",
-		Port:        "8201",
+		Domain:      "127.0.0.1", Port: "8201",
 	},
 	{
 		ID:          "dex-stt-service",
@@ -160,8 +156,7 @@ var serviceDefinitions = []ServiceDefinition{
 		Type:        "be",
 		Repo:        "git@github.com:EasterCompany/dex-stt-service.git",
 		Source:      "~/EasterCompany/dex-stt-service",
-		Domain:      "0.0.0.0",
-		Port:        "8202",
+		Domain:      "127.0.0.1", Port: "8202",
 	},
 	// 3rd Party (th)
 	{
@@ -171,8 +166,7 @@ var serviceDefinitions = []ServiceDefinition{
 		Type:        "th",
 		Repo:        "git@github.com:EasterCompany/dex-discord-service.git",
 		Source:      "~/EasterCompany/dex-discord-service",
-		Domain:      "0.0.0.0",
-		Port:        "8300",
+		Domain:      "127.0.0.1", Port: "8300",
 	},
 	// Frontend (fe)
 	{
@@ -182,8 +176,7 @@ var serviceDefinitions = []ServiceDefinition{
 		Type:        "fe",
 		Repo:        "git@github.com:EasterCompany/easter.company.git",
 		Source:      "~/EasterCompany/easter.company",
-		Domain:      "0.0.0.0",
-		Port:        "8000",
+		Domain:      "127.0.0.1", Port: "8000",
 	},
 	// OS Services (os)
 	{
