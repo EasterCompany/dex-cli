@@ -183,7 +183,7 @@ var serviceDefinitions = []ServiceDefinition{
 		Repo:        "git@github.com:EasterCompany/easter.company.git",
 		Source:      "~/EasterCompany/easter.company",
 		Domain:      "0.0.0.0",
-		Port:        "80",
+		Port:        "8000",
 	},
 	// OS Services (os)
 	{
