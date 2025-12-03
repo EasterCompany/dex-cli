@@ -134,6 +134,7 @@ func main() {
 		runCommand(func() error { return cmd.Discord(os.Args[2:]) })
 
 	case "config":
+		// config command can have subcommands like 'reset'
 		runCommand(func() error { return cmd.Config(os.Args[2:]) })
 
 	case "whisper":
@@ -185,6 +186,7 @@ func printUsage() {
 	}
 	if config.IsCommandAvailable("config") {
 		ui.PrintInfo("config     | <service> [field...] Show service config or a specific field")
+		ui.PrintInfo("           | reset                Reset service-map.json to default configuration")
 	}
 	if config.IsCommandAvailable("cache") {
 		ui.PrintInfo("cache      | [clear|list] Manage the local cache")

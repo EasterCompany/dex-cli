@@ -5,12 +5,17 @@ import (
 	"fmt"
 
 	"github.com/EasterCompany/dex-cli/config"
+	"github.com/EasterCompany/dex-cli/ui"
 )
 
-// Config displays the service-map.json configuration for a given service.
+// Config displays the service-map.json configuration for a given service, or manages it.
 func Config(args []string) error {
+	if len(args) > 0 && args[0] == "reset" {
+		return resetConfig()
+	}
+
 	if len(args) < 1 {
-		return fmt.Errorf("config command requires at least one argument: the service short name (e.g., 'dex config event')")
+		return fmt.Errorf("config command requires at least one argument: the service short name (e.g., 'dex config event') or 'reset'")
 	}
 
 	serviceShortName := args[0]
@@ -71,6 +76,16 @@ func Config(args []string) error {
 
 	// 8. Not found in the map
 	return fmt.Errorf("service '%s' (ID: %s) not found in service-map.json", serviceShortName, def.ID)
+}
+
+func resetConfig() error {
+	ui.PrintInfo("Resetting service-map.json to default configuration...")
+	defaultServiceMap := config.DefaultServiceMapConfig()
+	if err := config.SaveServiceMapConfig(defaultServiceMap); err != nil {
+		return fmt.Errorf("failed to save default service-map.json: %w", err)
+	}
+	ui.PrintSuccess("service-map.json reset successfully. Services will use updated defaults on next build/start.")
+	return nil
 }
 
 // findJSONValue recursively traverses a map to find a value at a given path.
