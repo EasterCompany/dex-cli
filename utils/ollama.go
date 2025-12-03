@@ -88,7 +88,7 @@ func doOllamaRequest(method, endpoint string, reqBody interface{}) ([]byte, erro
 		req.Header.Set("Content-Type", "application/json")
 	}
 
-	client := &http.Client{Timeout: 120 * time.Second}
+	client := &http.Client{Timeout: 300 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to Ollama at %s: %w", url, err)
