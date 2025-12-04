@@ -248,10 +248,10 @@ try:
     # 2. Translate (if not English)
     english_translation = ""
     if detected_lang != "en":
-        print("Translating to English...", file=sys.stderr)
+        print(f"Translating from {detected_lang} to English...", file=sys.stderr)
         # We must run transcription again with task="translate" to get the translation from the audio
-        # faster-whisper handles this natively
-        trans_segments, _ = model.transcribe(audio_path, task="translate", beam_size=5)
+        # faster-whisper handles this natively. Explicitly passing language helps accuracy.
+        trans_segments, _ = model.transcribe(audio_path, task="translate", language=detected_lang, beam_size=5)
         
         trans_text_parts = []
         for segment in trans_segments:
