@@ -121,34 +121,6 @@ var serviceDefinitions = []ServiceDefinition{
 		Source:      "~/EasterCompany/dex-event-service",
 		Domain:      "127.0.0.1", Port: "8100",
 	},
-	{
-		ID:          "dex-model-service",
-		ShortName:   "model",
-		SystemdName: "dex-model-service.service",
-		Type:        "cs",
-		Repo:        "git@github.com:EasterCompany/dex-model-service.git",
-		Source:      "~/EasterCompany/dex-model-service",
-		Domain:      "127.0.0.1", Port: "8101",
-	},
-	// Backend Services (be)
-	{
-		ID:          "dex-chat-service",
-		ShortName:   "chat",
-		SystemdName: "dex-chat-service.service",
-		Type:        "be",
-		Repo:        "git@github.com:EasterCompany/dex-chat-service.git",
-		Source:      "~/EasterCompany/dex-chat-service",
-		Domain:      "127.0.0.1", Port: "8200",
-	},
-	{
-		ID:          "dex-tts-service",
-		ShortName:   "tts",
-		SystemdName: "dex-tts-service.service",
-		Type:        "be",
-		Repo:        "git@github.com:EasterCompany/dex-tts-service.git",
-		Source:      "~/EasterCompany/dex-tts-service",
-		Domain:      "127.0.0.1", Port: "8201",
-	},
 	// 3rd Party (th)
 	{
 		ID:          "dex-discord-service",

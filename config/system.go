@@ -76,6 +76,8 @@ var RequiredPackages = []Package{
 	{Name: "jsonlint", Required: true, InstallCommand: "bun install -g jsonlint", UpgradeCommand: "bun install -g jsonlint"},
 	{Name: "shfmt", Required: true, InstallCommand: "go install mvdan.cc/sh/v3/cmd/shfmt@latest", UpgradeCommand: "go install mvdan.cc/sh/v3/cmd/shfmt@latest"},
 	{Name: "shellcheck", Required: true, InstallCommand: "sudo pacman -S shellcheck || sudo apt install shellcheck", UpgradeCommand: "sudo pacman -Syu shellcheck || (sudo apt update && sudo apt upgrade -y shellcheck)"},
+	{Name: "nvidia-smi", Required: true, MinVersion: "", InstallCommand: "Install NVIDIA drivers via your distribution's package manager (e.g. sudo pacman -S nvidia-utils)", UpgradeCommand: "Update system packages"},
+	{Name: "nvcc", Required: true, MinVersion: "11.0", InstallCommand: "sudo pacman -S cuda || sudo apt install nvidia-cuda-toolkit", UpgradeCommand: "sudo pacman -Syu cuda || (sudo apt update && sudo apt upgrade -y nvidia-cuda-toolkit)"},
 }
 
 // LoadSystemConfig loads or creates system.json
@@ -375,23 +377,6 @@ func detectPackages(requiredPackages []Package) []Package {
 		}
 	}
 
-	// Add conditional CUDA packages if dex-model-service exists
-	if modelServiceExists() {
-		cudaPackages := []Package{
-			{Name: "nvidia-smi", Required: true, MinVersion: "", InstallCommand: "Install NVIDIA drivers"},
-			{Name: "nvcc", Required: true, MinVersion: "11.0", InstallCommand: "sudo pacman -S cuda || sudo apt install nvidia-cuda-toolkit"},
-		}
-
-		for _, cudaPkg := range cudaPackages {
-			_, err := exec.LookPath(cudaPkg.Name)
-			cudaPkg.Installed = err == nil
-			if cudaPkg.Installed {
-				cudaPkg.Version = getPackageVersion(cudaPkg.Name)
-			}
-			packages = append(packages, cudaPkg)
-		}
-	}
-
 	// Add Python venv check
 	venvPath, err := ExpandPath(filepath.Join(DexterRoot, "python"))
 	if err == nil {
@@ -414,27 +399,6 @@ func detectPackages(requiredPackages []Package) []Package {
 	}
 
 	return packages
-}
-
-// modelServiceExists checks if dex-model-service is installed
-func modelServiceExists() bool {
-	// Check source directory
-	sourcePath, err := ExpandPath("~/EasterCompany/dex-model-service")
-	if err == nil {
-		if info, err := os.Stat(sourcePath); err == nil && info.IsDir() {
-			return true
-		}
-	}
-
-	// Check binary location
-	binaryPath, err := ExpandPath(filepath.Join(DexterRoot, "bin", "dex-model-service"))
-	if err == nil {
-		if _, err := os.Stat(binaryPath); err == nil {
-			return true
-		}
-	}
-
-	return false
 }
 
 // getPackageVersion tries to get package version
