@@ -42,6 +42,8 @@ func InitWhisper() error {
 		"faster-whisper",
 		"numpy",
 		"torch",
+		"nvidia-cublas-cu12",
+		"nvidia-cudnn-cu12",
 	}
 
 	// Install all packages in one command to ensure dependency resolution works correctly
