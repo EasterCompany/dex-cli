@@ -146,6 +146,16 @@ func RunUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), maj
 		// Makefile exists - use it for building
 		log(fmt.Sprintf("%s Using Makefile for build", def.ShortName))
 
+		// Clean before building to ensure fresh compilation
+		cleanCmd := exec.Command("make", "clean")
+		cleanCmd.Dir = sourcePath
+		cleanCmd.Stdout = os.Stdout
+		cleanCmd.Stderr = os.Stderr
+		if err := cleanCmd.Run(); err != nil {
+			log(fmt.Sprintf("%s 'make clean' failed: %v", def.ShortName, err))
+			return false, fmt.Errorf("%s 'make clean' failed: %w", def.ShortName, err)
+		}
+
 		// Export build variables for Makefile to use
 		ldflags := fmt.Sprintf("-X main.version=%s -X main.branch=%s -X main.commit=%s -X main.buildDate=%s -X main.buildYear=%s -X main.buildHash=%s -X main.arch=%s",
 			fullVersionStr, branch, commit, buildDate, buildYear, buildHash, buildArch)
