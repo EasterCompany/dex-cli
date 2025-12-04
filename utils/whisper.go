@@ -154,7 +154,10 @@ func TranscribeFile(filePath string) error {
 	// Create transcription script using transformers
 	transcribeScript := fmt.Sprintf(`
 import sys
+import json
 import torch
+import torchaudio
+import torchaudio.transforms as T
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
 
 try:
@@ -164,6 +167,7 @@ try:
 
     print("Loading Whisper model from local path...", file=sys.stderr)
     model_path = "%s"
+    audio_path = "%s"
 
     # Load model and processor from local directory
     model = AutoModelForSpeechSeq2Seq.from_pretrained(
@@ -177,6 +181,36 @@ try:
 
     processor = AutoProcessor.from_pretrained(model_path, local_files_only=True)
 
+    # Detect Language
+    print("Detecting language...", file=sys.stderr)
+    waveform, sample_rate = torchaudio.load(audio_path)
+    if sample_rate != 16000:
+        resampler = T.Resample(sample_rate, 16000)
+        waveform = resampler(waveform)
+    
+    # Mix to mono if needed
+    if waveform.shape[0] > 1:
+        waveform = torch.mean(waveform, dim=0, keepdim=True)
+
+    # Get features for first 30s
+    input_features = processor(waveform.squeeze().numpy(), sampling_rate=16000, return_tensors="pt").input_features
+    input_features = input_features.to(device).to(torch_dtype)
+
+    # Generate to detect language (force task to transcribe so it detects language)
+    # We rely on the model's first token output for language
+    model_output = model.generate(input_features, max_new_tokens=5)
+    
+    # The second token usually contains the language code (index 1)
+    # Token 0: <|startoftranscript|>
+    # Token 1: <|lang|>
+    if len(model_output[0]) > 1:
+        lang_id = model_output[0][1].item()
+        detected_lang = processor.tokenizer.decode([lang_id]).replace("<|", "").replace("|>", "")
+    else:
+        detected_lang = "en" # Fallback
+
+    print(f"Detected language: {detected_lang}", file=sys.stderr)
+
     # Create pipeline
     pipe = pipeline(
         "automatic-speech-recognition",
@@ -189,13 +223,26 @@ try:
     )
 
     print("Transcribing audio...", file=sys.stderr)
-    result = pipe("%s")
+    result = pipe(audio_path, generate_kwargs={"task": "transcribe"})
+    original_text = result["text"]
 
-    # Output the transcription
-    print(result["text"])
+    english_translation = ""
+    if detected_lang != "en":
+        print("Translating to English...", file=sys.stderr)
+        trans_result = pipe(audio_path, generate_kwargs={"task": "translate", "language": "en"})
+        english_translation = trans_result["text"]
+
+    # Output structured JSON
+    output = {
+        "original_transcription": original_text.strip(),
+        "detected_language": detected_lang,
+        "english_translation": english_translation.strip()
+    }
+    print(json.dumps(output))
 
 except Exception as e:
-    print(f"Error: {e}", file=sys.stderr)
+    error_out = {"error": str(e)}
+    print(json.dumps(error_out))
     import traceback
     traceback.print_exc(file=sys.stderr)
     sys.exit(1)
