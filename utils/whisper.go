@@ -251,14 +251,24 @@ try:
     # We rely on the model's first token output for language
     model_output = model.generate(input_features, max_new_tokens=5)
     
-    # The second token usually contains the language code (index 1)
-    # Token 0: <|startoftranscript|>
-    # Token 1: <|lang|>
-    if len(model_output[0]) > 1:
-        lang_id = model_output[0][1].item()
-        detected_lang = processor.tokenizer.decode([lang_id]).replace("<|", "").replace("|>", "")
-    else:
-        detected_lang = "en" # Fallback
+    detected_lang = "en" # Default
+    
+    # Debug: Print first few tokens
+    print("Generated tokens:", file=sys.stderr)
+    found_lang_token = False
+    for i, token_id in enumerate(model_output[0]):
+        token_str = processor.tokenizer.decode([token_id])
+        print(f"  Token {i}: {token_id} -> '{token_str}'", file=sys.stderr)
+        
+        # Look for language token format <|xx|>
+        # Whisper language tokens are typically like <|en|>, <|de|>, etc.
+        if not found_lang_token and token_str.startswith("<|") and token_str.endswith("|>"):
+            cleaned = token_str.replace("<|", "").replace("|>", "").strip().lower()
+            # Simple heuristic: 2 letter code? Most are. Some like 'haw' are 3.
+            # But key markers like transcribe/translate are also <|...|>
+            if cleaned not in ["startoftranscript", "endoftext", "transcribe", "translate", "notimestamps"] and len(cleaned) < 10:
+                detected_lang = cleaned
+                found_lang_token = True
 
     print(f"Detected language: {detected_lang}", file=sys.stderr)
 
