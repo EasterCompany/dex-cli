@@ -41,6 +41,7 @@ func InitWhisper() error {
 	packages := []string{
 		"faster-whisper",
 		"numpy",
+		"torch",
 	}
 
 	// Install all packages in one command to ensure dependency resolution works correctly
