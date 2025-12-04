@@ -43,18 +43,19 @@ func InitWhisper() error {
 		"torch",
 		"torchaudio",
 		"accelerate",
-		"huggingface-hub",
+		"huggingface-hub<1.0",
 		"numpy",
 	}
 
-	for _, pkg := range packages {
-		ui.PrintInfo(fmt.Sprintf("Installing %s...", pkg))
-		cmd := exec.Command(pipExecutable, "install", "-U", pkg)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("failed to install %s: %w", pkg, err)
-		}
+	// Install all packages in one command to ensure dependency resolution works correctly
+	args := append([]string{"install", "-U"}, packages...)
+	installCmd := exec.Command(pipExecutable, args...)
+	installCmd.Stdout = os.Stdout
+	installCmd.Stderr = os.Stderr
+
+	ui.PrintInfo(fmt.Sprintf("Running: %s %s", pipExecutable, fmt.Sprint(args)))
+	if err := installCmd.Run(); err != nil {
+		return fmt.Errorf("failed to install python packages: %w", err)
 	}
 	ui.PrintSuccess("All Python packages installed successfully.")
 
