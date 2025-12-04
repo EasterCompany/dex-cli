@@ -160,7 +160,7 @@ func RunUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), maj
 		ldflags := fmt.Sprintf("-X main.version=%s -X main.branch=%s -X main.commit=%s -X main.buildDate=%s -X main.buildYear=%s -X main.buildHash=%s -X main.arch=%s",
 			fullVersionStr, branch, commit, buildDate, buildYear, buildHash, buildArch)
 
-		buildCmd = exec.Command("make", "all")
+		buildCmd = exec.Command("make", "install")
 		buildCmd.Dir = sourcePath
 		buildCmd.Env = append(os.Environ(),
 			fmt.Sprintf("LDFLAGS=%s", ldflags),
@@ -170,8 +170,8 @@ func RunUnifiedBuildPipeline(def config.ServiceDefinition, log func(string), maj
 		buildCmd.Stdout = os.Stdout
 		buildCmd.Stderr = os.Stderr
 		if err := buildCmd.Run(); err != nil {
-			log(fmt.Sprintf("%s 'make all' failed: %v", def.ShortName, err))
-			return false, fmt.Errorf("%s 'make all' failed: %w", def.ShortName, err)
+			log(fmt.Sprintf("%s 'make install' failed: %v", def.ShortName, err))
+			return false, fmt.Errorf("%s 'make install' failed: %w", def.ShortName, err)
 		}
 	} else {
 		// No Makefile - use standard Go build
