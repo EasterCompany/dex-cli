@@ -44,6 +44,7 @@ func InitWhisper() error {
 		"torchaudio",
 		"accelerate",
 		"huggingface-hub",
+		"numpy",
 	}
 
 	for _, pkg := range packages {
@@ -155,16 +156,43 @@ func TranscribeFile(filePath string) error {
 	transcribeScript := fmt.Sprintf(`
 import sys
 import json
+import subprocess
 import torch
-import torchaudio
-import torchaudio.transforms as T
+import numpy as np
 from transformers import AutoModelForSpeechSeq2Seq, AutoProcessor, pipeline
+
+def load_audio_ffmpeg(file, sr=16000):
+    """
+    Decodes audio to raw PCM s16le, mono, at specified sample rate using ffmpeg.
+    Returns float32 numpy array normalized to [-1, 1].
+    """
+    try:
+        command = ['ffmpeg', '-i', file, '-f', 's16le', '-ac', '1', '-ar', str(sr), '-']
+        # Use subprocess.run to capture output
+        process = subprocess.run(command, capture_output=True, check=True)
+        # Convert bytes to int16 array
+        audio_int16 = np.frombuffer(process.stdout, dtype=np.int16)
+        # Normalize to float32
+        return audio_int16.astype(np.float32) / 32768.0
+    except Exception as e:
+        print(f"Error loading audio with ffmpeg: {e}", file=sys.stderr)
+        raise
 
 try:
     # Set device
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
+    
+    # Explicitly check if CUDA is actually usable (catches mismatches like sm_61 on newer pytorch)
+    if device.startswith("cuda"):
+        try:
+            _ = torch.zeros(1).to(device)
+        except Exception as e:
+            print(f"Warning: CUDA device selected but failed to use ({e}). Falling back to CPU.", file=sys.stderr)
+            device = "cpu"
 
+    torch_dtype = torch.float16 if device.startswith("cuda") else torch.float32
+
+    print(f"Using device: {device}", file=sys.stderr)
     print("Loading Whisper model from local path...", file=sys.stderr)
     model_path = "%s"
     audio_path = "%s"
@@ -183,17 +211,14 @@ try:
 
     # Detect Language
     print("Detecting language...", file=sys.stderr)
-    waveform, sample_rate = torchaudio.load(audio_path)
-    if sample_rate != 16000:
-        resampler = T.Resample(sample_rate, 16000)
-        waveform = resampler(waveform)
     
-    # Mix to mono if needed
-    if waveform.shape[0] > 1:
-        waveform = torch.mean(waveform, dim=0, keepdim=True)
-
+    # Load audio using ffmpeg instead of torchaudio
+    waveform_np = load_audio_ffmpeg(audio_path)
+    waveform = torch.from_numpy(waveform_np)
+    
     # Get features for first 30s
-    input_features = processor(waveform.squeeze().numpy(), sampling_rate=16000, return_tensors="pt").input_features
+    # Process directly from the numpy array or tensor
+    input_features = processor(waveform_np, sampling_rate=16000, return_tensors="pt").input_features
     input_features = input_features.to(device).to(torch_dtype)
 
     # Generate to detect language (force task to transcribe so it detects language)
@@ -223,6 +248,9 @@ try:
     )
 
     print("Transcribing audio...", file=sys.stderr)
+    # We can pass the audio path directly to the pipeline, or the loaded waveform
+    # Passing path lets pipeline handle it, but we already loaded it successfully. 
+    # Let's pass the path to keep it simple as pipeline handles long files with chunking better.
     result = pipe(audio_path, generate_kwargs={"task": "transcribe"})
     original_text = result["text"]
 
