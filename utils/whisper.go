@@ -165,7 +165,25 @@ func TranscribeFile(filePath string) error {
 	// Create transcription script using faster-whisper
 	transcribeScript := fmt.Sprintf(`
 import sys
+import os
 import json
+
+# Inject LD_LIBRARY_PATH inside python to ensure ctranslate2 finds the libs
+try:
+    import nvidia.cudnn
+    import nvidia.cublas
+    
+    cudnn_lib = os.path.join(os.path.dirname(nvidia.cudnn.__file__), 'lib')
+    cublas_lib = os.path.join(os.path.dirname(nvidia.cublas.__file__), 'lib')
+    
+    current_ld = os.environ.get("LD_LIBRARY_PATH", "")
+    new_ld = f"{cudnn_lib}:{cublas_lib}:{current_ld}"
+    os.environ["LD_LIBRARY_PATH"] = new_ld
+    
+    # Also add to sys.path or try to load explicitly if needed, but LD_LIBRARY_PATH is key for dlopen
+except Exception as e:
+    print(f"Warning: Failed to auto-inject nvidia libs: {e}", file=sys.stderr)
+
 import torch
 from faster_whisper import WhisperModel
 
