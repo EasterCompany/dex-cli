@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/EasterCompany/dex-cli/cache"
 	"github.com/EasterCompany/dex-cli/config"
@@ -97,6 +98,35 @@ print("Download complete.")
 	ui.PrintSuccess("Whisper initialization complete!")
 	ui.PrintInfo("You can now use 'dex whisper transcribe' to transcribe audio files.")
 	return nil
+}
+
+// getLibraryPathAdditions queries the python environment for nvidia library paths
+func getLibraryPathAdditions(pythonExecutable string) (string, error) {
+	script := `
+import os
+import sys
+
+paths = []
+try:
+    import nvidia.cudnn
+    paths.append(os.path.join(os.path.dirname(nvidia.cudnn.__file__), 'lib'))
+except Exception:
+    pass
+
+try:
+    import nvidia.cublas
+    paths.append(os.path.join(os.path.dirname(nvidia.cublas.__file__), 'lib'))
+except Exception:
+    pass
+
+print(os.pathsep.join(paths))
+`
+	cmd := exec.Command(pythonExecutable, "-c", script)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
 }
 
 // TranscribeFile transcribes an audio file using whisper
@@ -227,7 +257,27 @@ except Exception as e:
 `, modelDir, modelDir, absPath)
 
 	fmt.Fprintf(os.Stderr, "Loading model and transcribing...\n")
+
+	// Inject nvidia library paths into LD_LIBRARY_PATH
+	libPaths, err := getLibraryPathAdditions(pythonExecutable)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to get nvidia library paths: %v\n", err)
+	}
+
 	cmd := exec.Command(pythonExecutable, "-c", transcribeScript)
+
+	// Set environment variables
+	env := os.Environ()
+	if libPaths != "" {
+		currentLD := os.Getenv("LD_LIBRARY_PATH")
+		newLD := libPaths
+		if currentLD != "" {
+			newLD = libPaths + string(os.PathListSeparator) + currentLD
+		}
+		env = append(env, "LD_LIBRARY_PATH="+newLD)
+	}
+	cmd.Env = env
+
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
