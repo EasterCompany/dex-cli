@@ -109,13 +109,13 @@ import sys
 paths = []
 try:
     import nvidia.cudnn
-    paths.append(os.path.join(os.path.dirname(nvidia.cudnn.__file__), 'lib'))
+    paths.append(os.path.join(list(nvidia.cudnn.__path__)[0], 'lib'))
 except Exception:
     pass
 
 try:
     import nvidia.cublas
-    paths.append(os.path.join(os.path.dirname(nvidia.cublas.__file__), 'lib'))
+    paths.append(os.path.join(list(nvidia.cublas.__path__)[0], 'lib'))
 except Exception:
     pass
 
@@ -173,8 +173,8 @@ try:
     import nvidia.cudnn
     import nvidia.cublas
     
-    cudnn_lib = os.path.join(os.path.dirname(nvidia.cudnn.__file__), 'lib')
-    cublas_lib = os.path.join(os.path.dirname(nvidia.cublas.__file__), 'lib')
+    cudnn_lib = os.path.join(list(nvidia.cudnn.__path__)[0], 'lib')
+    cublas_lib = os.path.join(list(nvidia.cublas.__path__)[0], 'lib')
     
     current_ld = os.environ.get("LD_LIBRARY_PATH", "")
     new_ld = f"{cudnn_lib}:{cublas_lib}:{current_ld}"
