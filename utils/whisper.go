@@ -179,15 +179,40 @@ def load_audio_ffmpeg(file, sr=16000):
         raise
 
 try:
-    # Set device
-    device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    # Intelligent GPU Selection
+    best_device_index = -1
+    best_capability = -1.0
     
-    # Explicitly check if CUDA is actually usable (catches mismatches like sm_61 on newer pytorch)
+    if torch.cuda.is_available():
+        count = torch.cuda.device_count()
+        print(f"Found {count} CUDA devices.", file=sys.stderr)
+        for i in range(count):
+            try:
+                cap_major, cap_minor = torch.cuda.get_device_capability(i)
+                score = cap_major + (cap_minor / 10.0)
+                name = torch.cuda.get_device_name(i)
+                print(f"  GPU {i}: {name} (Capability {cap_major}.{cap_minor})", file=sys.stderr)
+                
+                # Prefer higher capability
+                if score > best_capability:
+                    best_capability = score
+                    best_device_index = i
+            except Exception as e:
+                print(f"  GPU {i}: Error getting capability: {e}", file=sys.stderr)
+
+    if best_device_index != -1:
+        device = f"cuda:{best_device_index}"
+        print(f"Selected GPU {best_device_index} with capability {best_capability:.1f}", file=sys.stderr)
+    else:
+        device = "cpu"
+        print("No suitable GPU found or CUDA unavailable. Using CPU.", file=sys.stderr)
+    
+    # Explicitly check if the selected CUDA device works
     if device.startswith("cuda"):
         try:
             _ = torch.zeros(1).to(device)
         except Exception as e:
-            print(f"Warning: CUDA device selected but failed to use ({e}). Falling back to CPU.", file=sys.stderr)
+            print(f"Warning: Selected {device} failed to initialize ({e}). Falling back to CPU.", file=sys.stderr)
             device = "cpu"
 
     torch_dtype = torch.float16 if device.startswith("cuda") else torch.float32
