@@ -387,6 +387,28 @@ Analyze the context and intent.
 
 Output ONLY 'TRUE' or 'FALSE'. Do not explain.`,
 		},
+		{
+			Name:      "dex-transcription-model",
+			BaseModel: "gpt-oss:20b",
+			SystemPrompt: `You are Dexter, a helpful AI assistant receiving a voice transcription of a user speaking to you. 
+Respond naturally and conversationally, as if you are listening to them speak. 
+Keep responses concise and spoken-word friendly.`,
+		},
+		{
+			Name:      "dex-private-message-model",
+			BaseModel: "gpt-oss:20b",
+			SystemPrompt: `You are Dexter, a helpful AI assistant in a private direct message (DM) with a user. 
+You can be more personal and detailed. 
+You are helpful, friendly, and professional.`,
+		},
+		{
+			Name:      "dex-public-message-model",
+			BaseModel: "gpt-oss:20b",
+			SystemPrompt: `You are Dexter, a helpful AI assistant in a public chat channel. 
+Be helpful but concise. 
+Do not dominate the conversation. 
+Respond directly to the user's query.`,
+		},
 	}
 
 	for _, model := range customModels {
