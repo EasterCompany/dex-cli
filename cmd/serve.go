@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/EasterCompany/dex-cli/ui"
@@ -60,6 +61,16 @@ func Serve(args []string, version, branch, commit, buildDate string) error {
 		// Log the request
 		log.Printf("ACCESS: %s %s %s %s", r.RemoteAddr, r.Method, r.URL.Path, time.Since(startTime))
 
+		// Check for version.txt in the served directory
+		currentVersion := version
+		versionFile := filepath.Join(absDir, "version.txt")
+		if data, err := os.ReadFile(versionFile); err == nil {
+			contentVersion := strings.TrimSpace(string(data))
+			if contentVersion != "" {
+				currentVersion = contentVersion
+			}
+		}
+
 		// Local struct to match what 'dex status' expects
 		type serviceHealth struct {
 			Status string `json:"status"`
@@ -102,7 +113,7 @@ func Serve(args []string, version, branch, commit, buildDate string) error {
 		// Construct report
 		report := serviceReport{
 			Version: serviceVersion{
-				Str: version,
+				Str: currentVersion,
 				Obj: versionObj{
 					Branch:    branch,
 					Commit:    commit,

@@ -96,7 +96,7 @@ func verifyDeveloperAccess() error {
 }
 
 // buildFrontendService executes the build.sh script for a frontend service like easter.company
-func buildFrontendService(def config.ServiceDefinition, log func(message string)) (bool, error) {
+func buildFrontendService(def config.ServiceDefinition, log func(message string), major, minor, patch int) (bool, error) {
 	sourcePath, err := config.ExpandPath(def.Source)
 	if err != nil {
 		return false, fmt.Errorf("failed to expand source path for %s: %w", def.ShortName, err)
@@ -104,11 +104,14 @@ func buildFrontendService(def config.ServiceDefinition, log func(message string)
 
 	buildScriptPath := filepath.Join(sourcePath, "scripts", "build.sh")
 
-	log(fmt.Sprintf("[%s] Running frontend build script: %s", def.ShortName, buildScriptPath))
+	versionStr := fmt.Sprintf("%d.%d.%d", major, minor, patch)
+	log(fmt.Sprintf("[%s] Running frontend build script: %s (Version: %s)", def.ShortName, buildScriptPath, versionStr))
+
 	cmd := exec.Command("bash", buildScriptPath)
 	cmd.Dir = sourcePath // Execute the script from the service's source directory
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Env = append(os.Environ(), fmt.Sprintf("DEX_BUILD_VERSION=%s", versionStr))
 
 	if err := cmd.Run(); err != nil {
 		return false, fmt.Errorf("failed to build frontend service %s: %w", def.ShortName, err)
@@ -382,7 +385,7 @@ func Build(args []string) error {
 		var built bool
 		var buildErr error
 		if s.Type == "fe" { // Check if it's a frontend service
-			built, buildErr = buildFrontendService(s, log)
+			built, buildErr = buildFrontendService(s, log, task.targetMajor, task.targetMinor, task.targetPatch)
 		} else {
 			built, buildErr = utils.RunUnifiedBuildPipeline(s, log, task.targetMajor, task.targetMinor, task.targetPatch)
 		}
