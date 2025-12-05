@@ -15,7 +15,7 @@ func handleDefaultEventOutput() error {
 	ui.PrintHeader("Event Command Usage")
 	ui.PrintInfo("event service          | Show the raw status from the /service endpoint")
 	ui.PrintInfo("event log              | Show the last 10 human-readable event logs")
-	ui.PrintInfo("event delete <pattern> | Delete events matching a pattern (e.g., 'event delete *')")
+	ui.PrintInfo("event delete <pattern> | Delete events matching a pattern (e.g., 'event delete all')")
 	return nil
 }
 
@@ -39,6 +39,11 @@ func handleEventDelete(args []string) error {
 		return fmt.Errorf("missing pattern for event delete. Usage: event delete <pattern>")
 	}
 
+	// Handle "all" keyword to safely delete everything without shell expansion issues with "*"
+	if len(args) == 1 && (strings.EqualFold(args[0], "all") || args[0] == "--all") {
+		args = []string{"*"}
+	}
+
 	eventServicePath, err := config.ExpandPath("~/Dexter/bin/dex-event-service")
 	if err != nil {
 		return err
@@ -48,6 +53,7 @@ func handleEventDelete(args []string) error {
 	cmd := exec.Command(eventServicePath, cmdArgs...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin // Connect stdin for interactive confirmation
 
 	return cmd.Run()
 }
