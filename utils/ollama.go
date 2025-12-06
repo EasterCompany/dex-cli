@@ -17,6 +17,7 @@ const DefaultOllamaURL = "http://127.0.0.1:11434"
 
 var DefaultModels = []string{
 	"gpt-oss:20b",
+	"qwen3-vl:8b",
 }
 
 // ModelInfo reflects a single model entry returned by the /api/tags endpoint.
@@ -409,6 +410,14 @@ Do not lecture or ramble.`,
 Respond directly to the user's query.
 Keep your responses extremely concise (max 1-2 sentences).
 Do not dominate the conversation.`,
+		},
+		{
+			Name:      "dex-vision-model",
+			BaseModel: "qwen3-vl:8b",
+			SystemPrompt: `You are a visual analysis engine for an AI assistant named Dexter. 
+Your job is to describe images and video frames concisely and accurately. 
+Focus on key elements, text, people, and actions. 
+Output ONLY the description.`,
 		},
 	}
 
