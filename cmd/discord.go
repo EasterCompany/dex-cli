@@ -87,19 +87,18 @@ func handleDiscordChannels() error {
 	for _, guild := range guilds {
 		ui.PrintHeader(fmt.Sprintf("Guild: %s (%s)", guild.GuildName, guild.GuildID))
 
-		// Print Categories
-		for _, cat := range guild.Categories {
-			ui.PrintInfo(fmt.Sprintf("📂 %s", cat.Name))
-			for _, ch := range cat.Channels {
+		// Print Uncategorized channels first
+		if len(guild.Uncategorized) > 0 {
+			for _, ch := range guild.Uncategorized {
 				printChannel(ch)
 			}
 			fmt.Println()
 		}
 
-		// Print Uncategorized
-		if len(guild.Uncategorized) > 0 {
-			ui.PrintInfo("📂 Uncategorized")
-			for _, ch := range guild.Uncategorized {
+		// Print Categories
+		for _, cat := range guild.Categories {
+			ui.PrintInfo(fmt.Sprintf("📂 %s", cat.Name))
+			for _, ch := range cat.Channels {
 				printChannel(ch)
 			}
 			fmt.Println()
