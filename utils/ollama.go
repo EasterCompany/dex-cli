@@ -16,7 +16,7 @@ import (
 const DefaultOllamaURL = "http://127.0.0.1:11434"
 
 var DefaultModels = []string{
-	"gpt-oss:20b",
+	"gpt-oss:20b-cloud",
 	"qwen3-vl:8b",
 }
 
@@ -357,7 +357,7 @@ func CreateCustomModels() error {
 	customModels := []CustomModel{
 		{
 			Name:      "dex-commit-model",
-			BaseModel: "gpt-oss:20b",
+			BaseModel: "gpt-oss:20b-cloud",
 			SystemPrompt: `You are a git commit message generator. Analyze the provided diff and generate a concise, one-line commit message.
 
 Format: <type>: <description>
@@ -371,7 +371,7 @@ Rules:
 		},
 		{
 			Name:      "dex-summary-model",
-			BaseModel: "gpt-oss:20b",
+			BaseModel: "gpt-oss:20b-cloud",
 			SystemPrompt: `
 You are a specialized AI assistant for generating summaries out of large and small bodies of text.
 You may only create text summaries.
@@ -379,7 +379,7 @@ Your task is to analyze a piece of text (various formats: message logs, poems, n
 		},
 		{
 			Name:      "dex-engagement-model",
-			BaseModel: "gpt-oss:20b",
+			BaseModel: "gpt-oss:20b-cloud",
 			SystemPrompt: `You are an engagement analyzer. Your task is to determine if the given text requires a response from an AI assistant named Dexter. 
 
 Analyze the context and intent. 
@@ -390,14 +390,14 @@ Output ONLY 'TRUE' or 'FALSE'. Do not explain.`,
 		},
 		{
 			Name:      "dex-transcription-model",
-			BaseModel: "gpt-oss:20b",
+			BaseModel: "gpt-oss:20b-cloud",
 			SystemPrompt: `You are Dexter, a helpful AI assistant receiving a voice transcription of a user speaking to you. 
 Respond naturally and conversationally, as if you are listening to them speak. 
 Keep responses concise and spoken-word friendly.`,
 		},
 		{
 			Name:      "dex-private-message-model",
-			BaseModel: "gpt-oss:20b",
+			BaseModel: "gpt-oss:20b-cloud",
 			SystemPrompt: `You are Dexter, a helpful AI assistant in a private direct message (DM) with a user. 
 You are helpful, friendly, and professional.
 Keep your responses short and conversational (max 2-3 sentences).
@@ -405,7 +405,7 @@ Do not lecture or ramble.`,
 		},
 		{
 			Name:      "dex-public-message-model",
-			BaseModel: "gpt-oss:20b",
+			BaseModel: "gpt-oss:20b-cloud",
 			SystemPrompt: `You are Dexter, a helpful AI assistant in a public chat channel. 
 Respond directly to the user's query.
 Keep your responses extremely concise (max 1-2 sentences).
