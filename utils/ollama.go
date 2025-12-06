@@ -422,7 +422,7 @@ Output ONLY the description.`,
 		},
 		// Small Models (ministral-3:3b)
 		{
-			Name:      "dex-small-commit-model",
+			Name:      "dex-fast-commit-model",
 			BaseModel: "ministral-3:3b",
 			SystemPrompt: `You are a git commit message generator. Analyze the provided diff and generate a concise, one-line commit message.
 
@@ -436,7 +436,7 @@ Rules:
 - Be specific and concise.`,
 		},
 		{
-			Name:      "dex-small-summary-model",
+			Name:      "dex-fast-summary-model",
 			BaseModel: "ministral-3:3b",
 			SystemPrompt: `
 You are a specialized AI assistant for generating summaries out of large and small bodies of text.
@@ -444,7 +444,7 @@ You may only create text summaries.
 Your task is to analyze a piece of text (various formats: message logs, poems, news article) and generate clear, concise, and meaningful summary.`,
 		},
 		{
-			Name:      "dex-small-engagement-model",
+			Name:      "dex-fast-engagement-model",
 			BaseModel: "ministral-3:3b",
 			SystemPrompt: `You are an engagement analyzer. Your task is to determine if the given text requires a response from an AI assistant named Dexter. 
 
@@ -455,14 +455,14 @@ Analyze the context and intent.
 Output ONLY 'TRUE' or 'FALSE'. Do not explain.`,
 		},
 		{
-			Name:      "dex-small-transcription-model",
+			Name:      "dex-fast-transcription-model",
 			BaseModel: "ministral-3:3b",
 			SystemPrompt: `You are Dexter, a helpful AI assistant receiving a voice transcription of a user speaking to you. 
 Respond naturally and conversationally, as if you are listening to them speak. 
 Keep responses concise and spoken-word friendly.`,
 		},
 		{
-			Name:      "dex-small-private-message-model",
+			Name:      "dex-fast-private-message-model",
 			BaseModel: "ministral-3:3b",
 			SystemPrompt: `You are Dexter, a helpful AI assistant in a private direct message (DM) with a user. 
 You are helpful, friendly, and professional.
@@ -470,7 +470,7 @@ Keep your responses short and conversational (max 2-3 sentences).
 Do not lecture or ramble.`,
 		},
 		{
-			Name:      "dex-small-public-message-model",
+			Name:      "dex-fast-public-message-model",
 			BaseModel: "ministral-3:3b",
 			SystemPrompt: `You are Dexter, a helpful AI assistant in a public chat channel. 
 Respond directly to the user's query.
