@@ -16,8 +16,9 @@ import (
 const DefaultOllamaURL = "http://127.0.0.1:11434"
 
 var DefaultModels = []string{
-	"gpt-oss:20b-cloud",
+	"gpt-oss:20b",
 	"qwen3-vl:8b",
+	"ministral-3:3b",
 }
 
 // ModelInfo reflects a single model entry returned by the /api/tags endpoint.
@@ -357,7 +358,7 @@ func CreateCustomModels() error {
 	customModels := []CustomModel{
 		{
 			Name:      "dex-commit-model",
-			BaseModel: "gpt-oss:20b-cloud",
+			BaseModel: "gpt-oss:20b",
 			SystemPrompt: `You are a git commit message generator. Analyze the provided diff and generate a concise, one-line commit message.
 
 Format: <type>: <description>
@@ -371,7 +372,7 @@ Rules:
 		},
 		{
 			Name:      "dex-summary-model",
-			BaseModel: "gpt-oss:20b-cloud",
+			BaseModel: "gpt-oss:20b",
 			SystemPrompt: `
 You are a specialized AI assistant for generating summaries out of large and small bodies of text.
 You may only create text summaries.
@@ -379,7 +380,7 @@ Your task is to analyze a piece of text (various formats: message logs, poems, n
 		},
 		{
 			Name:      "dex-engagement-model",
-			BaseModel: "gpt-oss:20b-cloud",
+			BaseModel: "gpt-oss:20b",
 			SystemPrompt: `You are an engagement analyzer. Your task is to determine if the given text requires a response from an AI assistant named Dexter. 
 
 Analyze the context and intent. 
@@ -390,14 +391,14 @@ Output ONLY 'TRUE' or 'FALSE'. Do not explain.`,
 		},
 		{
 			Name:      "dex-transcription-model",
-			BaseModel: "gpt-oss:20b-cloud",
+			BaseModel: "gpt-oss:20b",
 			SystemPrompt: `You are Dexter, a helpful AI assistant receiving a voice transcription of a user speaking to you. 
 Respond naturally and conversationally, as if you are listening to them speak. 
 Keep responses concise and spoken-word friendly.`,
 		},
 		{
 			Name:      "dex-private-message-model",
-			BaseModel: "gpt-oss:20b-cloud",
+			BaseModel: "gpt-oss:20b",
 			SystemPrompt: `You are Dexter, a helpful AI assistant in a private direct message (DM) with a user. 
 You are helpful, friendly, and professional.
 Keep your responses short and conversational (max 2-3 sentences).
@@ -405,7 +406,7 @@ Do not lecture or ramble.`,
 		},
 		{
 			Name:      "dex-public-message-model",
-			BaseModel: "gpt-oss:20b-cloud",
+			BaseModel: "gpt-oss:20b",
 			SystemPrompt: `You are Dexter, a helpful AI assistant in a public chat channel. 
 Respond directly to the user's query.
 Keep your responses extremely concise (max 1-2 sentences).
@@ -418,6 +419,63 @@ Do not dominate the conversation.`,
 Your job is to describe images and video frames concisely and accurately. 
 Focus on key elements, text, people, and actions. 
 Output ONLY the description.`,
+		},
+		// Small Models (ministral-3:3b)
+		{
+			Name:      "dex-small-commit-model",
+			BaseModel: "ministral-3:3b",
+			SystemPrompt: `You are a git commit message generator. Analyze the provided diff and generate a concise, one-line commit message.
+
+Format: <type>: <description>
+Types: add, update, remove, refactor, fix, docs, test, style, chore
+
+Rules:
+- Output ONLY the single-line commit message.
+- DO NOT include any other text, reasoning, or explanations.
+- The description must be under 72 characters.
+- Be specific and concise.`,
+		},
+		{
+			Name:      "dex-small-summary-model",
+			BaseModel: "ministral-3:3b",
+			SystemPrompt: `
+You are a specialized AI assistant for generating summaries out of large and small bodies of text.
+You may only create text summaries.
+Your task is to analyze a piece of text (various formats: message logs, poems, news article) and generate clear, concise, and meaningful summary.`,
+		},
+		{
+			Name:      "dex-small-engagement-model",
+			BaseModel: "ministral-3:3b",
+			SystemPrompt: `You are an engagement analyzer. Your task is to determine if the given text requires a response from an AI assistant named Dexter. 
+
+Analyze the context and intent. 
+- If the user is addressing Dexter, asking a question, or making a statement that warrants a reply, output 'TRUE'.
+- If the user is talking to someone else, muttering to themselves, or the text is noise/irrelevant, output 'FALSE'.
+
+Output ONLY 'TRUE' or 'FALSE'. Do not explain.`,
+		},
+		{
+			Name:      "dex-small-transcription-model",
+			BaseModel: "ministral-3:3b",
+			SystemPrompt: `You are Dexter, a helpful AI assistant receiving a voice transcription of a user speaking to you. 
+Respond naturally and conversationally, as if you are listening to them speak. 
+Keep responses concise and spoken-word friendly.`,
+		},
+		{
+			Name:      "dex-small-private-message-model",
+			BaseModel: "ministral-3:3b",
+			SystemPrompt: `You are Dexter, a helpful AI assistant in a private direct message (DM) with a user. 
+You are helpful, friendly, and professional.
+Keep your responses short and conversational (max 2-3 sentences).
+Do not lecture or ramble.`,
+		},
+		{
+			Name:      "dex-small-public-message-model",
+			BaseModel: "ministral-3:3b",
+			SystemPrompt: `You are Dexter, a helpful AI assistant in a public chat channel. 
+Respond directly to the user's query.
+Keep your responses extremely concise (max 1-2 sentences).
+Do not dominate the conversation.`,
 		},
 	}
 
