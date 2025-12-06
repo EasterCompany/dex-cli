@@ -19,6 +19,7 @@ var DefaultModels = []string{
 	"gpt-oss:20b",
 	"qwen3-vl:8b",
 	"ministral-3:3b",
+	"deepseek-r1:1.5b",
 }
 
 // ModelInfo reflects a single model entry returned by the /api/tags endpoint.
