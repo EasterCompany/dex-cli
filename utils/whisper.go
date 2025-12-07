@@ -235,7 +235,19 @@ try:
 
     # 1. Transcribe (Force English)
     # beam_size=5 is standard for good quality. language="en" ensures no auto-detection weirdness.
-    segments, info = model.transcribe(audio_path, task="transcribe", language="en", beam_size=5)
+    # vad_filter=True helps ignore silence/noise that triggers hallucinations.
+    # condition_on_previous_text=False prevents loop-getting-stuck issues.
+    segments, info = model.transcribe(
+        audio_path, 
+        task="transcribe", 
+        language="en", 
+        beam_size=5,
+        vad_filter=True,
+        vad_parameters=dict(min_silence_duration_ms=500),
+        condition_on_previous_text=False,
+        compression_ratio_threshold=2.4,
+        logprob_threshold=-1.0
+    )
     
     original_text_parts = []
     for segment in segments:
