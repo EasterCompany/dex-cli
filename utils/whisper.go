@@ -233,36 +233,18 @@ try:
     audio_path = r"%s"
     print("Transcribing audio...", file=sys.stderr)
 
-    # 1. Transcribe (Detect Language + Get Original Text)
-    segments, info = model.transcribe(audio_path, task="transcribe", beam_size=5)
+    # 1. Transcribe (Force English)
+    # beam_size=5 is standard for good quality. language="en" ensures no auto-detection weirdness.
+    segments, info = model.transcribe(audio_path, task="transcribe", language="en", beam_size=5)
     
     original_text_parts = []
     for segment in segments:
         original_text_parts.append(segment.text)
     original_text = "".join(original_text_parts).strip()
     
-    detected_lang = info.language
-    prob = info.language_probability
-    print(f"Detected language: {detected_lang} (probability {prob:.2f})", file=sys.stderr)
-
-    # 2. Translate (if not English)
-    english_translation = ""
-    if detected_lang != "en":
-        print(f"Translating from {detected_lang} to English...", file=sys.stderr)
-        # We must run transcription again with task="translate" to get the translation from the audio
-        # faster-whisper handles this natively. Explicitly passing language helps accuracy.
-        trans_segments, _ = model.transcribe(audio_path, task="translate", language=detected_lang, beam_size=5)
-        
-        trans_text_parts = []
-        for segment in trans_segments:
-            trans_text_parts.append(segment.text)
-        english_translation = "".join(trans_text_parts).strip()
-
     # Output structured JSON
     output = {
-        "original_transcription": original_text,
-        "detected_language": detected_lang,
-        "english_translation": english_translation
+        "original_transcription": original_text
     }
     print(json.dumps(output))
 
