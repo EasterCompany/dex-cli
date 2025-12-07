@@ -246,7 +246,7 @@ try:
         vad_parameters=dict(min_silence_duration_ms=500),
         condition_on_previous_text=False,
         compression_ratio_threshold=2.4,
-        logprob_threshold=-1.0
+        log_prob_threshold=-1.0
     )
     
     original_text_parts = []
