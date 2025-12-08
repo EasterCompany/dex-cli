@@ -28,10 +28,12 @@ func InstallSystemdService(service config.ServiceDefinition) error {
 		ExecStart   string
 		WorkingDir  string
 		Environment string
+		LogPath     string
 	}
 
 	data := ServiceData{
 		Description: fmt.Sprintf("Dexter Service: %s", service.ShortName),
+		LogPath:     fmt.Sprintf("%%h/Dexter/logs/%s.log", service.ID),
 	}
 
 	// Set WorkingDir to the service's source path if available
@@ -87,8 +89,8 @@ ExecStart={{.ExecStart}}
 WorkingDirectory={{.WorkingDir}}
 Restart=always
 RestartSec=5
-StandardOutput=journal
-StandardError=journal
+StandardOutput=append:{{.LogPath}}
+StandardError=append:{{.LogPath}}
 {{if .Environment}}Environment={{.Environment}}{{end}}
 
 [Install]
