@@ -40,11 +40,9 @@ func InstallSystemdService(service config.ServiceDefinition) error {
 	case "fe": // Frontend (served via dex serve)
 		dexPath := os.ExpandEnv("$HOME/Dexter/bin/dex")
 		sourcePath, _ := config.ExpandPath(service.Source)
-		distDir := filepath.Join(sourcePath, "dist") // Assume standard 'dist' output
-		// Fallback if dist doesn't exist? The build step should have created it.
 
-		// Use 'dex serve' command
-		data.ExecStart = fmt.Sprintf("%s serve --dir %s --port %s", dexPath, distDir, service.Port)
+		// Serve directly from source root (GitHub Pages style)
+		data.ExecStart = fmt.Sprintf("%s serve --dir %s --port %s", dexPath, sourcePath, service.Port)
 
 	case "be": // Backend (Python or other)
 		sourcePath, _ := config.ExpandPath(service.Source)
