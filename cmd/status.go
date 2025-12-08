@@ -574,10 +574,10 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 		} `json:"health"`
 		Metrics struct {
 			CPU struct {
-				Avg float64 `json:"avg"`
+				Avg *float64 `json:"avg"`
 			} `json:"cpu"`
 			Memory struct {
-				Avg float64 `json:"avg"`
+				Avg *float64 `json:"avg"`
 			} `json:"memory"`
 		} `json:"metrics"`
 	}
@@ -612,6 +612,18 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 	branch := report.Version.Obj.Branch
 	commit := report.Version.Obj.Commit
 
+	// If branch/commit are missing or "unknown", try to parse from Str
+	if (branch == "" || branch == "unknown") || (commit == "" || commit == "unknown") {
+		if parsed, err := git.Parse(report.Version.Str); err == nil {
+			if parsed.Branch != "" {
+				branch = parsed.Branch
+			}
+			if parsed.Commit != "" {
+				commit = parsed.Commit
+			}
+		}
+	}
+
 	// Use the parsed data for the table
 	shortVersion := utils.ParseToShortVersion(report.Version.Str)
 
@@ -621,11 +633,11 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 	// Format CPU and Memory metrics
 	cpu := "N/A"
 	mem := "N/A"
-	if report.Metrics.CPU.Avg > 0 {
-		cpu = fmt.Sprintf("%.1f%%", report.Metrics.CPU.Avg)
+	if report.Metrics.CPU.Avg != nil {
+		cpu = fmt.Sprintf("%.1f%%", *report.Metrics.CPU.Avg)
 	}
-	if report.Metrics.Memory.Avg > 0 {
-		mem = fmt.Sprintf("%.1f%%", report.Metrics.Memory.Avg)
+	if report.Metrics.Memory.Avg != nil {
+		mem = fmt.Sprintf("%.1f%%", *report.Metrics.Memory.Avg)
 	}
 
 	return []string{
