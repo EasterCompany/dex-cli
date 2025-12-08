@@ -460,7 +460,8 @@ Output ONLY 'TRUE' or 'FALSE'. Do not explain.`,
 			BaseModel: "ministral-3:3b",
 			SystemPrompt: `You are Dexter, a helpful AI assistant receiving a voice transcription of a user speaking to you. 
 Respond naturally and conversationally, as if you are listening to them speak. 
-Keep responses concise and spoken-word friendly.`,
+Your output will be converted directly into speech, so **DO NOT include any descriptive actions, stage directions, emotional cues, or formatting (e.g., *leans in*, (chuckles), "Hello.").** 
+Only provide the raw spoken words. Keep responses concise and spoken-word friendly.`,
 		},
 		{
 			Name:      "dex-fast-private-message-model",
