@@ -6,8 +6,10 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/EasterCompany/dex-cli/config"
+	"github.com/EasterCompany/dex-cli/git"
 )
 
 // RunUnifiedBuildPipeline runs the unified build and test process for a service.
@@ -40,8 +42,20 @@ func RunUnifiedBuildPipeline(service config.ServiceDefinition, log func(message 
 		return runPythonBuildPipeline(service, sourcePath, log)
 	}
 
+	// Fetch Git Info for ldflags
+	branch, commit := git.GetVersionInfo(sourcePath)
+	buildDate := time.Now().Format("2006-01-02")
+	buildYear := time.Now().Format("2006")
+	buildHash := commit // Use commit hash as build hash for now
+
+	// Construct ldflags
+	ldflags := fmt.Sprintf(
+		"-X main.version=%s -X main.branch=%s -X main.commit=%s -X main.buildDate=%s -X main.buildYear=%s -X main.buildHash=%s",
+		versionStr, branch, commit, buildDate, buildYear, buildHash,
+	)
+
 	// Default to Go pipeline
-	return runGoBuildPipeline(service, sourcePath, log, versionStr)
+	return runGoBuildPipeline(service, sourcePath, log, ldflags)
 }
 
 func runPythonBuildPipeline(service config.ServiceDefinition, sourcePath string, log func(message string)) (bool, error) {
@@ -103,7 +117,7 @@ func runPythonBuildPipeline(service config.ServiceDefinition, sourcePath string,
 	return true, nil
 }
 
-func runGoBuildPipeline(service config.ServiceDefinition, sourcePath string, log func(message string), versionStr string) (bool, error) {
+func runGoBuildPipeline(service config.ServiceDefinition, sourcePath string, log func(message string), ldflags string) (bool, error) {
 	// 1. Stop service if running (to overwrite binary)
 	// We don't stop here, we stop in the actual build step if needed or assume systemd restart handles it?
 	// Actually, endpoints might be in use. `dex build` stops the service usually?
@@ -170,7 +184,7 @@ func runGoBuildPipeline(service config.ServiceDefinition, sourcePath string, log
 
 	// Helper for build command
 	buildBinary := func(outputName string, buildTags string) error {
-		args := []string{"build", "-ldflags", fmt.Sprintf("-X main.version=%s", versionStr), "-o", filepath.Join(binDir, outputName)}
+		args := []string{"build", "-ldflags", ldflags, "-o", filepath.Join(binDir, outputName)}
 		if buildTags != "" {
 			args = append(args, "-tags", buildTags)
 		}
@@ -217,7 +231,7 @@ func runGoBuildPipeline(service config.ServiceDefinition, sourcePath string, log
 						targetName := fmt.Sprintf("event-%s-handler", finalSuffix)
 						log(fmt.Sprintf("Building %s...", targetName))
 
-						args := []string{"build", "-ldflags", fmt.Sprintf("-X main.version=%s", versionStr), "-o", filepath.Join(binDir, targetName), fmt.Sprintf("./handlers/%s", entry.Name())}
+						args := []string{"build", "-ldflags", ldflags, "-o", filepath.Join(binDir, targetName), fmt.Sprintf("./handlers/%s", entry.Name())}
 						cmd := exec.Command("go", args...)
 						cmd.Dir = sourcePath
 						cmd.Stdout = os.Stdout
