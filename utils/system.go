@@ -32,7 +32,16 @@ func InstallSystemdService(service config.ServiceDefinition) error {
 
 	data := ServiceData{
 		Description: fmt.Sprintf("Dexter Service: %s", service.ShortName),
-		WorkingDir:  os.ExpandEnv("$HOME"), // Default working dir
+	}
+
+	// Set WorkingDir to the service's source path if available
+	if service.Source != "" {
+		expandedSourcePath, err := config.ExpandPath(service.Source)
+		if err == nil {
+			data.WorkingDir = expandedSourcePath
+		}
+	} else {
+		data.WorkingDir = os.ExpandEnv("$HOME") // Fallback for services without a source dir
 	}
 
 	// Determine ExecStart based on service type
