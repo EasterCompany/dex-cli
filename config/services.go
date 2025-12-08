@@ -323,15 +323,8 @@ func DefaultServiceMapConfig() *ServiceMapConfig {
 	// Create the map from the hardcoded definitions
 	services := make(map[string][]ServiceEntry)
 	for _, def := range serviceDefinitions {
-		// Only "cli", "fe" and "os" types are in the map by default
-		if def.Type == "cli" || def.Type == "fe" || def.Type == "os" {
-			services[def.Type] = append(services[def.Type], def.ToServiceEntry())
-		} else {
-			// Ensure other types have at least an empty slice
-			if _, ok := services[def.Type]; !ok {
-				services[def.Type] = []ServiceEntry{}
-			}
-		}
+		// Include all service types in the default map
+		services[def.Type] = append(services[def.Type], def.ToServiceEntry())
 	}
 
 	return &ServiceMapConfig{
