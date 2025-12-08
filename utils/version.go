@@ -56,6 +56,30 @@ func GetServiceVersion(service config.ServiceDefinition) string {
 // GetBinaryVersion gets the version by executing the binary with 'version' argument
 // This is used during build to get the version of a newly-built binary
 func GetBinaryVersion(service config.ServiceDefinition) string {
+	// For frontend, read version.txt
+	if service.Type == "fe" {
+		sourcePath, _ := config.ExpandPath(service.Source)
+		versionFile := filepath.Join(sourcePath, "dist", "version.txt") // Look in dist
+		data, err := os.ReadFile(versionFile)
+		if err == nil {
+			return strings.TrimSpace(string(data))
+		}
+		// Fallback to source version.txt if build didn't happen yet?
+		versionFileSrc := filepath.Join(sourcePath, "version.txt")
+		dataSrc, errSrc := os.ReadFile(versionFileSrc)
+		if errSrc == nil {
+			return strings.TrimSpace(string(dataSrc))
+		}
+		return "unknown"
+	}
+
+	// For Python backend, can we query it?
+	if service.Type == "be" {
+		// Maybe `run.sh version`? Or check a version file?
+		// For now, return "N/A" or "managed"
+		return "N/A"
+	}
+
 	var binPath string
 	if service.ShortName == "cli" {
 		binPath = filepath.Join(os.Getenv("HOME"), "Dexter", "bin", "dex")

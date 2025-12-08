@@ -91,6 +91,10 @@ func PrintSummaryTable(summaries []SummaryInfo) {
 
 // GetBinarySize returns the size of the service's binary in bytes.
 func GetBinarySize(service config.ServiceDefinition) int64 {
+	if service.Type == "fe" || service.Type == "be" {
+		return 0
+	}
+
 	path, err := config.ExpandPath(service.GetBinaryPath())
 	if err != nil {
 		return 0
