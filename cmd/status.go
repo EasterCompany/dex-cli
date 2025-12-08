@@ -624,6 +624,11 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 		}
 	}
 
+	// Truncate commit hash if it's the full hash
+	if len(commit) > 7 {
+		commit = commit[:7]
+	}
+
 	// Use the parsed data for the table
 	shortVersion := utils.ParseToShortVersion(report.Version.Str)
 

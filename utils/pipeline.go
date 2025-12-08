@@ -205,7 +205,11 @@ func runGoBuildPipeline(service config.ServiceDefinition, sourcePath string, log
 	}
 
 	// Main service build
-	if err := buildBinary(service.ID, ""); err != nil {
+	outputName := service.ID
+	if service.ShortName == "cli" {
+		outputName = "dex"
+	}
+	if err := buildBinary(outputName, ""); err != nil {
 		return false, fmt.Errorf("failed to build %s: %w", service.ID, err)
 	}
 	log(fmt.Sprintf("✓ %s built successfully", service.ID))
