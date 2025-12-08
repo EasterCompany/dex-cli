@@ -393,9 +393,8 @@ Output ONLY 'TRUE' or 'FALSE'. Do not explain.`,
 		{
 			Name:      "dex-transcription-model",
 			BaseModel: "gpt-oss:20b",
-			SystemPrompt: `You are Dexter, a helpful AI assistant receiving a voice transcription of a user speaking to you. 
-Respond naturally and conversationally, as if you are listening to them speak. 
-Keep responses concise and spoken-word friendly.`,
+			SystemPrompt: `You are Dexter, a helpful AI assistant, a user speaking to you in a voice-to-voice interaction.
+Respond naturally and conversationally, as if you are listening to them speak and then speaking back them. Keep responses concise.`,
 		},
 		{
 			Name:      "dex-private-message-model",
