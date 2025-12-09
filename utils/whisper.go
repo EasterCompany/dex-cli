@@ -250,7 +250,26 @@ try:
     )
     
     original_text_parts = []
+    # Common hallucinations from Whisper on silent audio
+    hallucinations = ["thank you", "thanks", "you", "bye", "thank you.", "thanks.", "you.", "bye."]
+    
     for segment in segments:
+        text_clean = segment.text.strip().lower()
+        # Check against hallucinations list (exact match or close)
+        is_hallucination = False
+        if text_clean in hallucinations:
+            is_hallucination = True
+        # Also check for repeated "Thank you. Thank you."
+        if "thank you" in text_clean and len(text_clean) < 25:
+             is_hallucination = True
+
+        if is_hallucination:
+            # Only keep if extremely confident
+            # avg_logprob closer to 0 is better. -0.25 is very confident.
+            if segment.avg_logprob < -0.25:
+                print(f"Dropped potential hallucination: '{segment.text}' (score: {segment.avg_logprob})", file=sys.stderr)
+                continue
+        
         original_text_parts.append(segment.text)
     original_text = "".join(original_text_parts).strip()
     
