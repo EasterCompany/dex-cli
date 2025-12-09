@@ -231,6 +231,7 @@ func runGoBuildPipeline(service config.ServiceDefinition, sourcePath string, log
 						if finalSuffix == "privatemessage" {
 							finalSuffix = "private-message"
 						}
+						// greeting -> event-greeting-handler (automatic)
 
 						targetName := fmt.Sprintf("event-%s-handler", finalSuffix)
 						log(fmt.Sprintf("Building %s...", targetName))
