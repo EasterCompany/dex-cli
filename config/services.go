@@ -131,6 +131,15 @@ var serviceDefinitions = []ServiceDefinition{
 		Source:      "~/EasterCompany/dex-tts-service",
 		Domain:      "127.0.0.1", Port: "8200",
 	},
+	{
+		ID:          "dex-web-service",
+		ShortName:   "web",
+		SystemdName: "dex-web-service.service",
+		Type:        "be",
+		Repo:        "git@github.com:EasterCompany/dex-web-service.git",
+		Source:      "~/EasterCompany/dex-web-service",
+		Domain:      "127.0.0.1", Port: "8201",
+	},
 	// 3rd Party (th)
 	{
 		ID:          "dex-discord-service",
