@@ -380,6 +380,14 @@ You may only create text summaries.
 Your task is to analyze a piece of text (various formats: message logs, poems, news article) and generate clear, concise, and meaningful summary.`,
 		},
 		{
+			Name:      "dex-scraper-model",
+			BaseModel: "gpt-oss:20b",
+			SystemPrompt: `You are a web content analyzer. Your task is to analyze scraped HTML content and provide a concise, informative summary.
+Focus on the main article content, product details, or key information.
+Ignore navigation menus, footers, and advertisements.
+Your output will be used as context for another AI, so prioritize clarity and density of information.`,
+		},
+		{
 			Name:      "dex-engagement-model",
 			BaseModel: "gpt-oss:20b",
 			SystemPrompt: `You are an engagement analyzer. Your task is to determine if the given text requires a response from an AI assistant named Dexter. 
