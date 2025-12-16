@@ -78,6 +78,7 @@ var RequiredPackages = []Package{
 	{Name: "shellcheck", Required: true, InstallCommand: "sudo pacman -S shellcheck || sudo apt install shellcheck", UpgradeCommand: "sudo pacman -Syu shellcheck || (sudo apt update && sudo apt upgrade -y shellcheck)"},
 	{Name: "nvidia-smi", Required: true, MinVersion: "", InstallCommand: "Install NVIDIA drivers via your distribution's package manager (e.g. sudo pacman -S nvidia-utils)", UpgradeCommand: "Update system packages"},
 	{Name: "nvcc", Required: true, MinVersion: "11.0", InstallCommand: "sudo pacman -S cuda || sudo apt install nvidia-cuda-toolkit", UpgradeCommand: "sudo pacman -Syu cuda || (sudo apt update && sudo apt upgrade -y nvidia-cuda-toolkit)"},
+	{Name: "chromium", Required: false, MinVersion: "", InstallCommand: "sudo pacman -S --noconfirm chromium || sudo apt install -y chromium-browser || sudo apt install -y chromium", UpgradeCommand: "sudo pacman -Syu --noconfirm chromium || (sudo apt update && sudo apt upgrade -y chromium-browser)"},
 }
 
 // LoadSystemConfig loads or creates system.json
@@ -419,6 +420,7 @@ func getPackageVersion(pkgName string) string {
 		"nvcc":          {"--version"},
 		"lsblk":         {"--version"},
 		"findmnt":       {"--version"},
+		"chromium":      {"--version"},
 	}
 
 	args, ok := versionArgs[pkgName]
