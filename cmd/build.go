@@ -460,9 +460,9 @@ func Build(args []string) error {
 	}
 
 	// ---
-	// 6. Publish to easter.company (major/minor only, NOT patch)
+	// 6. Publish to easter.company (major, minor, AND patch)
 	// ---
-	if incrementType == "major" || incrementType == "minor" {
+	if incrementType == "major" || incrementType == "minor" || incrementType == "patch" {
 		fmt.Println()
 		ui.PrintHeader("Publish Phase")
 

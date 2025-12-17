@@ -76,7 +76,7 @@ func PublishRelease(fullVersion, shortVersion, releaseType string, services []co
 	// Copy binaries and update data
 	platform := "linux-amd64" // We only support linux-amd64
 	for _, service := range services {
-		binPath := filepath.Join("/home/owen/Dexter/bin", getBinaryName(service))
+		binPath := filepath.Join(os.Getenv("HOME"), "Dexter", "bin", getBinaryName(service))
 
 		if _, err := os.Stat(binPath); os.IsNotExist(err) {
 			ui.PrintWarning(fmt.Sprintf("Binary not found: %s", binPath))
@@ -102,13 +102,6 @@ func PublishRelease(fullVersion, shortVersion, releaseType string, services []co
 		data.UpdateService(service.ShortName, serviceFullVersion, serviceFullVersion, repo)
 
 		ui.PrintSuccess(fmt.Sprintf("Published %s", filepath.Base(binPath)))
-
-		// If this is the event service, also copy event handlers
-		if service.ID == "dex-event-service" {
-			if err := copyEventHandlers(versionDir, shortVersion, platform, data); err != nil {
-				ui.PrintWarning(fmt.Sprintf("Failed to copy event handlers: %v", err))
-			}
-		}
 	}
 
 	// Update latest versions (store full version strings)
@@ -160,44 +153,9 @@ func copyFile(src, dst string) error {
 	return nil
 }
 
-// copyEventHandlers copies all event handler binaries for the event service
-func copyEventHandlers(versionDir, shortVersion, platform string, data *ReleaseData) error {
-	// List of event handlers to copy (without path prefix)
-	handlers := []string{
-		"event-test-handler",
-		// Add more handlers here as they're created
-	}
-
-	for _, handler := range handlers {
-		srcPath := filepath.Join("/home/owen/Dexter/bin", handler)
-
-		// Check if handler exists
-		if _, err := os.Stat(srcPath); os.IsNotExist(err) {
-			ui.PrintWarning(fmt.Sprintf("Handler not found: %s (skipping)", handler))
-			continue
-		}
-
-		// Copy handler to version directory
-		destPath := filepath.Join(versionDir, handler)
-		if err := copyFile(srcPath, destPath); err != nil {
-			return fmt.Errorf("failed to copy handler %s: %w", handler, err)
-		}
-
-		// Add handler to data.json as a binary
-		// Use the handler name directly since it already has the "event-" prefix
-		if err := data.AddBinary(shortVersion, handler, platform, destPath); err != nil {
-			ui.PrintWarning(fmt.Sprintf("Failed to add handler %s to data.json: %v", handler, err))
-		}
-
-		ui.PrintSuccess(fmt.Sprintf("Published handler: %s", handler))
-	}
-
-	return nil
-}
-
 // getServiceFullVersion gets the full version string for a service binary
 func getServiceFullVersion(service config.ServiceDefinition) string {
-	binPath := filepath.Join("/home/owen/Dexter/bin", getBinaryName(service))
+	binPath := filepath.Join(os.Getenv("HOME"), "Dexter", "bin", getBinaryName(service))
 
 	// Run the binary with 'version' argument to get full version
 	cmd := exec.Command(binPath, "version")

@@ -23,6 +23,24 @@ func RunUnifiedBuildPipeline(service config.ServiceDefinition, log func(message 
 	versionStr := fmt.Sprintf("%d.%d.%d", major, minor, patch)
 	log(fmt.Sprintf("Starting unified build pipeline for %s (v%s)...", service.ShortName, versionStr))
 
+	// Check for Go service (prioritize over Python if go.mod exists)
+	goModPath := filepath.Join(sourcePath, "go.mod")
+	if _, err := os.Stat(goModPath); err == nil {
+		// Fetch Git Info for ldflags
+		branch, commit := git.GetVersionInfo(sourcePath)
+		buildDate := time.Now().Format("2006-01-02")
+		buildYear := time.Now().Format("2006")
+		buildHash := commit // Use commit hash as build hash for now
+
+		// Construct ldflags
+		ldflags := fmt.Sprintf(
+			"-X main.version=%s -X main.branch=%s -X main.commit=%s -X main.buildDate=%s -X main.buildYear=%s -X main.buildHash=%s",
+			versionStr, branch, commit, buildDate, buildYear, buildHash,
+		)
+
+		return runGoBuildPipeline(service, sourcePath, log, ldflags)
+	}
+
 	// Check for Python service (marker: requirements.txt or main.py)
 	isPython := false
 	reqPath := filepath.Join(sourcePath, "requirements.txt")
@@ -42,6 +60,7 @@ func RunUnifiedBuildPipeline(service config.ServiceDefinition, log func(message 
 		return runPythonBuildPipeline(service, sourcePath, log)
 	}
 
+	// Default to Go pipeline (fallback)
 	// Fetch Git Info for ldflags
 	branch, commit := git.GetVersionInfo(sourcePath)
 	buildDate := time.Now().Format("2006-01-02")
@@ -54,7 +73,6 @@ func RunUnifiedBuildPipeline(service config.ServiceDefinition, log func(message 
 		versionStr, branch, commit, buildDate, buildYear, buildHash,
 	)
 
-	// Default to Go pipeline
 	return runGoBuildPipeline(service, sourcePath, log, ldflags)
 }
 
@@ -189,14 +207,6 @@ func runGoBuildPipeline(service config.ServiceDefinition, sourcePath string, log
 			args = append(args, "-tags", buildTags)
 		}
 
-		// If it's the event service, it might have multiple binaries (handlers)
-		// But standard `go build` in root builds the main module.
-		// dex-event-service has handlers as separate binaries?
-		// Checking file structure: handlers/publicmessage/main.go etc.
-		// So `go build` in root builds the main service.
-		// For handlers, we might need to build them individually if they are main packages.
-
-		// Let's assume standard build first.
 		cmd := exec.Command("go", args...)
 		cmd.Dir = sourcePath
 		cmd.Stdout = os.Stdout
@@ -214,46 +224,8 @@ func runGoBuildPipeline(service config.ServiceDefinition, sourcePath string, log
 	}
 	log(fmt.Sprintf("✓ %s built successfully", service.ID))
 
-	// Special case for dex-event-service: Build handlers
-	if service.ID == "dex-event-service" {
-		handlersDir := filepath.Join(sourcePath, "handlers")
-		entries, err := os.ReadDir(handlersDir)
-		if err == nil {
-			for _, entry := range entries {
-				if entry.IsDir() && entry.Name() != "test-suite" { // Skip non-handler dirs if any
-					// Check if it has a main.go
-					if _, err := os.Stat(filepath.Join(handlersDir, entry.Name(), "main.go")); err == nil {
-						// Hardcoding mapping for safety/consistency with existing
-						finalSuffix := entry.Name()
-						if finalSuffix == "publicmessage" {
-							finalSuffix = "public-message"
-						}
-						if finalSuffix == "privatemessage" {
-							finalSuffix = "private-message"
-						}
-						// greeting -> event-greeting-handler (automatic)
-
-						targetName := fmt.Sprintf("event-%s-handler", finalSuffix)
-						log(fmt.Sprintf("Building %s...", targetName))
-
-						args := []string{"build", "-ldflags", ldflags, "-o", filepath.Join(binDir, targetName), fmt.Sprintf("./handlers/%s", entry.Name())}
-						cmd := exec.Command("go", args...)
-						cmd.Dir = sourcePath
-						cmd.Stdout = os.Stdout
-						cmd.Stderr = os.Stderr
-						if err := cmd.Run(); err != nil {
-							return false, fmt.Errorf("failed to build handler %s: %w", targetName, err)
-						}
-						log(fmt.Sprintf("✓ %s built successfully", targetName))
-					}
-				}
-			}
-		}
-	}
-
 	// 7. Clean source (optional, mostly for git status)
 	log("Cleaning build artifacts...")
-	// git clean -fdX ? No, dangerous. Just leave it.
 	log("✓ Clean complete")
 
 	return true, nil
