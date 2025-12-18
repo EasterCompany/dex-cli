@@ -18,8 +18,29 @@ import (
 
 var RunningVersion string
 
-// getServiceVersion gets the current version for a service from its git tags
+// getServiceVersion gets the current version for a service from bin/data.json (primary) or git tags (fallback)
 func getServiceVersion(def config.ServiceDefinition) (major, minor, patch int, err error) {
+	// 1. Try to read from data.json (The Truth)
+	feDef := config.GetServiceDefinition("easter-company")
+	feSource, err := config.ExpandPath(feDef.Source)
+	if err == nil {
+		dataPath := filepath.Join(feSource, "bin", "data.json")
+		rd, err := release.LoadReleaseData(dataPath)
+		if err == nil && rd != nil {
+			if svcInfo, ok := rd.Services[def.ID]; ok && svcInfo.Current != "" {
+				// Parse the "Current" version string
+				v, err := git.Parse(svcInfo.Current)
+				if err == nil {
+					major, _ = strconv.Atoi(v.Major)
+					minor, _ = strconv.Atoi(v.Minor)
+					patch, _ = strconv.Atoi(v.Patch)
+					return major, minor, patch, nil
+				}
+			}
+		}
+	}
+
+	// 2. Fallback to Git Tags (Legacy / Bootstrapping)
 	sourcePath, expandErr := config.ExpandPath(def.Source)
 	if expandErr != nil {
 		return 0, 0, 0, fmt.Errorf("failed to expand source path: %w", expandErr)
