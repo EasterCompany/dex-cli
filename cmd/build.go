@@ -109,8 +109,8 @@ func getHighestMajorMinor(services []config.ServiceDefinition) (int, int, error)
 
 // verifyDeveloperAccess checks if this is a developer environment with source code access
 func verifyDeveloperAccess() error {
-	easterCompanyDir := fmt.Sprintf("%s/EasterCompany", os.Getenv("HOME"))
-	if _, err := os.Stat(easterCompanyDir); os.IsNotExist(err) {
+	dexCliDir := fmt.Sprintf("%s/EasterCompany/dex-cli", os.Getenv("HOME"))
+	if _, err := os.Stat(dexCliDir); os.IsNotExist(err) {
 		return fmt.Errorf("build command is only available for Easter Company developers with source code access")
 	}
 	return nil

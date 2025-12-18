@@ -20,12 +20,12 @@ func GetCommandRequirements() map[string]CommandRequirement {
 		"update": {
 			Name:        "update",
 			Description: "Update dex-cli and all services",
-			Check:       HasDexCliSource,
+			Check:       func() bool { return true }, // Always available
 		},
 		"build": {
 			Name:        "build",
 			Description: "Build and install all services from local source",
-			Check:       HasAnyDexService,
+			Check:       HasDexCliSource,
 		},
 		"start": {
 			Name:        "start",

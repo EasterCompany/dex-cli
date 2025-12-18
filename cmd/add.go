@@ -15,7 +15,7 @@ import (
 // Add installs a new service.
 func Add(args []string) error {
 	// Parse flags
-	cloneSource := false
+	cloneSource := config.IsDevMode()
 	var serviceNames []string
 
 	for _, arg := range args {
