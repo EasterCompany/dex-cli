@@ -102,6 +102,21 @@ func PublishRelease(fullVersion, shortVersion, releaseType string, services []co
 		data.UpdateService(service.ShortName, serviceFullVersion, serviceFullVersion, repo)
 
 		ui.PrintSuccess(fmt.Sprintf("Published %s", filepath.Base(binPath)))
+
+		// Special case for CLI: Update latest binary for install script
+		if service.ShortName == "cli" {
+			latestDir := filepath.Join(repoPath, BinPath, "latest")
+			if err := os.MkdirAll(latestDir, 0755); err != nil {
+				ui.PrintWarning(fmt.Sprintf("Failed to create latest directory: %v", err))
+			} else {
+				latestPath := filepath.Join(latestDir, "dex")
+				if err := copyFile(binPath, latestPath); err != nil {
+					ui.PrintWarning(fmt.Sprintf("Failed to update latest binary: %v", err))
+				} else {
+					ui.PrintSuccess("Updated bin/latest/dex")
+				}
+			}
+		}
 	}
 
 	// Update latest versions (store full version strings)
