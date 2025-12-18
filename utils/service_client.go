@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -85,4 +87,55 @@ func FetchURL(url string, timeout time.Duration) (string, error) {
 	}
 
 	return string(body), nil
+}
+
+// SendEvent sends a fire-and-forget event to the event service
+func SendEvent(eventType string, eventData map[string]interface{}) {
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				// Prevent crash on panic
+				fmt.Printf("Recovered from panic in SendEvent: %v\n", r)
+			}
+		}()
+
+		// Get Event Service URL
+		// We use a safe fallback if config fails or isn't initialized
+		var url string
+		// Try to get definition
+		def := config.GetServiceDefinition("dex-event-service")
+		if def.ID == "" {
+			url = "http://localhost:8081/events" // Fallback
+		} else {
+			url = def.GetHTTP("/events")
+		}
+
+		// Basic event structure
+		eventData["type"] = eventType
+
+		// Ensure timestamp exists
+		if _, ok := eventData["timestamp"]; !ok {
+			eventData["timestamp"] = time.Now().Format(time.RFC3339)
+		}
+
+		requestBody := map[string]interface{}{
+			"service": "dex-cli",
+			"event":   eventData,
+		}
+
+		jsonData, err := json.Marshal(requestBody)
+		if err != nil {
+			return
+		}
+
+		client := &http.Client{
+			Timeout: 2 * time.Second,
+		}
+
+		resp, err := client.Post(url, "application/json", bytes.NewBuffer(jsonData))
+		if err != nil {
+			return
+		}
+		defer func() { _ = resp.Body.Close() }()
+	}()
 }

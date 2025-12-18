@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/EasterCompany/dex-cli/cmd"
 	"github.com/EasterCompany/dex-cli/config"
@@ -155,12 +156,76 @@ func main() {
 }
 
 func runCommand(commandFunc func() error) {
+	command := "unknown"
+	if len(os.Args) > 1 {
+		command = os.Args[1]
+	}
+	args := ""
+	if len(os.Args) > 2 {
+		args = fmt.Sprintf("%v", os.Args[2:])
+	}
+
+	// Emit Command Started Event
+	utils.SendEvent("system.cli.command", map[string]interface{}{
+		"command": command,
+		"args":    args,
+		"status":  "started",
+	})
+
+	// Special handling for build/update commands to set Discord status
+	if command == "build" || command == "update" {
+		utils.SendEvent("system.cli.status", map[string]interface{}{
+			"status":  "dnd",
+			"message": fmt.Sprintf("%s in progress...", command),
+		})
+	}
+
 	fmt.Println()
-	if err := commandFunc(); err != nil {
+	start := time.Now()
+	err := commandFunc()
+	duration := time.Since(start).String()
+
+	if err != nil {
+		// Emit Command Error Event
+		utils.SendEvent("system.cli.command", map[string]interface{}{
+			"command":   command,
+			"args":      args,
+			"status":    "error",
+			"output":    err.Error(),
+			"duration":  duration,
+			"exit_code": 1,
+		})
+
+		// Reset status if it was build/update
+		if command == "build" || command == "update" {
+			utils.SendEvent("system.cli.status", map[string]interface{}{
+				"status":  "online",
+				"message": "Operation failed",
+			})
+		}
+
 		ui.PrintError(fmt.Sprintf("Error: %v", err))
 		fmt.Println() // Add padding at the end
 		os.Exit(1)
 	}
+
+	// Emit Command Success Event
+	utils.SendEvent("system.cli.command", map[string]interface{}{
+		"command":   command,
+		"args":      args,
+		"status":    "success",
+		"duration":  duration,
+		"exit_code": 0,
+	})
+
+	// Reset status on success
+	if command == "build" || command == "update" {
+		utils.SendEvent("system.cli.status", map[string]interface{}{
+			"status":  "online",
+			"message": "Operation complete",
+		})
+	}
+
 	fmt.Println()
 }
 
