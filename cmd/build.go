@@ -295,20 +295,18 @@ func Build(args []string) error {
 		buildAllServices = true
 
 	case "patch", "auto":
-		// LAW 1: Any repo with changes increments only its own patch
-		if len(servicesWithChanges) == 0 {
-			if !forceRebuild {
-				ui.PrintWarning("No uncommitted changes detected in any service")
-				return nil
-			}
-			// Force rebuild all services if --force is specified
-			ui.PrintInfo("Force rebuild: building all services without version increment")
+		// If force rebuild is specified, build ALL services
+		if forceRebuild {
+			ui.PrintInfo("Force rebuild: building all services")
 			servicesWithChanges = []config.ServiceDefinition{}
 			for _, s := range allServices {
 				if s.IsBuildable() {
 					servicesWithChanges = append(servicesWithChanges, s)
 				}
 			}
+		} else if len(servicesWithChanges) == 0 {
+			ui.PrintWarning("No uncommitted changes detected in any service")
+			return nil
 		}
 
 		if len(servicesWithChanges) == 1 {
