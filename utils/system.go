@@ -57,18 +57,21 @@ func InstallSystemdService(service config.ServiceDefinition) error {
 
 	case "be": // Backend (Python or other)
 		sourcePath, _ := config.ExpandPath(service.Source)
+		binaryPath := filepath.Join(os.ExpandEnv("$HOME/Dexter/bin"), service.ID)
 
-		// Check for run.sh which handles venv and everything
-		runScript := filepath.Join(sourcePath, "run.sh")
-		if _, err := os.Stat(runScript); err == nil {
-			data.ExecStart = runScript
-			data.WorkingDir = sourcePath
-		} else {
-			// Fallback or other types?
-			// Ideally backend services should have a run script or standard binary.
-			// If it's a binary we built (like dex-event-service):
-			binaryPath := filepath.Join(os.ExpandEnv("$HOME/Dexter/bin"), service.ID)
+		// Check for built binary first (Go wrapper or standard binary)
+		if _, err := os.Stat(binaryPath); err == nil {
 			data.ExecStart = binaryPath
+		} else {
+			// Check for run.sh as fallback
+			runScript := filepath.Join(sourcePath, "run.sh")
+			if _, err := os.Stat(runScript); err == nil {
+				data.ExecStart = runScript
+				data.WorkingDir = sourcePath
+			} else {
+				// Final fallback
+				data.ExecStart = binaryPath
+			}
 		}
 
 	default: // "cs", "th" etc - usually Go binaries

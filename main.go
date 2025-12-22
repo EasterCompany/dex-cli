@@ -83,7 +83,7 @@ func main() {
 		runCommand(func() error { return cmd.Build(os.Args[2:]) })
 
 	case "start", "stop", "restart":
-		runCommand(func() error { return cmd.Service(command) })
+		runCommand(func() error { return cmd.Service(command, os.Args[2:]) })
 
 	case "status":
 		service := "all"

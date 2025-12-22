@@ -9,9 +9,18 @@ import (
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
-// Service handles start, stop, and restart commands for all manageable services.
-func Service(command string) error {
-	ui.PrintInfo(fmt.Sprintf("Attempting to %s all services...", command))
+// Service handles start, stop, and restart commands for manageable services.
+func Service(command string, args []string) error {
+	serviceShortName := "all"
+	if len(args) > 0 {
+		serviceShortName = args[0]
+	}
+
+	if serviceShortName == "all" {
+		ui.PrintInfo(fmt.Sprintf("Attempting to %s all services...", command))
+	} else {
+		ui.PrintInfo(fmt.Sprintf("Attempting to %s service %s...", command, serviceShortName))
+	}
 
 	serviceMap, err := config.LoadServiceMapConfig()
 	if err != nil {
@@ -19,18 +28,34 @@ func Service(command string) error {
 	}
 
 	var servicesToManage []config.ServiceDefinition
-	for _, serviceList := range serviceMap.Services {
-		for _, serviceEntry := range serviceList {
-			def := config.GetServiceDefinition(serviceEntry.ID)
-			// Only manage services that are not "cli" or "os" and have a systemd name
-			if def.ID != "" && def.Type != "cli" && def.Type != "os" && def.SystemdName != "" {
-				servicesToManage = append(servicesToManage, def)
+	if serviceShortName == "all" {
+		for _, serviceList := range serviceMap.Services {
+			for _, serviceEntry := range serviceList {
+				def := config.GetServiceDefinition(serviceEntry.ID)
+				// Only manage services that are not "cli" or "os" and have a systemd name
+				if def.ID != "" && def.Type != "cli" && def.Type != "os" && def.SystemdName != "" {
+					servicesToManage = append(servicesToManage, def)
+				}
 			}
 		}
+	} else {
+		// Find specific service
+		def, err := config.Resolve(serviceShortName)
+		if err != nil {
+			return err
+		}
+		if def.SystemdName == "" {
+			return fmt.Errorf("service '%s' is not manageable via systemd", serviceShortName)
+		}
+		servicesToManage = append(servicesToManage, *def)
 	}
 
 	if len(servicesToManage) == 0 {
-		ui.PrintInfo("No manageable services found in service-map.json.")
+		if serviceShortName == "all" {
+			ui.PrintInfo("No manageable services found in service-map.json.")
+		} else {
+			ui.PrintInfo(fmt.Sprintf("Service '%s' not found or not manageable.", serviceShortName))
+		}
 		return nil
 	}
 
@@ -62,6 +87,10 @@ func Service(command string) error {
 		return fmt.Errorf("one or more services failed to %s", command)
 	}
 
-	ui.PrintSuccess(fmt.Sprintf("Successfully executed '%s' for all services.", command))
+	if serviceShortName == "all" {
+		ui.PrintSuccess(fmt.Sprintf("Successfully executed '%s' for all services.", command))
+	} else {
+		ui.PrintSuccess(fmt.Sprintf("Successfully executed '%s' for %s.", command, serviceShortName))
+	}
 	return nil
 }

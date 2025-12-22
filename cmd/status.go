@@ -653,7 +653,7 @@ func checkHTTPStatus(service config.ServiceDefinition, serviceID, address string
 		cpu = fmt.Sprintf("%.1f%%", *report.Metrics.CPU.Avg)
 	}
 	if report.Metrics.Memory.Avg != nil {
-		mem = fmt.Sprintf("%.1f%%", *report.Metrics.Memory.Avg)
+		mem = fmt.Sprintf("%.1f MB", *report.Metrics.Memory.Avg)
 	}
 
 	return []string{
