@@ -10,6 +10,22 @@ import (
 
 // Config displays the service-map.json configuration for a given service, or manages it.
 func Config(args []string) error {
+	for _, arg := range args {
+		if arg == "--help" || arg == "-h" {
+			ui.PrintHeader("Config Command Help")
+			ui.PrintInfo("Usage: dex config <service> [field...]")
+			ui.PrintInfo("       dex config reset")
+			fmt.Println()
+			ui.PrintInfo("Description:")
+			ui.PrintInfo("  View or manage service configurations.")
+			ui.PrintInfo("  <service>   The short name of the service (e.g., 'event', 'discord').")
+			ui.PrintInfo("  [field...]  Optional path to a specific field in the config JSON.")
+			ui.PrintInfo("              If omitted, the full configuration is displayed.")
+			ui.PrintInfo("  reset       Reset service-map.json to default configuration.")
+			return nil
+		}
+	}
+
 	if len(args) > 0 && args[0] == "reset" {
 		return resetConfig()
 	}

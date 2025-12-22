@@ -244,7 +244,8 @@ func setupSignalHandler() {
 
 func printUsage() {
 	ui.PrintHeader("DEX")
-	ui.PrintSection("A cli program for interfacing with local and/or remote dexter services as a user and/or developer.")
+	ui.PrintSection("A CLI program for interfacing with local and/or remote Dexter services as a user and/or developer.")
+
 	ui.PrintSubHeader("Local/User System Commands")
 	if config.IsCommandAvailable("system") {
 		ui.PrintInfo("system     | Show system info and manage packages")
@@ -259,22 +260,27 @@ func printUsage() {
 	if config.IsCommandAvailable("logs") {
 		ui.PrintInfo("logs       | <service> [-f] View service logs")
 	}
+	if config.IsCommandAvailable("serve") {
+		ui.PrintInfo("serve      | -d <dir> -p <port> Serve static files from a directory")
+	}
+
 	ui.PrintSubHeader("Developer Lifecycle Commands")
 	if config.IsCommandAvailable("test") {
-		ui.PrintInfo("test       | Test services")
+		ui.PrintInfo("test       | Run service tests")
 	}
 	if config.IsCommandAvailable("build") {
-		ui.PrintInfo("build      | Build and install cli and services")
+		ui.PrintInfo("build      | [major|minor|patch] Build and install CLI and services")
 	}
 	if config.IsCommandAvailable("update") {
-		ui.PrintInfo("update     | Update cli and services")
+		ui.PrintInfo("update     | Update CLI and services")
 	}
+
 	ui.PrintSubHeader("Global Service Management Commands")
 	if config.IsCommandAvailable("status") {
-		ui.PrintInfo("status     | Checks the status of cli and services")
+		ui.PrintInfo("status     | [service|all] Check the status of CLI and services")
 	}
 	if config.IsCommandAvailable("add") {
-		ui.PrintInfo("add        | Add (install) a service")
+		ui.PrintInfo("add        | Add (install) a new service")
 	}
 	if config.IsCommandAvailable("remove") {
 		ui.PrintInfo("remove     | Remove (uninstall) a service")
@@ -288,32 +294,32 @@ func printUsage() {
 	if config.IsCommandAvailable("restart") {
 		ui.PrintInfo("restart    | Restart all manageable services")
 	}
+
 	ui.PrintSubHeader("Proxy Commands")
 	if config.IsCommandAvailable("python") {
-		ui.PrintInfo("python     | Access the python virtual environment")
+		ui.PrintInfo("python     | Run commands in the Python virtual environment")
 	}
 	if config.IsCommandAvailable("bun") {
-		ui.PrintInfo("bun        | Access the system bun executable")
+		ui.PrintInfo("bun        | Run the system 'bun' executable")
 	}
 	if config.IsCommandAvailable("bunx") {
-		ui.PrintInfo("bunx       | Access the system bunx executable")
+		ui.PrintInfo("bunx       | Run the system 'bunx' executable")
 	}
 	if config.IsCommandAvailable("ollama") {
-		ui.PrintInfo("ollama     | Access the system ollama executable")
+		ui.PrintInfo("ollama     | Run the system 'ollama' executable")
 	}
 	if config.IsCommandAvailable("whisper") {
-		ui.PrintInfo("whisper    | Speech-to-text transcription with Whisper")
+		ui.PrintInfo("whisper    | Transcribe audio using Whisper")
 	}
+
 	ui.PrintSubHeader("Service Commands")
 	if config.IsCommandAvailable("event") {
-		ui.PrintInfo("event      | Interact with the event service for this instance")
-	}
-	if config.IsCommandAvailable("model") {
-		ui.PrintInfo("model      | Interact with the model service for this instance")
+		ui.PrintInfo("event      | Interact with the Event Service")
 	}
 	if config.IsCommandAvailable("discord") {
-		ui.PrintInfo("discord    | Interact with the discord service for this instance")
+		ui.PrintInfo("discord    | Interact with the Discord Service")
 	}
+
 	ui.PrintSubHeader("CLI Basic commands")
 	ui.PrintInfo("version    Show version information")
 	ui.PrintInfo("help       Show this help message")

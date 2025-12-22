@@ -20,20 +20,37 @@ func Serve(args []string, version, branch, commit, buildDate string) error {
 	var dir string
 	var port int
 
-	serveFlagSet := flag.NewFlagSet("serve", flag.ExitOnError)
+	serveFlagSet := flag.NewFlagSet("serve", flag.ContinueOnError)
 	serveFlagSet.StringVar(&dir, "dir", "", "Directory to serve static files from")
 	serveFlagSet.StringVar(&dir, "d", "", "Directory to serve static files from (shorthand)")
 	serveFlagSet.IntVar(&port, "port", 0, "Port to listen on")
 	serveFlagSet.IntVar(&port, "p", 0, "Port to listen on (shorthand)")
 
+	serveFlagSet.Usage = func() {
+		ui.PrintHeader("Serve Command Help")
+		ui.PrintInfo("Usage: dex serve -d <dir> -p <port>")
+		fmt.Println()
+		ui.PrintInfo("Flags:")
+		ui.PrintInfo("  -d, --dir   Directory to serve static files from (required)")
+		ui.PrintInfo("  -p, --port  Port to listen on (required)")
+		fmt.Println()
+		ui.PrintInfo("Description:")
+		ui.PrintInfo("  Starts a static file server for the specified directory.")
+	}
+
 	if err := serveFlagSet.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			return nil
+		}
 		return fmt.Errorf("failed to parse flags for serve command: %w", err)
 	}
 
 	if dir == "" {
+		serveFlagSet.Usage()
 		return fmt.Errorf("ERROR: --dir flag is required for serve command")
 	}
 	if port == 0 {
+		serveFlagSet.Usage()
 		return fmt.Errorf("ERROR: --port flag is required for serve command")
 	}
 

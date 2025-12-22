@@ -183,6 +183,25 @@ func verifyGitHubAccess() error {
 }
 
 func Build(args []string) error {
+	for _, arg := range args {
+		if arg == "--help" || arg == "-h" {
+			ui.PrintHeader("Build Command Help")
+			ui.PrintInfo("Usage: dex build [major|minor|patch] [-f|--force]")
+			fmt.Println()
+			ui.PrintInfo("Arguments:")
+			ui.PrintInfo("  major, minor, patch   Increment the version number accordingly.")
+			ui.PrintInfo("                        If omitted, defaults to 'patch' for modified services only.")
+			fmt.Println()
+			ui.PrintInfo("Flags:")
+			ui.PrintInfo("  -f, --force           Force rebuild of all services even if no changes are detected.")
+			fmt.Println()
+			ui.PrintInfo("Description:")
+			ui.PrintInfo("  Builds and installs CLI and services from source.")
+			ui.PrintInfo("  This command requires developer access to the source code.")
+			return nil
+		}
+	}
+
 	// Verify this is a developer environment
 	if err := verifyDeveloperAccess(); err != nil {
 		return err

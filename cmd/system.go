@@ -11,6 +11,21 @@ import (
 
 // System displays and manages system configuration
 func System(args []string) error {
+	for _, arg := range args {
+		if arg == "--help" || arg == "-h" {
+			ui.PrintHeader("System Command Help")
+			ui.PrintInfo("Usage: dex system [command] [args...]")
+			fmt.Println()
+			ui.PrintInfo("Commands:")
+			ui.PrintInfo("  info       Show system info (default)")
+			ui.PrintInfo("  scan       Re-scan hardware/software")
+			ui.PrintInfo("  validate   Check for missing required packages")
+			ui.PrintInfo("  install    [package] Install missing package(s)")
+			ui.PrintInfo("  upgrade    [package] Upgrade installed package(s)")
+			return nil
+		}
+	}
+
 	logFile, err := config.LogFile()
 	if err != nil {
 		return fmt.Errorf("failed to get log file: %w", err)

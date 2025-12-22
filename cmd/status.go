@@ -36,6 +36,17 @@ const (
 
 // Status checks the health of one or all services
 func Status(serviceShortName string) error {
+	if serviceShortName == "--help" || serviceShortName == "-h" {
+		ui.PrintHeader("Status Command Help")
+		ui.PrintInfo("Usage: dex status [service|all]")
+		fmt.Println()
+		ui.PrintInfo("Description:")
+		ui.PrintInfo("  Check the status of CLI and services.")
+		ui.PrintInfo("  If no argument or 'all' is provided, checks all services.")
+		ui.PrintInfo("  Otherwise, checks the specified service.")
+		return nil
+	}
+
 	logFile, err := config.LogFile()
 	if err != nil {
 		return fmt.Errorf("failed to get log file: %w", err)

@@ -6,10 +6,23 @@ import (
 	"os/exec"
 
 	"github.com/EasterCompany/dex-cli/config"
+	"github.com/EasterCompany/dex-cli/ui"
 )
 
 // Logs displays logs for a given service
 func Logs(args []string, follow bool) error {
+	for _, arg := range args {
+		if arg == "--help" || arg == "-h" {
+			ui.PrintHeader("Logs Command Help")
+			ui.PrintInfo("Usage: dex logs <service> [-f]")
+			fmt.Println()
+			ui.PrintInfo("Description:")
+			ui.PrintInfo("  View logs for a specific service.")
+			ui.PrintInfo("  -f    Follow log output (tail -f).")
+			return nil
+		}
+	}
+
 	logFile, err := config.LogFile()
 	if err != nil {
 		return fmt.Errorf("failed to get log file: %w", err)
