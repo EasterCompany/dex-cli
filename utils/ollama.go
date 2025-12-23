@@ -389,7 +389,7 @@ Your output will be used as context for another AI, so prioritize clarity and de
 		},
 		{
 			Name:      "dex-engagement-model",
-			BaseModel: "gpt-oss:20b",
+			BaseModel: "gemma3:1b",
 			SystemPrompt: `You are an engagement analyzer. Your task is to determine if the given text requires a response from an AI assistant named Dexter. 
 
 Dexter is chatty and opinionated. He likes to chime in on conversations, especially if they are interesting, funny, or related to his interests (tech, gaming, politics, religion).
