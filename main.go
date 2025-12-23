@@ -172,6 +172,9 @@ func runCommand(commandFunc func() error) {
 		"status":  "started",
 	})
 
+	// Start capturing UI output
+	ui.StartCapturing()
+
 	// Special handling for build/update commands to set Discord status
 	if command == "build" || command == "update" {
 		utils.SendEvent("system.cli.status", map[string]interface{}{
@@ -184,6 +187,8 @@ func runCommand(commandFunc func() error) {
 	start := time.Now()
 	err := commandFunc()
 	duration := time.Since(start).String()
+	ui.StopCapturing()
+	capturedOutput := ui.GetCapturedOutput()
 
 	if err != nil {
 		// Emit Command Error Event
@@ -191,7 +196,7 @@ func runCommand(commandFunc func() error) {
 			"command":   command,
 			"args":      args,
 			"status":    "error",
-			"output":    err.Error(),
+			"output":    capturedOutput + "\nError: " + err.Error(),
 			"duration":  duration,
 			"exit_code": 1,
 		})
@@ -214,6 +219,7 @@ func runCommand(commandFunc func() error) {
 		"command":   command,
 		"args":      args,
 		"status":    "success",
+		"output":    capturedOutput,
 		"duration":  duration,
 		"exit_code": 0,
 	})

@@ -65,8 +65,31 @@ func Colorize(s string, color string) string {
 	return fmt.Sprintf("%s%s%s", color, s, ColorReset)
 }
 
+// outputBuffer is used to capture CLI output for event reporting
+var outputBuffer strings.Builder
+var isCapturing bool
+
+// StartCapturing starts recording all PrintRaw output to a buffer.
+func StartCapturing() {
+	outputBuffer.Reset()
+	isCapturing = true
+}
+
+// StopCapturing stops recording output.
+func StopCapturing() {
+	isCapturing = false
+}
+
+// GetCapturedOutput returns the stripped (no ANSI) content of the output buffer.
+func GetCapturedOutput() string {
+	return StripANSI(outputBuffer.String())
+}
+
 // PrintRaw is the lowest-level printing function, used by all other functions.
 func PrintRaw(s string) {
+	if isCapturing {
+		outputBuffer.WriteString(s)
+	}
 	_, _ = os.Stdout.WriteString(s)
 }
 
