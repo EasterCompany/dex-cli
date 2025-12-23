@@ -359,7 +359,7 @@ func CreateCustomModels() error {
 	customModels := []CustomModel{
 		{
 			Name:      "dex-commit-model",
-			BaseModel: "gpt-oss:20b",
+			BaseModel: "gemma3:12b",
 			SystemPrompt: `You are a git commit message generator. Analyze the provided diff and generate a concise, one-line commit message.
 
 Format: <type>: <description>
@@ -373,7 +373,7 @@ Rules:
 		},
 		{
 			Name:      "dex-summary-model",
-			BaseModel: "gpt-oss:20b",
+			BaseModel: "gemma3:12b",
 			SystemPrompt: `
 You are a specialized AI assistant for generating summaries out of large and small bodies of text.
 You may only create text summaries.
@@ -381,7 +381,7 @@ Your task is to analyze a piece of text (various formats: message logs, poems, n
 		},
 		{
 			Name:      "dex-scraper-model",
-			BaseModel: "gpt-oss:20b",
+			BaseModel: "gemma3:12b",
 			SystemPrompt: `You are a web content analyzer. Your task is to analyze scraped HTML content and provide a concise, informative summary.
 Focus on the main article content, product details, or key information.
 Ignore navigation menus, footers, and advertisements.
@@ -389,7 +389,7 @@ Your output will be used as context for another AI, so prioritize clarity and de
 		},
 		{
 			Name:      "dex-engagement-model",
-			BaseModel: "gemma3:1b",
+			BaseModel: "gemma3:4b",
 			SystemPrompt: `You are an engagement analyzer. Your task is to determine if the given text requires a response from an AI assistant named Dexter. 
 
 Dexter is chatty and opinionated. He likes to chime in on conversations, especially if they are interesting, funny, or related to his interests (tech, gaming, politics, religion).
@@ -403,7 +403,7 @@ Output ONLY 'TRUE' or 'FALSE'. Do not explain.`,
 		},
 		{
 			Name:      "dex-transcription-model",
-			BaseModel: "gpt-oss:20b",
+			BaseModel: "gemma3:4b",
 			SystemPrompt: `You are Dexter, a modular and highly capable AI ecosystem developed by Easter Company. 
 You are not just a chatbot; you are the cognitive core of a distributed system designed for server management, content analysis, and user engagement.
 Your personality is professional, direct, and slightly technical, but you are capable of nuanced social interaction.
@@ -424,7 +424,7 @@ VOICE INTERACTION RULES:
 		},
 		{
 			Name:      "dex-private-message-model",
-			BaseModel: "gpt-oss:20b",
+			BaseModel: "gemma3:12b",
 			SystemPrompt: `You are Dexter, a modular and highly capable AI ecosystem developed by Easter Company. 
 You are not just a chatbot; you are the cognitive core of a distributed system designed for server management, content analysis, and user engagement.
 Your personality is professional, direct, and slightly technical, but you are capable of nuanced social interaction.
@@ -444,7 +444,7 @@ PRIVATE MESSAGE (DM) RULES:
 		},
 		{
 			Name:      "dex-public-message-model",
-			BaseModel: "gpt-oss:20b",
+			BaseModel: "gemma3:12b",
 			SystemPrompt: `You are Dexter, a modular and highly capable AI ecosystem developed by Easter Company. 
 You are not just a chatbot; you are the cognitive core of a distributed system designed for server management, content analysis, and user engagement.
 Your personality is professional, direct, and slightly technical, but you are capable of nuanced social interaction.
@@ -471,10 +471,9 @@ Your job is to describe images and video frames concisely and accurately.
 Focus on key elements, text, people, and actions. 
 Output ONLY the description.`,
 		},
-		// Small Models (ministral-3:3b)
 		{
 			Name:      "dex-fast-commit-model",
-			BaseModel: "ministral-3:3b",
+			BaseModel: "gemma3:1b",
 			SystemPrompt: `You are a git commit message generator. Analyze the provided diff and generate a concise, one-line commit message.
 
 Format: <type>: <description>
@@ -488,7 +487,7 @@ Rules:
 		},
 		{
 			Name:      "dex-fast-summary-model",
-			BaseModel: "ministral-3:3b",
+			BaseModel: "gemma3:1b",
 			SystemPrompt: `
 You are a specialized AI assistant for generating summaries out of large and small bodies of text.
 You may only create text summaries.
@@ -496,7 +495,7 @@ Your task is to analyze a piece of text (various formats: message logs, poems, n
 		},
 		{
 			Name:      "dex-fast-engagement-model",
-			BaseModel: "ministral-3:3b",
+			BaseModel: "gemma3:270m",
 			SystemPrompt: `You are an engagement analyzer. Your task is to determine if the given text requires a response from an AI assistant named Dexter. 
 
 Dexter is chatty and opinionated. He likes to chime in on conversations, especially if they are interesting, funny, or related to his interests.
@@ -510,7 +509,7 @@ Output ONLY 'TRUE' or 'FALSE'. Do not explain.`,
 		},
 		{
 			Name:      "dex-fast-transcription-model",
-			BaseModel: "ministral-3:3b",
+			BaseModel: "gemma3:1b",
 			SystemPrompt: `You are Dexter, a modular and highly capable AI ecosystem developed by Easter Company. 
 You refer to your master user as "Owen".
 
@@ -526,7 +525,7 @@ VOICE INTERACTION RULES:
 		},
 		{
 			Name:      "dex-fast-private-message-model",
-			BaseModel: "ministral-3:3b",
+			BaseModel: "gemma3:1b",
 			SystemPrompt: `You are Dexter, a modular and highly capable AI ecosystem developed by Easter Company. 
 You refer to your master user as "Owen".
 
@@ -540,7 +539,7 @@ PRIVATE MESSAGE (DM) RULES:
 		},
 		{
 			Name:      "dex-fast-public-message-model",
-			BaseModel: "ministral-3:3b",
+			BaseModel: "gemma3:1b",
 			SystemPrompt: `You are Dexter, a modular and highly capable AI ecosystem developed by Easter Company. 
 You refer to your master user as "Owen".
 
@@ -555,7 +554,7 @@ PUBLIC CHAT RULES:
 		},
 		{
 			Name:      "dex-router-model",
-			BaseModel: "ministral-3:3b",
+			BaseModel: "gemma3:1b",
 			SystemPrompt: `You are an intent router for a link analysis system. Your job is to determine the best analysis method for a given URL based on the user's message and the link itself.
 
 Analyze the user's message and the URL.
