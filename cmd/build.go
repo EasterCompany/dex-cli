@@ -507,8 +507,36 @@ func Build(args []string) error {
 		// Get short version (e.g., "2.1.0")
 		shortVersion := fmt.Sprintf("%d.%d.%d", targetMajorAll, targetMinorAll, targetPatchAll)
 
+		// LAW: If shortVersion is 0.0.0 (individual patch builds), find the highest version among built services
+		if shortVersion == "0.0.0" {
+			for _, s := range builtServices {
+				v := newVersions[s.ID]
+				if v != "" && v != "N/A" && v != "unknown" {
+					// We take the first non-empty version from built services as representative
+					// Since we captured newVersions right before this, it should be accurate.
+					// We only need the major.minor.patch part.
+					parts := strings.Split(v, ".")
+					if len(parts) >= 3 {
+						shortVersion = strings.Join(parts[:3], ".")
+						break
+					}
+				}
+			}
+		}
+
 		// Publish binaries and update data.json
-		if err := release.PublishRelease("", shortVersion, incrementType, builtServices); err != nil {
+		fullVersion := ""
+		for _, s := range builtServices {
+			if s.ShortName == "cli" {
+				fullVersion = newVersions[s.ID]
+				break
+			}
+		}
+		if fullVersion == "" && len(builtServices) > 0 {
+			fullVersion = newVersions[builtServices[0].ID]
+		}
+
+		if err := release.PublishRelease(fullVersion, shortVersion, incrementType, builtServices); err != nil {
 			ui.PrintError(fmt.Sprintf("Failed to publish release: %v", err))
 			ui.PrintWarning("Binaries are built and committed, but not published to easter.company")
 		} else {
