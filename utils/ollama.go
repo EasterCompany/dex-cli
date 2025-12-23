@@ -359,7 +359,7 @@ func CreateCustomModels() error {
 	customModels := []CustomModel{
 		{
 			Name:      "dex-commit-model",
-			BaseModel: "gemma3:12b",
+			BaseModel: "gemma3:4b",
 			SystemPrompt: `You are a git commit message generator. Analyze the provided diff and generate a concise, one-line commit message.
 
 Format: <type>: <description>
@@ -389,7 +389,7 @@ Your output will be used as context for another AI, so prioritize clarity and de
 		},
 		{
 			Name:      "dex-engagement-model",
-			BaseModel: "gemma3:4b",
+			BaseModel: "gemma3:1b",
 			SystemPrompt: `You are an engagement analyzer. Your task is to determine if the given text requires a response from an AI assistant named Dexter. 
 
 Dexter is chatty and opinionated. He likes to chime in on conversations, especially if they are interesting, funny, or related to his interests (tech, gaming, politics, religion).
@@ -462,6 +462,13 @@ PUBLIC CHAT RULES:
 3. Sound like a human, not a bot. Avoid "As an AI..."
 4. Only use long-form text or bullet points if the user asks a formal, scientific, or work-related question.
 5. Do not dominate the conversation unless asked to elaborate.`,
+		},
+		{
+			Name:      "dex-analyst-model",
+			BaseModel: "gemma3:12b",
+			SystemPrompt: `You are a system analyst for Dexter, a modular AI ecosystem. 
+Your task is to analyze event logs and identify significant patterns, errors, or anomalies.
+You output your findings in a strict JSON format.`,
 		},
 		{
 			Name:      "dex-vision-model",
