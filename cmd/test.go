@@ -11,27 +11,28 @@ import (
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/ui"
+	"github.com/EasterCompany/dex-cli/utils"
 )
 
 // TestResult holds the outcome of a single test operation
 type TestResult struct {
-	Status      string // "OK", "FAILED", "SKIPPED", "N/A"
-	Message     string
-	Duration    time.Duration
-	TestCount   int
-	FailCount   int
-	Coverage    float64
-	IssueCount  int
-	DetailsLine string
+	Status      string  `json:"status"` // "OK", "FAILED", "SKIPPED", "N/A"
+	Message     string  `json:"message"`
+	Duration    string  `json:"duration"`
+	TestCount   int     `json:"test_count"`
+	FailCount   int     `json:"fail_count"`
+	Coverage    float64 `json:"coverage"`
+	IssueCount  int     `json:"issue_count"`
+	DetailsLine string  `json:"details"`
 }
 
 // ServiceTestSummary holds all test results for a single service
 type ServiceTestSummary struct {
-	ServiceName   string
-	FormatResult  TestResult
-	LintResult    TestResult
-	TestResult    TestResult
-	TotalDuration time.Duration
+	ServiceName   string     `json:"service_name"`
+	FormatResult  TestResult `json:"format_result"`
+	LintResult    TestResult `json:"lint_result"`
+	TestResult    TestResult `json:"test_result"`
+	TotalDuration string     `json:"total_duration"`
 }
 
 // Test runs format, lint, and test for all services, or a specific service if provided.
@@ -126,13 +127,44 @@ func Test(args []string) error {
 		// Print duration
 		ui.PrintInfo(fmt.Sprintf("%s  Total Duration: %s%s", ui.ColorDarkGray, totalDuration.Round(time.Millisecond), ui.ColorReset))
 
-		summaries = append(summaries, ServiceTestSummary{
+		summary := ServiceTestSummary{
 			ServiceName:   def.ShortName,
 			FormatResult:  formatResult,
 			LintResult:    lintResult,
 			TestResult:    testResult,
-			TotalDuration: totalDuration,
+			TotalDuration: totalDuration.String(),
+		}
+		summaries = append(summaries, summary)
+
+		// EMIT EVENT: system.test.completed
+		utils.SendEvent("system.test.completed", map[string]interface{}{
+			"service_name": def.ShortName,
+			"format":       summary.FormatResult,
+			"lint":         summary.LintResult,
+			"test":         summary.TestResult,
+			"duration":     summary.TotalDuration,
 		})
+
+		// EMIT NOTIFICATION IF FAILED
+		if summary.FormatResult.Status == "FAILED" || summary.LintResult.Status == "FAILED" || summary.TestResult.Status == "FAILED" {
+			failedSteps := []string{}
+			if summary.FormatResult.Status == "FAILED" {
+				failedSteps = append(failedSteps, "Formatting")
+			}
+			if summary.LintResult.Status == "FAILED" {
+				failedSteps = append(failedSteps, fmt.Sprintf("Linting (%d issues)", summary.LintResult.IssueCount))
+			}
+			if summary.TestResult.Status == "FAILED" {
+				failedSteps = append(failedSteps, fmt.Sprintf("Tests (%d/%d failed)", summary.TestResult.FailCount, summary.TestResult.TestCount))
+			}
+
+			utils.SendEvent("system.notification.generated", map[string]interface{}{
+				"title":    fmt.Sprintf("Test Failure: %s", def.ShortName),
+				"priority": "high",
+				"category": "error",
+				"body":     fmt.Sprintf("The service '%s' failed the following test steps: %s. Please review the logs or run 'dex test %s' for details.", def.ShortName, strings.Join(failedSteps, ", "), def.ShortName),
+			})
+		}
 	}
 
 	// Print summary
@@ -153,6 +185,15 @@ func Test(args []string) error {
 	fmt.Println()
 	if allPassed {
 		ui.PrintSuccess("All tests passed!")
+		// Optional: Emit a positive summary notification if multiple services were tested
+		if len(summaries) > 1 {
+			utils.SendEvent("system.notification.generated", map[string]interface{}{
+				"title":    "All Systems Verified",
+				"priority": "low",
+				"category": "system",
+				"body":     fmt.Sprintf("Successfully ran tests for %d services. All checks (Format, Lint, Test) passed.", len(summaries)),
+			})
+		}
 	} else {
 		ui.PrintError("Some tests failed.")
 	}
@@ -178,7 +219,7 @@ func runFormatCheck(def config.ServiceDefinition, sourcePath string, log func(st
 			return TestResult{
 				Status:   "FAILED",
 				Message:  fmt.Sprintf("gofmt failed: %v", err),
-				Duration: duration,
+				Duration: duration.String(),
 			}
 		}
 
@@ -191,7 +232,7 @@ func runFormatCheck(def config.ServiceDefinition, sourcePath string, log func(st
 			return TestResult{
 				Status:      "FAILED",
 				Message:     fmt.Sprintf("%d file(s) need formatting: %s", fileCount, strings.Join(files, ", ")),
-				Duration:    duration,
+				Duration:    duration.String(),
 				IssueCount:  fileCount,
 				DetailsLine: fmt.Sprintf("%d file(s) unformatted", fileCount),
 			}
@@ -199,12 +240,12 @@ func runFormatCheck(def config.ServiceDefinition, sourcePath string, log func(st
 
 		return TestResult{
 			Status:      "OK",
-			Duration:    duration,
+			Duration:    duration.String(),
 			DetailsLine: "all files formatted",
 		}
 	}
 
-	return TestResult{Status: "SKIPPED", Message: "formatting not configured for this service type"}
+	return TestResult{Status: "SKIPPED", Message: "formatting not configured for this service type", Duration: time.Since(startTime).String()}
 }
 
 // runLintCheck runs linting checks for a service
@@ -217,7 +258,7 @@ func runLintCheck(def config.ServiceDefinition, sourcePath string, log func(stri
 	if def.Type == "cli" || strings.HasPrefix(def.ID, "dex-") {
 		// Check if golangci-lint is available
 		if _, err := exec.LookPath("golangci-lint"); err != nil {
-			return TestResult{Status: "SKIPPED", Message: "golangci-lint not found"}
+			return TestResult{Status: "SKIPPED", Message: "golangci-lint not found", Duration: time.Since(startTime).String()}
 		}
 
 		cmd := exec.Command("golangci-lint", "run")
@@ -241,7 +282,7 @@ func runLintCheck(def config.ServiceDefinition, sourcePath string, log func(stri
 			return TestResult{
 				Status:      "FAILED",
 				Message:     displayOutput,
-				Duration:    duration,
+				Duration:    duration.String(),
 				IssueCount:  issueCount,
 				DetailsLine: fmt.Sprintf("%d issue(s)", issueCount),
 			}
@@ -254,7 +295,7 @@ func runLintCheck(def config.ServiceDefinition, sourcePath string, log func(stri
 			return TestResult{
 				Status:      "FAILED",
 				Message:     outputStr,
-				Duration:    duration,
+				Duration:    duration.String(),
 				IssueCount:  issueCount,
 				DetailsLine: fmt.Sprintf("%d issue(s)", issueCount),
 			}
@@ -262,12 +303,12 @@ func runLintCheck(def config.ServiceDefinition, sourcePath string, log func(stri
 
 		return TestResult{
 			Status:      "OK",
-			Duration:    duration,
+			Duration:    duration.String(),
 			DetailsLine: "no issues",
 		}
 	}
 
-	return TestResult{Status: "SKIPPED", Message: "linting not configured for this service type"}
+	return TestResult{Status: "SKIPPED", Message: "linting not configured for this service type", Duration: time.Since(startTime).String()}
 }
 
 // runTestCheck runs unit tests for a service
@@ -297,7 +338,7 @@ func runTestCheck(def config.ServiceDefinition, sourcePath string, log func(stri
 			return TestResult{
 				Status:      "FAILED",
 				Message:     failureDetails,
-				Duration:    duration,
+				Duration:    duration.String(),
 				TestCount:   testCount,
 				FailCount:   failCount,
 				Coverage:    coverage,
@@ -310,7 +351,7 @@ func runTestCheck(def config.ServiceDefinition, sourcePath string, log func(stri
 			return TestResult{
 				Status:      "SKIPPED",
 				Message:     "no test files found",
-				Duration:    duration,
+				Duration:    duration.String(),
 				DetailsLine: "no test files",
 			}
 		}
@@ -322,14 +363,14 @@ func runTestCheck(def config.ServiceDefinition, sourcePath string, log func(stri
 
 		return TestResult{
 			Status:      "OK",
-			Duration:    duration,
+			Duration:    duration.String(),
 			TestCount:   testCount,
 			Coverage:    coverage,
 			DetailsLine: detailsLine,
 		}
 	}
 
-	return TestResult{Status: "SKIPPED", Message: "testing not configured for this service type"}
+	return TestResult{Status: "SKIPPED", Message: "testing not configured for this service type", Duration: time.Since(startTime).String()}
 }
 
 // printTestStepResult prints the result of a single test step
@@ -357,8 +398,9 @@ func printTestStepResult(stepName string, result TestResult) {
 	if result.DetailsLine != "" {
 		statusLine += fmt.Sprintf(" (%s)", result.DetailsLine)
 	}
-	if result.Duration > 0 {
-		statusLine += fmt.Sprintf(" [%s]", result.Duration.Round(time.Millisecond))
+	if result.Duration != "" {
+		parsed, _ := time.ParseDuration(result.Duration)
+		statusLine += fmt.Sprintf(" [%s]", parsed.Round(time.Millisecond))
 	}
 	statusLine += ui.ColorReset
 
@@ -392,7 +434,7 @@ func printTestSummaryTable(summaries []ServiceTestSummary) {
 		formatStatus := formatStatusForTable(s.FormatResult)
 		lintStatus := formatStatusForTable(s.LintResult)
 		testStatus := formatStatusForTable(s.TestResult)
-		duration := s.TotalDuration.Round(time.Millisecond).String()
+		duration := s.TotalDuration
 
 		table.AddRow(ui.TableRow{
 			s.ServiceName,

@@ -222,6 +222,37 @@ func verifyGitHubAccess() error {
 }
 
 func Build(args []string) error {
+	startTime := time.Now()
+	// EMIT START EVENT
+	utils.SendEvent("system.cli.command", map[string]interface{}{
+		"command":    "build",
+		"args":       args,
+		"state":      "started",
+		"start_time": startTime.Format(time.RFC3339),
+	})
+
+	err := runBuild(args)
+
+	duration := time.Since(startTime)
+	status := "success"
+	if err != nil {
+		status = "failure"
+	}
+
+	// EMIT END EVENT
+	utils.SendEvent("system.cli.command", map[string]interface{}{
+		"command":  "build",
+		"args":     args,
+		"state":    "completed",
+		"status":   status,
+		"duration": duration.String(),
+		"error":    fmt.Sprintf("%v", err),
+	})
+
+	return err
+}
+
+func runBuild(args []string) error {
 	for _, arg := range args {
 		if arg == "--help" || arg == "-h" {
 			ui.PrintHeader("Build Command Help")
@@ -242,13 +273,19 @@ func Build(args []string) error {
 	}
 
 	// Verify this is a developer environment
+
 	if err := verifyDeveloperAccess(); err != nil {
+
 		return err
+
 	}
 
 	// Verify GitHub access (one-time check)
+
 	if err := verifyGitHubAccess(); err != nil {
+
 		return err
+
 	}
 
 	logFile, err := config.LogFile()
@@ -468,19 +505,37 @@ func Build(args []string) error {
 
 		var built bool
 		var buildErr error
+		serviceStartTime := time.Now()
 		if s.Type == "fe" { // Check if it's a frontend service
 			built, buildErr = buildFrontendService(s, log, task.targetMajor, task.targetMinor, task.targetPatch)
 		} else {
 			built, buildErr = utils.RunUnifiedBuildPipeline(s, log, task.targetMajor, task.targetMinor, task.targetPatch)
 		}
 
+		serviceDuration := time.Since(serviceStartTime)
+
 		if buildErr != nil {
+			// EMIT NOTIFICATION ON FAILURE
+			utils.SendEvent("system.notification.generated", map[string]interface{}{
+				"title":    fmt.Sprintf("Build Failed: %s", s.ShortName),
+				"priority": "critical",
+				"category": "build",
+				"body":     fmt.Sprintf("Build failure in service '%s'. Error: %v", s.ShortName, buildErr),
+			})
 			return buildErr
 		}
 
 		if built {
 			builtServices = append(builtServices, s)
 			ui.PrintSuccess(fmt.Sprintf("Successfully built %s!", s.ShortName))
+
+			// EMIT EVENT: system.build.completed
+			utils.SendEvent("system.build.completed", map[string]interface{}{
+				"service_name": s.ShortName,
+				"version":      fmt.Sprintf("%d.%d.%d", task.targetMajor, task.targetMinor, task.targetPatch),
+				"duration":     serviceDuration.String(),
+				"status":       "success",
+			})
 		}
 	}
 
@@ -674,6 +729,16 @@ func Build(args []string) error {
 	}
 
 	ui.PrintSuccess("Build complete.")
+
+	// EMIT FINAL SUCCESS NOTIFICATION
+	if len(builtServices) > 0 {
+		utils.SendEvent("system.notification.generated", map[string]interface{}{
+			"title":    "System Build Complete",
+			"priority": "low",
+			"category": "system",
+			"body":     fmt.Sprintf("Successfully built and deployed %d service(s). The system is now running the latest version.", len(builtServices)),
+		})
+	}
 
 	// ---
 	// 9. Run release script if version increment was requested (post-build actions)
