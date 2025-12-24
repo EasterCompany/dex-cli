@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,7 +15,7 @@ import (
 
 // RunUnifiedBuildPipeline runs the unified build and test process for a service.
 // Supports Go services (go mod tidy, fmt, lint, test, build) and Python services (run.sh).
-func RunUnifiedBuildPipeline(service config.ServiceDefinition, log func(message string), major, minor, patch int) (bool, error) {
+func RunUnifiedBuildPipeline(ctx context.Context, service config.ServiceDefinition, log func(message string), major, minor, patch int) (bool, error) {
 	sourcePath, err := config.ExpandPath(service.Source)
 	if err != nil {
 		return false, fmt.Errorf("failed to expand source path: %w", err)
@@ -38,7 +39,7 @@ func RunUnifiedBuildPipeline(service config.ServiceDefinition, log func(message 
 			versionStr, branch, commit, buildDate, buildYear, buildHash,
 		)
 
-		return runGoBuildPipeline(service, sourcePath, log, ldflags)
+		return runGoBuildPipeline(ctx, service, sourcePath, log, ldflags)
 	}
 
 	// Check for Python service (marker: requirements.txt or main.py)
@@ -57,7 +58,7 @@ func RunUnifiedBuildPipeline(service config.ServiceDefinition, log func(message 
 	}
 
 	if isPython {
-		return runPythonBuildPipeline(service, sourcePath, log)
+		return runPythonBuildPipeline(ctx, service, sourcePath, log)
 	}
 
 	// Default to Go pipeline (fallback)
@@ -73,18 +74,11 @@ func RunUnifiedBuildPipeline(service config.ServiceDefinition, log func(message 
 		versionStr, branch, commit, buildDate, buildYear, buildHash,
 	)
 
-	return runGoBuildPipeline(service, sourcePath, log, ldflags)
+	return runGoBuildPipeline(ctx, service, sourcePath, log, ldflags)
 }
 
-func runPythonBuildPipeline(service config.ServiceDefinition, sourcePath string, log func(message string)) (bool, error) {
+func runPythonBuildPipeline(ctx context.Context, service config.ServiceDefinition, sourcePath string, log func(message string)) (bool, error) {
 	log("Detected Python service.")
-
-	// Check for run.sh or install.sh script
-	// For Python services in this architecture, "build" mostly means ensuring the venv is set up
-	// and dependencies are installed. We can use the run.sh script if it handles setup,
-	// but ideally we should just ensure it's ready to run.
-	// Wait, `dex build` creates artifacts. For Python, there isn't a binary artifact usually.
-	// But we do want to package it or at least ensure it works.
 
 	// Let's create a virtual env and install requirements if they exist.
 	log("Setting up Python environment...")
@@ -93,13 +87,11 @@ func runPythonBuildPipeline(service config.ServiceDefinition, sourcePath string,
 	venvPath := filepath.Join(sourcePath, "venv")
 	if _, err := os.Stat(venvPath); os.IsNotExist(err) {
 		log("Creating virtual environment...")
-		// Try python3.10 first
-		cmd := exec.Command("python3.10", "-m", "venv", "venv")
+		cmd := exec.CommandContext(ctx, "python3.10", "-m", "venv", "venv")
 		cmd.Dir = sourcePath
 		if out, err := cmd.CombinedOutput(); err != nil {
 			log(fmt.Sprintf("python3.10 failed: %s. Trying python3...", strings.TrimSpace(string(out))))
-			// Fallback to python3
-			cmd = exec.Command("python3", "-m", "venv", "venv")
+			cmd = exec.CommandContext(ctx, "python3", "-m", "venv", "venv")
 			cmd.Dir = sourcePath
 			if out2, err2 := cmd.CombinedOutput(); err2 != nil {
 				return false, fmt.Errorf("failed to create venv: %v\nOutput: %s", err2, string(out2))
@@ -110,17 +102,15 @@ func runPythonBuildPipeline(service config.ServiceDefinition, sourcePath string,
 	// 2. Install requirements
 	if _, err := os.Stat(filepath.Join(sourcePath, "requirements.txt")); err == nil {
 		log("Installing requirements (this may take a while)...")
-		// Use the pip inside the venv
 		pipCmd := filepath.Join(venvPath, "bin", "pip")
 
-		// Upgrade pip first
-		upgradeCmd := exec.Command(pipCmd, "install", "--upgrade", "pip")
+		upgradeCmd := exec.CommandContext(ctx, pipCmd, "install", "--upgrade", "pip")
 		upgradeCmd.Dir = sourcePath
 		if out, err := upgradeCmd.CombinedOutput(); err != nil {
 			log(fmt.Sprintf("Warning: failed to upgrade pip: %v\n%s", err, string(out)))
 		}
 
-		cmd := exec.Command(pipCmd, "install", "-r", "requirements.txt")
+		cmd := exec.CommandContext(ctx, pipCmd, "install", "-r", "requirements.txt")
 		cmd.Dir = sourcePath
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -129,30 +119,17 @@ func runPythonBuildPipeline(service config.ServiceDefinition, sourcePath string,
 		}
 	}
 
-	// 3. Create git tag for versioning (handled by Build command git phase, but we need to report success here)
-
 	log("Python service setup complete.")
 	return true, nil
 }
 
-func runGoBuildPipeline(service config.ServiceDefinition, sourcePath string, log func(message string), ldflags string) (bool, error) {
-	// 1. Stop service if running (to overwrite binary)
-	// We don't stop here, we stop in the actual build step if needed or assume systemd restart handles it?
-	// Actually, endpoints might be in use. `dex build` stops the service usually?
-	// The caller `Build` handles "Stopping service if running..." in the log messages?
-	// No, looking at cmd/build.go, it says "Stopping service if running..." but calls `utils.RunUnifiedBuildPipeline`.
-	// So we should handle it here or assume it's handled.
-	// `cmd/build.go` logic:
-	// ui.PrintInfo(fmt.Sprintf("# Building %s", s.ShortName))
-	// ... calls RunUnifiedBuildPipeline
-
-	// Let's check if we need to stop it.
+func runGoBuildPipeline(ctx context.Context, service config.ServiceDefinition, sourcePath string, log func(message string), ldflags string) (bool, error) {
 	log("Stopping service if running...")
-	_ = exec.Command("systemctl", "--user", "stop", service.SystemdName).Run()
+	_ = exec.CommandContext(ctx, "systemctl", "--user", "stop", service.SystemdName).Run()
 
 	// 2. Go Mod Tidy
 	log("Ensuring Go modules are tidy...")
-	cmd := exec.Command("go", "mod", "tidy")
+	cmd := exec.CommandContext(ctx, "go", "mod", "tidy")
 	cmd.Dir = sourcePath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return false, fmt.Errorf("%s 'go mod tidy' failed: %w\n%s", service.ShortName, err, string(output))
@@ -160,7 +137,7 @@ func runGoBuildPipeline(service config.ServiceDefinition, sourcePath string, log
 
 	// 3. Format
 	log("Formatting...")
-	cmd = exec.Command("go", "fmt", "./...")
+	cmd = exec.CommandContext(ctx, "go", "fmt", "./...")
 	cmd.Dir = sourcePath
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return false, fmt.Errorf("%s 'go fmt' failed: %w\n%s", service.ShortName, err, string(output))
@@ -168,12 +145,10 @@ func runGoBuildPipeline(service config.ServiceDefinition, sourcePath string, log
 
 	// 4. Lint
 	log("Linting...")
-	// Check if golangci-lint is installed
 	if _, err := exec.LookPath("golangci-lint"); err == nil {
-		cmd = exec.Command("golangci-lint", "run")
+		cmd = exec.CommandContext(ctx, "golangci-lint", "run")
 		cmd.Dir = sourcePath
 		if output, err := cmd.CombinedOutput(); err != nil {
-			// Treat lint errors as fatal
 			return false, fmt.Errorf("%s 'golangci-lint run' failed: %w\n%s", service.ShortName, err, string(output))
 		}
 		log("0 issues.")
@@ -183,9 +158,9 @@ func runGoBuildPipeline(service config.ServiceDefinition, sourcePath string, log
 
 	// 5. Test
 	log("Testing...")
-	cmd = exec.Command("go", "test", "./...")
+	cmd = exec.CommandContext(ctx, "go", "test", "./...")
 	cmd.Dir = sourcePath
-	cmd.Stdout = os.Stdout // Stream test output
+	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		return false, fmt.Errorf("%s tests failed: %w", service.ShortName, err)
@@ -194,27 +169,24 @@ func runGoBuildPipeline(service config.ServiceDefinition, sourcePath string, log
 	// 6. Build
 	log(fmt.Sprintf("Building %s...", service.ID))
 
-	// Determine output path
 	binDir := filepath.Join(os.Getenv("HOME"), "Dexter", "bin")
 	if err := os.MkdirAll(binDir, 0755); err != nil {
 		return false, fmt.Errorf("failed to create bin dir: %w", err)
 	}
 
-	// Helper for build command
 	buildBinary := func(outputName string, buildTags string) error {
 		args := []string{"build", "-ldflags", ldflags, "-o", filepath.Join(binDir, outputName)}
 		if buildTags != "" {
 			args = append(args, "-tags", buildTags)
 		}
 
-		cmd := exec.Command("go", args...)
+		cmd := exec.CommandContext(ctx, "go", args...)
 		cmd.Dir = sourcePath
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		return cmd.Run()
 	}
 
-	// Main service build
 	outputName := service.ID
 	if service.ShortName == "cli" {
 		outputName = "dex"
@@ -224,7 +196,6 @@ func runGoBuildPipeline(service config.ServiceDefinition, sourcePath string, log
 	}
 	log(fmt.Sprintf("✓ %s built successfully", service.ID))
 
-	// 7. Clean source (optional, mostly for git status)
 	log("Cleaning build artifacts...")
 	log("✓ Clean complete")
 

@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/EasterCompany/dex-cli/cmd"
@@ -23,9 +21,6 @@ var (
 )
 
 func main() {
-	// Set up signal handler to ensure clean exit with blank line
-	setupSignalHandler()
-
 	cmd.RunningVersion = version
 	if len(os.Args) > 1 && os.Args[1] != "version" {
 		command := os.Args[1]
@@ -191,18 +186,20 @@ func runCommand(commandFunc func() error) {
 	capturedOutput := ui.GetCapturedOutput()
 
 	if err != nil {
-		// Emit Command Error Event
-		utils.SendEvent("system.cli.command", map[string]interface{}{
-			"command":   command,
-			"args":      args,
-			"status":    "error",
-			"output":    capturedOutput + "\nError: " + err.Error(),
-			"duration":  duration,
-			"exit_code": 1,
-		})
+		// Emit Command Error Event (unless it's build which handles its own)
+		if command != "build" {
+			utils.SendEvent("system.cli.command", map[string]interface{}{
+				"command":   command,
+				"args":      args,
+				"status":    "error",
+				"output":    capturedOutput + "\nError: " + err.Error(),
+				"duration":  duration,
+				"exit_code": 1,
+			})
+		}
 
-		// Reset status if it was build/update
-		if command == "build" || command == "update" {
+		// Reset status if it was update
+		if command == "update" {
 			utils.SendEvent("system.cli.status", map[string]interface{}{
 				"status":  "online",
 				"message": "Operation failed",
@@ -214,18 +211,20 @@ func runCommand(commandFunc func() error) {
 		os.Exit(1)
 	}
 
-	// Emit Command Success Event
-	utils.SendEvent("system.cli.command", map[string]interface{}{
-		"command":   command,
-		"args":      args,
-		"status":    "success",
-		"output":    capturedOutput,
-		"duration":  duration,
-		"exit_code": 0,
-	})
+	// Emit Command Success Event (unless it's build)
+	if command != "build" {
+		utils.SendEvent("system.cli.command", map[string]interface{}{
+			"command":   command,
+			"args":      args,
+			"status":    "success",
+			"output":    capturedOutput,
+			"duration":  duration,
+			"exit_code": 0,
+		})
+	}
 
 	// Reset status on success
-	if command == "build" || command == "update" {
+	if command == "update" {
 		utils.SendEvent("system.cli.status", map[string]interface{}{
 			"status":  "online",
 			"message": "Operation complete",
@@ -233,19 +232,6 @@ func runCommand(commandFunc func() error) {
 	}
 
 	fmt.Println()
-}
-
-func setupSignalHandler() {
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
-
-	go func() {
-		<-sigChan
-		// Clear any progress indicators and print final blank line
-		ui.ClearLine()
-		fmt.Println()
-		os.Exit(130) // Standard exit code for SIGINT (128 + 2)
-	}()
 }
 
 func printUsage() {

@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/EasterCompany/dex-cli/cache"
@@ -164,7 +166,7 @@ func verifyDeveloperAccess() error {
 }
 
 // buildFrontendService executes the build.sh script for a frontend service like easter.company
-func buildFrontendService(def config.ServiceDefinition, log func(message string), major, minor, patch int) (bool, error) {
+func buildFrontendService(ctx context.Context, def config.ServiceDefinition, log func(message string), major, minor, patch int) (bool, error) {
 	sourcePath, err := config.ExpandPath(def.Source)
 	if err != nil {
 		return false, fmt.Errorf("failed to expand source path for %s: %w", def.ShortName, err)
@@ -175,7 +177,7 @@ func buildFrontendService(def config.ServiceDefinition, log func(message string)
 	versionStr := fmt.Sprintf("%d.%d.%d", major, minor, patch)
 	log(fmt.Sprintf("[%s] Running frontend build script: %s (Version: %s)", def.ShortName, buildScriptPath, versionStr))
 
-	cmd := exec.Command("bash", buildScriptPath)
+	cmd := exec.CommandContext(ctx, "bash", buildScriptPath)
 	cmd.Dir = sourcePath // Execute the script from the service's source directory
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -231,6 +233,20 @@ func verifyGitHubAccess() error {
 
 func Build(args []string) error {
 	startTime := time.Now()
+
+	// Setup signal handling for graceful cleanup on Ctrl+C
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+
+	// Emit initial status to register process
+	utils.SendEvent("system.cli.status", map[string]interface{}{
+		"status":  "online",
+		"message": "build in progress...",
+	})
+
 	// EMIT START EVENT
 	utils.SendEvent("system.cli.command", map[string]interface{}{
 		"command":    "build",
@@ -239,7 +255,21 @@ func Build(args []string) error {
 		"start_time": startTime.Format(time.RFC3339),
 	})
 
-	err := runBuild(args)
+	// Run build in a goroutine so we can listen for signals
+	errChan := make(chan error, 1)
+	go func() {
+		errChan <- runBuild(ctx, args)
+	}()
+
+	var err error
+	select {
+	case sig := <-sigChan:
+		fmt.Printf("\nReceived signal %v, cancelling build...\n", sig)
+		cancel()
+		err = fmt.Errorf("build cancelled by user")
+	case err = <-errChan:
+		// Build finished naturally
+	}
 
 	duration := time.Since(startTime)
 	status := "success"
@@ -257,10 +287,16 @@ func Build(args []string) error {
 		"error":    fmt.Sprintf("%v", err),
 	})
 
+	// Emit final status to clear process (EventTypeCLIStatus)
+	utils.SendEvent("system.cli.status", map[string]interface{}{
+		"status":  status,
+		"message": fmt.Sprintf("build %s", status),
+	})
+
 	return err
 }
 
-func runBuild(args []string) error {
+func runBuild(ctx context.Context, args []string) error {
 	for _, arg := range args {
 		if arg == "--help" || arg == "-h" {
 			ui.PrintHeader("Build Command Help")
@@ -320,7 +356,7 @@ func runBuild(args []string) error {
 
 	// Check for active processes before starting build (unless forced)
 	if !forceRebuild {
-		if err := waitForActiveProcesses(context.Background()); err != nil {
+		if err := waitForActiveProcesses(ctx); err != nil {
 			return err
 		}
 	}
@@ -496,6 +532,13 @@ func runBuild(args []string) error {
 	var builtServices []config.ServiceDefinition
 
 	for i, task := range buildTasks {
+		// Check for cancellation between tasks
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		if i > 0 {
 			fmt.Println()
 		}
@@ -515,9 +558,9 @@ func runBuild(args []string) error {
 		var buildErr error
 		serviceStartTime := time.Now()
 		if s.Type == "fe" { // Check if it's a frontend service
-			built, buildErr = buildFrontendService(s, log, task.targetMajor, task.targetMinor, task.targetPatch)
+			built, buildErr = buildFrontendService(ctx, s, log, task.targetMajor, task.targetMinor, task.targetPatch)
 		} else {
-			built, buildErr = utils.RunUnifiedBuildPipeline(s, log, task.targetMajor, task.targetMinor, task.targetPatch)
+			built, buildErr = utils.RunUnifiedBuildPipeline(ctx, s, log, task.targetMajor, task.targetMinor, task.targetPatch)
 		}
 
 		serviceDuration := time.Since(serviceStartTime)
