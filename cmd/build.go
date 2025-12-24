@@ -40,16 +40,16 @@ func waitForActiveProcesses(ctx context.Context) error {
 			return fmt.Errorf("failed to query active processes: %w", err)
 		}
 
-		// Filter out our own build process and other non-blocking system processes
+		// Filter out our own build process and persistent system heartbeats
 		var activeKeys []string
 		for _, k := range keys {
+			// We ignore our own build op and the persistent discord connection
+			// We DO NOT ignore system-analyst, because that is a heavy resource-consuming task
 			if !strings.HasSuffix(k, ":system-cli-op") &&
-				!strings.HasSuffix(k, ":system-analyst") &&
 				!strings.HasSuffix(k, ":system-discord") {
 				activeKeys = append(activeKeys, k)
 			}
 		}
-
 		if len(activeKeys) == 0 {
 			ui.ClearLine()
 			return nil
