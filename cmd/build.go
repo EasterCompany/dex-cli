@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/EasterCompany/dex-cli/cache"
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/git"
 	"github.com/EasterCompany/dex-cli/release"
@@ -17,6 +19,43 @@ import (
 )
 
 var RunningVersion string
+
+// waitForActiveProcesses checks Redis for 'process:info:*' keys and waits until they are gone.
+func waitForActiveProcesses(ctx context.Context) error {
+	redisClient, err := cache.GetLocalClient(ctx)
+	if err != nil {
+		// If Redis is unreachable, we can't check, so we continue but warn.
+		ui.PrintWarning("Could not connect to Redis to check for active processes. Continuing...")
+		return nil
+	}
+	defer func() { _ = redisClient.Close() }()
+
+	spinFrame := 0
+	for {
+		// Check for active process keys
+		keys, err := redisClient.Keys(ctx, "process:info:*").Result()
+		if err != nil {
+			return fmt.Errorf("failed to query active processes: %w", err)
+		}
+
+		if len(keys) == 0 {
+			ui.ClearLine()
+			return nil
+		}
+
+		// Show waiting status
+		label := fmt.Sprintf("Waiting for %d active process(es) to finish...", len(keys))
+		ui.PrintSpinner(label, spinFrame)
+		spinFrame++
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(1 * time.Second):
+			// Check again
+		}
+	}
+}
 
 // getServiceVersion gets the current version for a service from bin/data.json (primary) or git tags (fallback)
 func getServiceVersion(def config.ServiceDefinition) (major, minor, patch int, err error) {
@@ -233,6 +272,13 @@ func Build(args []string) error {
 		}
 	}
 	args = filteredArgs
+
+	// Check for active processes before starting build (unless forced)
+	if !forceRebuild {
+		if err := waitForActiveProcesses(context.Background()); err != nil {
+			return err
+		}
+	}
 
 	// Validate arguments
 	if len(args) > 1 {
