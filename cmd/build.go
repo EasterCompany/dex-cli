@@ -38,13 +38,21 @@ func waitForActiveProcesses(ctx context.Context) error {
 			return fmt.Errorf("failed to query active processes: %w", err)
 		}
 
-		if len(keys) == 0 {
+		// Filter out our own build process to prevent self-blocking
+		var activeKeys []string
+		for _, k := range keys {
+			if !strings.HasSuffix(k, ":system-cli-op") {
+				activeKeys = append(activeKeys, k)
+			}
+		}
+
+		if len(activeKeys) == 0 {
 			ui.ClearLine()
 			return nil
 		}
 
 		// Show waiting status
-		label := fmt.Sprintf("Waiting for %d active process(es) to finish...", len(keys))
+		label := fmt.Sprintf("Waiting for %d active process(es) to finish...", len(activeKeys))
 		ui.PrintSpinner(label, spinFrame)
 		spinFrame++
 

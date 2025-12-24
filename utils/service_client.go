@@ -103,7 +103,7 @@ func SendEvent(eventType string, eventData map[string]interface{}) {
 	var url string
 	def := config.GetServiceDefinition("dex-event-service")
 	if def.ID == "" {
-		url = "http://localhost:8100/events" // Corrected default port
+		url = "http://127.0.0.1:8100/events" // Corrected default port
 	} else {
 		url = def.GetHTTP("/events")
 	}
