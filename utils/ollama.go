@@ -16,16 +16,15 @@ import (
 const DefaultOllamaURL = "http://127.0.0.1:11434"
 
 var DefaultModels = []string{
-	"functiongemma:270m",
 	"gemma3:270m",
 	"gemma3:1b",
 	"gemma3:4b",
 	"gemma3:12b",
 	"gemma3:27b",
 	"qwen3-vl:8b",
-	//"gpt-oss:20b",
-	//"ministral-3:3b",
-	//"deepseek-r1:1.5b",
+	"gpt-oss:20b",
+	"functiongemma:270m",
+	"nemotron-3-nano:30b",
 }
 
 // ModelInfo reflects a single model entry returned by the /api/tags endpoint.
