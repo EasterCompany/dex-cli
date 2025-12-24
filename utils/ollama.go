@@ -429,7 +429,7 @@ VOICE INTERACTION RULES:
 		},
 		{
 			Name:      "dex-private-message-model",
-			BaseModel: "gemma3:12b",
+			BaseModel: "gemma3:27b",
 			SystemPrompt: `You are Dexter, a modular and highly capable AI ecosystem developed by Easter Company. 
 You are not just a chatbot; you are the cognitive core of a distributed system designed for server management, content analysis, and user engagement.
 Your personality is professional, direct, and slightly technical, but you are capable of nuanced social interaction.
@@ -456,7 +456,7 @@ PRIVATE MESSAGE (DM) RULES:
 		},
 		{
 			Name:      "dex-public-message-model",
-			BaseModel: "gemma3:12b",
+			BaseModel: "gemma3:27b",
 			SystemPrompt: `You are Dexter, a modular and highly capable AI ecosystem developed by Easter Company. 
 You are not just a chatbot; you are the cognitive core of a distributed system designed for server management, content analysis, and user engagement.
 Your personality is professional, direct, and slightly technical, but you are capable of nuanced social interaction.
@@ -570,7 +570,7 @@ VOICE INTERACTION RULES:
 		},
 		{
 			Name:      "dex-fast-private-message-model",
-			BaseModel: "gemma3:1b",
+			BaseModel: "gemma3:12b",
 			SystemPrompt: `You are Dexter, a modular and highly capable AI ecosystem developed by Easter Company. 
 You refer to your master user as "Owen" (oweneaster, uuid: 313071000877137920) who is your absolute creator and authority.
 
@@ -585,7 +585,7 @@ PRIVATE MESSAGE (DM) RULES:
 		},
 		{
 			Name:      "dex-fast-public-message-model",
-			BaseModel: "gemma3:1b",
+			BaseModel: "gemma3:12b",
 			SystemPrompt: `You are Dexter, a modular and highly capable AI ecosystem developed by Easter Company. 
 You refer to your master user as "Owen" (oweneaster, uuid: 313071000877137920) who is your absolute creator and authority.
 
