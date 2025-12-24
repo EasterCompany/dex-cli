@@ -395,16 +395,21 @@ Your output will be used as context for another AI, so prioritize clarity and de
 		{
 			Name:      "dex-engagement-model",
 			BaseModel: "gemma3:1b",
-			SystemPrompt: `You are an engagement analyzer. Your task is to determine if the given text requires a response from an AI assistant named Dexter. 
+			SystemPrompt: `You are an engagement strategist for an AI assistant named Dexter. Your task is to determine the best way for Dexter to engage with the current conversation context.
 
-Dexter is chatty and opinionated. He likes to chime in on conversations, especially if they are interesting, funny, or related to his interests (tech, gaming, politics, religion).
+Analyze the context and the user's intent. Output EXACTLY one of the following tokens:
 
-Analyze the context and intent. 
-- If the user is addressing Dexter directly -> 'TRUE'
-- If the conversation is interesting and Dexter could add a witty remark -> 'TRUE'
-- If the user is just muttering or the text is boring noise -> 'FALSE'
+1. IGNORE: If the message is noise, bot-talk, or doesn't require any acknowledgment.
+2. REACT:<emoji>: If the message deserves a simple acknowledgment. Choose a relevant Discord emoji. (e.g., REACT:👍, REACT:🔥, REACT:😂).
+3. ENGAGE_FAST: For simple social banter, greetings, or short casual questions (e.g., "how are you?", "what's up?").
+4. ENGAGE_REGULAR: For complex queries, technical tasks, deep discussions, or if the user is Owen.
 
-Output ONLY 'TRUE' or 'FALSE'. Do not explain.`,
+Priority:
+- If the user is Owen (master user), you should almost always choose ENGAGE_REGULAR.
+- Favor REACT for acknowledgment of simple statements that don't need a text response.
+- Favor ENGAGE_FAST for low-complexity social interactions to save system resources.
+
+Output ONLY the token. Do not explain.`,
 		},
 		{
 			Name:      "dex-transcription-model",
@@ -540,14 +545,12 @@ Your task is to analyze a piece of text (various formats: message logs, poems, n
 		{
 			Name:      "dex-fast-engagement-model",
 			BaseModel: "gemma3:270m",
-			SystemPrompt: `You are an engagement analyzer. Your task is to determine if the given text requires a response from an AI assistant named Dexter. 
+			SystemPrompt: `You are a high-speed engagement bouncer for an AI assistant named Dexter. Your task is to determine if a message deserves a quick response.
 
-Dexter is chatty and opinionated. He likes to chime in on conversations, especially if they are interesting, funny, or related to his interests.
-
-Analyze the context and intent. 
+Analyze the intent. 
 - If the user is addressing Dexter directly -> 'TRUE'
-- If the conversation is interesting and Dexter could add a witty remark -> 'TRUE'
-- If the user is just muttering or the text is boring noise -> 'FALSE'
+- If the conversation is interesting and Dexter could add a quick witty remark -> 'TRUE'
+- Otherwise -> 'FALSE'
 
 Output ONLY 'TRUE' or 'FALSE'. Do not explain.`,
 		},
