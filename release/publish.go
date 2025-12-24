@@ -195,8 +195,10 @@ func commitAndPush(repoPath, version, releaseType string) error {
 	// Git add
 	addCmd := exec.Command("git", "add", ".")
 	addCmd.Dir = repoPath
-	if output, err := addCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git add failed:\n%s", string(output))
+	addCmd.Stdout = os.Stdout
+	addCmd.Stderr = os.Stderr
+	if err := addCmd.Run(); err != nil {
+		return fmt.Errorf("git add failed: %w", err)
 	}
 
 	// Check for changes
@@ -216,15 +218,19 @@ func commitAndPush(repoPath, version, releaseType string) error {
 	commitMsg := fmt.Sprintf("release: publish %s version %s", releaseType, version)
 	commitCmd := exec.Command("git", "commit", "-m", commitMsg)
 	commitCmd.Dir = repoPath
-	if output, err := commitCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git commit failed:\n%s", string(output))
+	commitCmd.Stdout = os.Stdout
+	commitCmd.Stderr = os.Stderr
+	if err := commitCmd.Run(); err != nil {
+		return fmt.Errorf("git commit failed: %w", err)
 	}
 
 	// Push
 	pushCmd := exec.Command("git", "push")
 	pushCmd.Dir = repoPath
-	if output, err := pushCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git push failed:\n%s", string(output))
+	pushCmd.Stdout = os.Stdout
+	pushCmd.Stderr = os.Stderr
+	if err := pushCmd.Run(); err != nil {
+		return fmt.Errorf("git push failed: %w", err)
 	}
 
 	ui.PrintSuccess("Published to https://easter.company")
