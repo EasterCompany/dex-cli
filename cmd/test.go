@@ -226,15 +226,24 @@ func runFormatCheck(def config.ServiceDefinition, sourcePath string, log func(st
 		// Check if any files need formatting
 		outputStr := strings.TrimSpace(string(output))
 		if outputStr != "" {
-			files := strings.Split(outputStr, "\n")
+			allFiles := strings.Split(outputStr, "\n")
+			var files []string
+			for _, f := range allFiles {
+				if !strings.Contains(f, "vendor/") {
+					files = append(files, f)
+				}
+			}
+
 			fileCount := len(files)
-			log(fmt.Sprintf("[%s] Format check found %d files needing formatting", def.ShortName, fileCount))
-			return TestResult{
-				Status:      "FAILED",
-				Message:     fmt.Sprintf("%d file(s) need formatting: %s", fileCount, strings.Join(files, ", ")),
-				Duration:    duration.String(),
-				IssueCount:  fileCount,
-				DetailsLine: fmt.Sprintf("%d file(s) unformatted", fileCount),
+			if fileCount > 0 {
+				log(fmt.Sprintf("[%s] Format check found %d files needing formatting", def.ShortName, fileCount))
+				return TestResult{
+					Status:      "FAILED",
+					Message:     fmt.Sprintf("%d file(s) need formatting: %s", fileCount, strings.Join(files, ", ")),
+					Duration:    duration.String(),
+					IssueCount:  fileCount,
+					DetailsLine: fmt.Sprintf("%d file(s) unformatted", fileCount),
+				}
 			}
 		}
 
