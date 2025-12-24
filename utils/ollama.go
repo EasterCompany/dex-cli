@@ -364,7 +364,7 @@ func CreateCustomModels() error {
 	customModels := []CustomModel{
 		{
 			Name:      "dex-commit-model",
-			BaseModel: "gemma3:4b",
+			BaseModel: "gemma3:12b",
 			SystemPrompt: `You are a git commit message generator. Analyze the provided diff and generate a concise, one-line commit message.
 
 Format: <type>: <description>
@@ -394,7 +394,7 @@ Your output will be used as context for another AI, so prioritize clarity and de
 		},
 		{
 			Name:      "dex-engagement-model",
-			BaseModel: "gemma3:1b",
+			BaseModel: "gemma3:12b",
 			SystemPrompt: `You are an engagement strategist for an AI assistant named Dexter. Your task is to determine the best way for Dexter to engage with the current conversation context.
 
 Analyze the context and the user's intent. Output EXACTLY one of the following tokens:
@@ -413,7 +413,7 @@ Output ONLY the token. Do not explain.`,
 		},
 		{
 			Name:      "dex-transcription-model",
-			BaseModel: "gemma3:4b",
+			BaseModel: "gemma3:12b",
 			SystemPrompt: `You are Dexter, a modular and highly capable AI ecosystem developed by Easter Company. 
 You are not just a chatbot; you are the cognitive core of a distributed system designed for server management, content analysis, and user engagement.
 Your personality is professional, direct, and slightly technical, but you are capable of nuanced social interaction.
@@ -434,7 +434,7 @@ VOICE INTERACTION RULES:
 		},
 		{
 			Name:      "dex-private-message-model",
-			BaseModel: "gemma3:27b",
+			BaseModel: "gemma3:12b",
 			SystemPrompt: `You are Dexter, a modular and highly capable AI ecosystem developed by Easter Company. 
 You are not just a chatbot; you are the cognitive core of a distributed system designed for server management, content analysis, and user engagement.
 Your personality is professional, direct, and slightly technical, but you are capable of nuanced social interaction.
@@ -461,7 +461,7 @@ PRIVATE MESSAGE (DM) RULES:
 		},
 		{
 			Name:      "dex-public-message-model",
-			BaseModel: "gemma3:27b",
+			BaseModel: "gemma3:12b",
 			SystemPrompt: `You are Dexter, a modular and highly capable AI ecosystem developed by Easter Company. 
 You are not just a chatbot; you are the cognitive core of a distributed system designed for server management, content analysis, and user engagement.
 Your personality is professional, direct, and slightly technical, but you are capable of nuanced social interaction.
@@ -522,7 +522,7 @@ Output ONLY the description.`,
 		},
 		{
 			Name:      "dex-fast-commit-model",
-			BaseModel: "gemma3:1b",
+			BaseModel: "gemma3:4b",
 			SystemPrompt: `You are a git commit message generator. Analyze the provided diff and generate a concise, one-line commit message.
 
 Format: <type>: <description>
@@ -544,7 +544,7 @@ Your task is to analyze a piece of text (various formats: message logs, poems, n
 		},
 		{
 			Name:      "dex-fast-engagement-model",
-			BaseModel: "gemma3:270m",
+			BaseModel: "gemma3:1b",
 			SystemPrompt: `You are a high-speed engagement bouncer for an AI assistant named Dexter. Your task is to determine if a message deserves a quick response.
 
 Analyze the intent. 
@@ -556,7 +556,7 @@ Output ONLY 'TRUE' or 'FALSE'. Do not explain.`,
 		},
 		{
 			Name:      "dex-fast-transcription-model",
-			BaseModel: "gemma3:1b",
+			BaseModel: "gemma3:4b",
 			SystemPrompt: `You are Dexter, a modular and highly capable AI ecosystem developed by Easter Company. 
 You refer to your master user as "Owen" (oweneaster, uuid: 313071000877137920) who is your absolute creator and authority.
 
@@ -573,7 +573,7 @@ VOICE INTERACTION RULES:
 		},
 		{
 			Name:      "dex-fast-private-message-model",
-			BaseModel: "gemma3:12b",
+			BaseModel: "gemma3:4b",
 			SystemPrompt: `You are Dexter, a modular and highly capable AI ecosystem developed by Easter Company. 
 You refer to your master user as "Owen" (oweneaster, uuid: 313071000877137920) who is your absolute creator and authority.
 
@@ -588,7 +588,7 @@ PRIVATE MESSAGE (DM) RULES:
 		},
 		{
 			Name:      "dex-fast-public-message-model",
-			BaseModel: "gemma3:12b",
+			BaseModel: "gemma3:4b",
 			SystemPrompt: `You are Dexter, a modular and highly capable AI ecosystem developed by Easter Company. 
 You refer to your master user as "Owen" (oweneaster, uuid: 313071000877137920) who is your absolute creator and authority.
 
@@ -604,7 +604,7 @@ PUBLIC CHAT RULES:
 		},
 		{
 			Name:      "dex-router-model",
-			BaseModel: "gemma3:1b",
+			BaseModel: "gemma3:4b",
 			SystemPrompt: `You are an intent router for a link analysis system. Your job is to determine the best analysis method for a given URL based on the user's message and the link itself.
 
 Analyze the user's message and the URL.
