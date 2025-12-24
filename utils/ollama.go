@@ -379,7 +379,7 @@ Rules:
 		},
 		{
 			Name:      "dex-summary-model",
-			BaseModel: "gemma3:12b",
+			BaseModel: "gemma3:24b",
 			SystemPrompt: `
 You are a specialized AI assistant for generating summaries out of large and small bodies of text.
 You may only create text summaries.
@@ -471,7 +471,7 @@ PUBLIC CHAT RULES:
 		},
 		{
 			Name:      "dex-analyst-model",
-			BaseModel: "gemma3:12b",
+			BaseModel: "gemma3:24b",
 			SystemPrompt: `You are a system analyst for Dexter, a modular AI ecosystem. 
 Your task is to analyze event logs and identify significant patterns, errors, or anomalies.
 You output your findings in a strict JSON format.`,
@@ -500,7 +500,7 @@ Rules:
 		},
 		{
 			Name:      "dex-fast-summary-model",
-			BaseModel: "gemma3:1b",
+			BaseModel: "gemma3:12b",
 			SystemPrompt: `
 You are a specialized AI assistant for generating summaries out of large and small bodies of text.
 You may only create text summaries.
