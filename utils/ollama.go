@@ -22,7 +22,7 @@ var DefaultModels = []string{
 	"gemma3:4b",
 	"gemma3:12b",
 	"gemma3:27b",
-	//"qwen3-vl:8b",
+	"qwen3-vl:8b",
 	//"gpt-oss:20b",
 	//"ministral-3:3b",
 	//"deepseek-r1:1.5b",
@@ -478,7 +478,7 @@ You output your findings in a strict JSON format.`,
 		},
 		{
 			Name:      "dex-vision-model",
-			BaseModel: "gemma3:4b",
+			BaseModel: "qwen3-vl:8b",
 			SystemPrompt: `You are a visual analysis engine for an AI assistant named Dexter. 
 Your job is to describe images and video frames concisely and accurately. 
 Focus on key elements, text, people, and actions. 
