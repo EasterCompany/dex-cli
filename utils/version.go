@@ -73,13 +73,6 @@ func GetBinaryVersion(service config.ServiceDefinition) string {
 		return "unknown"
 	}
 
-	// For Python backend, can we query it?
-	if service.Type == "be" {
-		// Maybe `run.sh version`? Or check a version file?
-		// For now, return "N/A" or "managed"
-		return "N/A"
-	}
-
 	var binPath string
 	if service.ShortName == "cli" {
 		binPath = filepath.Join(os.Getenv("HOME"), "Dexter", "bin", "dex")
