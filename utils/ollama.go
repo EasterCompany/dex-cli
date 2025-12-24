@@ -16,10 +16,16 @@ import (
 const DefaultOllamaURL = "http://127.0.0.1:11434"
 
 var DefaultModels = []string{
-	"gpt-oss:20b",
-	"qwen3-vl:8b",
-	"ministral-3:3b",
-	"deepseek-r1:1.5b",
+	"functiongemma:270m",
+	"gemma3:270m",
+	"gemma3:1b",
+	"gemma3:4b",
+	"gemma3:12b",
+	"gemma3:27b",
+	//"qwen3-vl:8b",
+	//"gpt-oss:20b",
+	//"ministral-3:3b",
+	//"deepseek-r1:1.5b",
 }
 
 // ModelInfo reflects a single model entry returned by the /api/tags endpoint.
@@ -472,7 +478,7 @@ You output your findings in a strict JSON format.`,
 		},
 		{
 			Name:      "dex-vision-model",
-			BaseModel: "qwen3-vl:8b",
+			BaseModel: "gemma3:4b",
 			SystemPrompt: `You are a visual analysis engine for an AI assistant named Dexter. 
 Your job is to describe images and video frames concisely and accurately. 
 Focus on key elements, text, people, and actions. 
