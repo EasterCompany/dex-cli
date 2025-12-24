@@ -23,6 +23,7 @@ type DiscordOptions struct {
 	DebugChannelID      string `json:"debug_channel_id"`
 	MasterUser          string `json:"master_user"`
 	DefaultVoiceChannel string `json:"default_voice_channel"`
+	QuietMode           bool   `json:"quiet_mode"`
 }
 
 // DefaultOptionsConfig returns the default options configuration

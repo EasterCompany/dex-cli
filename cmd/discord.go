@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/ui"
@@ -10,8 +11,54 @@ import (
 )
 
 func handleDefaultDiscordOutput() error {
-	ui.PrintHeader("Event Command Usage")
+	ui.PrintHeader("Discord Command Usage")
 	ui.PrintInfo("  discord service          | Show the raw status from the /service endpoint")
+	ui.PrintInfo("  discord channels         | Show the channel structure of connected guilds")
+	ui.PrintInfo("  discord quiet [on|off]   | Toggle Dexter's quiet mode for public channels")
+	return nil
+}
+
+func handleDiscordQuiet(args []string) error {
+	if len(args) == 0 {
+		options, err := config.LoadOptionsConfig()
+		if err != nil {
+			return err
+		}
+		status := "OFF"
+		if options.Discord.QuietMode {
+			status = "ON"
+		}
+		ui.PrintInfo(fmt.Sprintf("Discord quiet mode is currently: %s", status))
+		return nil
+	}
+
+	value := strings.ToLower(args[0])
+	var enabled bool
+	switch value {
+	case "on", "1", "true":
+		enabled = true
+	case "off", "0", "false":
+		enabled = false
+	default:
+		return fmt.Errorf("invalid value '%s': must be on/off, true/false, or 1/0", args[0])
+	}
+
+	options, err := config.LoadOptionsConfig()
+	if err != nil {
+		return err
+	}
+
+	options.Discord.QuietMode = enabled
+	if err := config.SaveOptionsConfig(options); err != nil {
+		return err
+	}
+
+	status := "disabled"
+	if enabled {
+		status = "enabled"
+	}
+	ui.PrintSuccess(fmt.Sprintf("Discord quiet mode has been %s", status))
+	ui.PrintWarning("Note: Some services may need a restart or reload to apply this change immediately.")
 	return nil
 }
 
@@ -41,8 +88,10 @@ func Discord(args []string) error {
 		return handleDiscordServiceStatus()
 	case "channels":
 		return handleDiscordChannels()
+	case "quiet":
+		return handleDiscordQuiet(args[1:])
 	default:
-		return fmt.Errorf("unknown discord subcommand: %s\n\nUsage:\n  discord service\n  discord channels", subcommand)
+		return fmt.Errorf("unknown discord subcommand: %s\n\nUsage:\n  discord service\n  discord channels\n  discord quiet [on|off]", subcommand)
 	}
 }
 
