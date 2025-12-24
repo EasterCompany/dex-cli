@@ -489,7 +489,7 @@ PUBLIC CHAT RULES:
 		},
 		{
 			Name:      "dex-analyst-guardian",
-			BaseModel: "gemma3:12b",
+			BaseModel: "gpt-oss:20b",
 			SystemPrompt: `You are the Guardian Analyst. Your primary objective is high-fidelity anomaly detection and system health monitoring.
 
 # System Health Report

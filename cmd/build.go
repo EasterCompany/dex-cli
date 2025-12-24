@@ -40,10 +40,12 @@ func waitForActiveProcesses(ctx context.Context) error {
 			return fmt.Errorf("failed to query active processes: %w", err)
 		}
 
-		// Filter out our own build process to prevent self-blocking
+		// Filter out our own build process and other non-blocking system processes
 		var activeKeys []string
 		for _, k := range keys {
-			if !strings.HasSuffix(k, ":system-cli-op") {
+			if !strings.HasSuffix(k, ":system-cli-op") &&
+				!strings.HasSuffix(k, ":system-analyst") &&
+				!strings.HasSuffix(k, ":system-discord") {
 				activeKeys = append(activeKeys, k)
 			}
 		}
