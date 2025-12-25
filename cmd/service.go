@@ -1,10 +1,12 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"sync"
 
+	"github.com/EasterCompany/dex-cli/cache"
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/ui"
 )
@@ -92,5 +94,33 @@ func Service(command string, args []string) error {
 	} else {
 		ui.PrintSuccess(fmt.Sprintf("Successfully executed '%s' for %s.", command, serviceShortName))
 	}
+
+	// Perform cleanup if stopping or restarting
+	if command == "stop" || command == "restart" {
+		cleanupProcesses()
+	}
+
 	return nil
+}
+
+func cleanupProcesses() {
+	ui.PrintInfo("Cleaning up stale process flags...")
+	ctx := context.Background()
+	client, err := cache.GetLocalClient(ctx)
+	if err != nil {
+		// It's possible Redis is down or not configured, which is fine during a full stop
+		return
+	}
+	defer func() { _ = client.Close() }()
+
+	// Find all keys starting with "process:"
+	keys, err := client.Keys(ctx, "process:*").Result()
+	if err != nil {
+		return
+	}
+
+	if len(keys) > 0 {
+		client.Del(ctx, keys...)
+		ui.PrintInfo(fmt.Sprintf("Removed %d stale process flags.", len(keys)))
+	}
 }
