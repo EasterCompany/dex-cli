@@ -76,7 +76,7 @@ func Serve(args []string, version, branch, commit, buildDate string) error {
 	// Register standard service health endpoint
 	mux.HandleFunc("/service", func(w http.ResponseWriter, r *http.Request) {
 		// Log the request
-		log.Printf("ACCESS: %s %s %s %s", r.RemoteAddr, r.Method, r.URL.Path, time.Since(startTime))
+		// log.Printf("ACCESS: %s %s %s %s", r.RemoteAddr, r.Method, r.URL.Path, time.Since(startTime))
 
 		// Check for version.txt in the served directory
 		currentVersion := version
@@ -211,9 +211,9 @@ func serve404(w http.ResponseWriter, r *http.Request, root string) {
 // loggingMiddleware logs every HTTP request.
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
+		// start := time.Now()
 		next.ServeHTTP(w, r)
-		duration := time.Since(start)
-		log.Printf("ACCESS: %s %s %s %s", r.RemoteAddr, r.Method, r.URL.Path, duration)
+		// duration := time.Since(start)
+		// log.Printf("ACCESS: %s %s %s %s", r.RemoteAddr, r.Method, r.URL.Path, duration)
 	})
 }
