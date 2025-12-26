@@ -10,10 +10,11 @@ import (
 	"github.com/EasterCompany/dex-cli/utils"
 )
 
-func handleDefaultDiscordOutput() error {
+func handleDiscordDefault() error {
 	ui.PrintHeader("Discord Command Usage")
-	ui.PrintInfo("  discord service          | Show the raw status from the /service endpoint")
+	ui.PrintInfo("  discord contacts         | Show all guild members and their system levels")
 	ui.PrintInfo("  discord channels         | Show the channel structure of connected guilds")
+	ui.PrintInfo("  discord service          | Show the raw status from the /service endpoint")
 	ui.PrintInfo("  discord quiet [on|off]   | Toggle Dexter's quiet mode for public channels")
 	return nil
 }
@@ -77,21 +78,93 @@ func handleDiscordServiceStatus() error {
 	return nil
 }
 
+func handleDiscordContacts() error {
+	def, err := config.Resolve("discord")
+	if err != nil {
+		return fmt.Errorf("failed to resolve discord service: %w", err)
+	}
+
+	ui.PrintHeader("Discord Contacts")
+	ui.PrintInfo("Fetching guild members...")
+
+	body, _, err := utils.GetHTTPBody(def.GetHTTP("/contacts"))
+	if err != nil {
+		return fmt.Errorf("failed to fetch contacts: %w", err)
+	}
+
+	var resp struct {
+		GuildName string `json:"guild_name"`
+		Members   []struct {
+			ID       string `json:"id"`
+			Username string `json:"username"`
+			Level    string `json:"level"`
+			Status   string `json:"status"`
+		} `json:"members"`
+	}
+
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return fmt.Errorf("failed to parse contacts: %w", err)
+	}
+
+	ui.PrintSubHeader(fmt.Sprintf("Server: %s (%d members)", resp.GuildName, len(resp.Members)))
+
+	table := ui.NewTable([]string{"LEVEL", "USERNAME", "STATUS", "DISCORD ID"})
+
+	for _, m := range resp.Members {
+		levelColor := ui.ColorDarkGray
+		switch m.Level {
+		case "Master User":
+			levelColor = ui.ColorPurple
+		case "Admin":
+			levelColor = ui.ColorRed
+		case "Moderator":
+			levelColor = ui.ColorCyan
+		case "Contributor":
+			levelColor = ui.ColorYellow
+		case "User":
+			levelColor = ui.ColorWhite
+		}
+
+		statusStr := m.Status
+		statusColor := ui.ColorDarkGray
+		switch m.Status {
+		case "online":
+			statusColor = ui.ColorGreen
+		case "idle":
+			statusColor = ui.ColorYellow
+		case "dnd":
+			statusColor = ui.ColorRed
+		}
+
+		table.AddRow([]string{
+			ui.Colorize(m.Level, levelColor),
+			m.Username,
+			ui.Colorize(statusStr, statusColor),
+			ui.Colorize(m.ID, ui.ColorDarkGray),
+		})
+	}
+
+	table.Render()
+	return nil
+}
+
 func Discord(args []string) error {
 	if len(args) == 0 {
-		return handleDefaultDiscordOutput()
+		return handleDiscordDefault()
 	}
 
 	subcommand := args[0]
 	switch subcommand {
-	case "service":
-		return handleDiscordServiceStatus()
+	case "contacts":
+		return handleDiscordContacts()
 	case "channels":
 		return handleDiscordChannels()
+	case "service":
+		return handleDiscordServiceStatus()
 	case "quiet":
 		return handleDiscordQuiet(args[1:])
 	default:
-		return fmt.Errorf("unknown discord subcommand: %s\n\nUsage:\n  discord service\n  discord channels\n  discord quiet [on|off]", subcommand)
+		return handleDiscordDefault()
 	}
 }
 
