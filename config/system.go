@@ -201,149 +201,212 @@ func detectCPU() []CPUInfo {
 }
 
 // detectGPU introspects GPU information
+
 func detectGPU() []GPUInfo {
+
 	var gpus []GPUInfo
 
 	// Try nvidia-smi for NVIDIA GPUs
+
 	cmd := exec.Command("nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader")
+
 	if output, err := cmd.Output(); err == nil {
+
 		lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+
 		for i, line := range lines {
+
 			parts := strings.Split(line, ",")
+
 			if len(parts) >= 2 {
+
 				name := strings.TrimSpace(parts[0])
-				vramStr := strings.TrimSpace(strings.Split(parts[1], " ")[0])
+
+				// Fix: Trim space before splitting or parsing to handle " 4096 MiB" correctly
+
+				vramPart := strings.TrimSpace(parts[1])
+
+				vramStr := strings.Fields(vramPart)[0]
+
 				vram, _ := strconv.ParseInt(vramStr, 10, 64)
+
 				vram *= 1024 * 1024 // Convert MB to bytes
 
 				gpus = append(gpus, GPUInfo{
-					Label:            name,
-					CUDA:             1, // Assume CUDA available if nvidia-smi works
-					VRAM:             vram,
-					ComputePriority:  i,
+
+					Label: name,
+
+					CUDA: 1, // Assume CUDA available if nvidia-smi works
+
+					VRAM: vram,
+
+					ComputePriority: i,
+
 					ComputePotential: 1,
 				})
+
 			}
+
 		}
+
 	}
 
 	// If no GPUs detected, return empty
+
 	return gpus
+
 }
 
 // detectRAM gets total system RAM
+
 func detectRAM() int64 {
+
 	if runtime.GOOS == "linux" {
+
 		if data, err := os.ReadFile("/proc/meminfo"); err == nil {
+
 			lines := strings.Split(string(data), "\n")
+
 			for _, line := range lines {
+
 				if strings.HasPrefix(line, "MemTotal:") {
+
 					fields := strings.Fields(line)
+
 					if len(fields) >= 2 {
+
 						kb, _ := strconv.ParseInt(fields[1], 10, 64)
+
 						return kb * 1024 // Convert KB to bytes
+
 					}
+
 				}
+
 			}
+
 		}
+
 	}
+
 	return 0
+
+}
+
+type LSBLKOutput struct {
+	BlockDevices []BlockDevice `json:"blockdevices"`
+}
+
+type BlockDevice struct {
+	Name string `json:"name"`
+
+	Size int64 `json:"size"`
+
+	FSUsed *int64 `json:"fsused"`
+
+	Type string `json:"type"`
+
+	MountPoint *string `json:"mountpoint"`
+
+	Children []BlockDevice `json:"children"`
 }
 
 // detectStorage lists storage devices with usage information
+
 func detectStorage() []StorageInfo {
+
 	var storage []StorageInfo
 
 	// Try lsblk on Linux
+
 	if runtime.GOOS != "linux" {
+
 		return storage
+
 	}
 
-	// Use -r to get raw output (no tree structure)
-	cmd := exec.Command("lsblk", "-b", "-n", "-r", "-o", "NAME,SIZE,FSUSED,TYPE")
+	// Use -J for JSON output, -b for bytes
+
+	cmd := exec.Command("lsblk", "-J", "-b", "-o", "NAME,SIZE,FSUSED,TYPE,MOUNTPOINT")
+
 	output, err := cmd.Output()
+
 	if err != nil {
+
 		return storage
+
 	}
 
-	// Parse lsblk output to find disk devices
+	var lsblkOut LSBLKOutput
 
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	if err := json.Unmarshal(output, &lsblkOut); err != nil {
 
-	deviceMap := make(map[string]*StorageInfo) // Map device name to storage info
+		return storage
 
-	partitionMap := make(map[string]string) // Map partition to parent disk
+	}
 
-	for _, line := range lines {
+	for _, device := range lsblkOut.BlockDevices {
 
-		fields := strings.Fields(line)
+		// We only care about physical disks
 
-		if len(fields) < 3 {
+		if device.Type != "disk" {
 
 			continue
 
 		}
 
-		// Raw output implies no tree chars
+		info := StorageInfo{
 
-		name := fields[0]
+			Device: device.Name,
 
-		sizeStr := fields[1]
+			Size: device.Size,
 
-		devType := fields[len(fields)-1]
+			Used: 0,
 
-		// Parse size
+			MountPoint: "unmounted",
+		}
 
-		size, _ := strconv.ParseInt(sizeStr, 10, 64)
+		// Calculate total used from children (partitions)
 
-		// For disk devices (not partitions), initialize entry
+		var totalUsed int64
 
-		switch devType {
+		var bestMountPoint string
 
-		case "disk":
+		var scanChildren func([]BlockDevice)
 
-			deviceMap[name] = &StorageInfo{
+		scanChildren = func(children []BlockDevice) {
 
-				Device: name,
+			for _, child := range children {
 
-				Size: size,
+				if child.FSUsed != nil {
 
-				Used: 0,
-
-				MountPoint: "",
-			}
-
-		case "part":
-
-			// Map partition to parent disk
-
-			parentDisk := name
-
-			if strings.Contains(name, "nvme") && strings.Contains(name, "p") {
-
-				if idx := strings.LastIndex(name, "p"); idx != -1 {
-
-					parentDisk = name[:idx]
+					totalUsed += *child.FSUsed
 
 				}
 
-			} else {
+				if child.MountPoint != nil && *child.MountPoint != "" {
 
-				parentDisk = strings.TrimRight(name, "0123456789")
+					// Prioritize root, then shortest path
 
-			}
+					if *child.MountPoint == "/" {
 
-			partitionMap[name] = parentDisk
+						bestMountPoint = "/"
 
-			// If we have FSUSED from lsblk, add it to the parent disk
+					} else if bestMountPoint != "/" {
 
-			if len(fields) >= 4 {
+						if bestMountPoint == "" || len(*child.MountPoint) < len(bestMountPoint) {
 
-				used, _ := strconv.ParseInt(fields[2], 10, 64)
+							bestMountPoint = *child.MountPoint
 
-				if info, exists := deviceMap[parentDisk]; exists {
+						}
 
-					info.Used += used
+					}
+
+				}
+
+				if len(child.Children) > 0 {
+
+					scanChildren(child.Children)
 
 				}
 
@@ -351,91 +414,22 @@ func detectStorage() []StorageInfo {
 
 		}
 
-	}
+		scanChildren(device.Children)
 
-	// Use findmnt to get mount points and usage for each partition
+		info.Used = totalUsed
 
-	// Use -r to get raw output
+		if bestMountPoint != "" {
 
-	findmntCmd := exec.Command("findmnt", "-b", "-n", "-r", "-o", "TARGET,SOURCE,USED")
-
-	findmntOutput, err := findmntCmd.Output()
-
-	if err == nil {
-
-		findmntLines := strings.Split(strings.TrimSpace(string(findmntOutput)), "\n")
-
-		for _, line := range findmntLines {
-
-			fields := strings.Fields(line)
-
-			if len(fields) < 2 {
-
-				continue
-
-			}
-
-			mountPoint := fields[0]
-
-			source := fields[1]
-
-			// Extract device name from source (e.g., /dev/sda2[/@] -> sda2)
-
-			deviceName := strings.TrimPrefix(source, "/dev/")
-
-			if idx := strings.Index(deviceName, "["); idx != -1 {
-
-				deviceName = deviceName[:idx]
-
-			}
-
-			// Find parent disk for this partition
-
-			parentDisk, exists := partitionMap[deviceName]
-
-			if !exists {
-
-				continue
-
-			}
-
-			info, exists := deviceMap[parentDisk]
-
-			if !exists {
-
-				continue
-
-			}
-
-			// Prioritize root mount point, otherwise shortest path
-
-			if mountPoint == "/" {
-
-				info.MountPoint = mountPoint
-
-			} else if info.MountPoint != "/" {
-
-				if info.MountPoint == "" || len(mountPoint) < len(info.MountPoint) {
-
-					info.MountPoint = mountPoint
-
-				}
-
-			}
+			info.MountPoint = bestMountPoint
 
 		}
 
-	}
+		storage = append(storage, info)
 
-	// Convert map to slice
-	for _, info := range deviceMap {
-		if info.MountPoint == "" {
-			info.MountPoint = "unmounted"
-		}
-		storage = append(storage, *info)
 	}
 
 	return storage
+
 }
 
 // detectPackages checks which required packages are installed
