@@ -295,12 +295,27 @@ func detectStorage() []StorageInfo {
 			}
 		case "part":
 			// Map partition to parent disk
-			parentDisk := strings.TrimRight(name, "0123456789")
+			parentDisk := name
+			if strings.Contains(name, "nvme") && strings.Contains(name, "p") {
+				if idx := strings.LastIndex(name, "p"); idx != -1 {
+					parentDisk = name[:idx]
+				}
+			} else {
+				parentDisk = strings.TrimRight(name, "0123456789")
+			}
 			partitionMap[name] = parentDisk
+
+			// If we have FSUSED from lsblk, add it to the parent disk
+			if len(fields) >= 4 {
+				used, _ := strconv.ParseInt(fields[2], 10, 64)
+				if info, exists := deviceMap[parentDisk]; exists {
+					info.Used += used
+				}
+			}
 		}
 	}
 
-	// Use findmnt to get mount points and usage for each partition
+	// Use findmnt to get mount points for each partition
 	findmntCmd := exec.Command("findmnt", "-b", "-n", "-o", "TARGET,SOURCE,USED")
 	findmntOutput, err := findmntCmd.Output()
 	if err == nil {
@@ -314,10 +329,6 @@ func detectStorage() []StorageInfo {
 
 			mountPoint := fields[0]
 			source := fields[1]
-			var used int64
-			if len(fields) >= 3 {
-				used, _ = strconv.ParseInt(fields[2], 10, 64)
-			}
 
 			// Extract device name from source (e.g., /dev/sda2[/@] -> sda2)
 			deviceName := strings.TrimPrefix(source, "/dev/")
@@ -339,11 +350,9 @@ func detectStorage() []StorageInfo {
 			// Prioritize root mount point, otherwise shortest path
 			if mountPoint == "/" {
 				info.MountPoint = mountPoint
-				info.Used = used
 			} else if info.MountPoint != "/" {
 				if info.MountPoint == "" || len(mountPoint) < len(info.MountPoint) {
 					info.MountPoint = mountPoint
-					info.Used = used
 				}
 			}
 		}
