@@ -259,103 +259,172 @@ func detectStorage() []StorageInfo {
 		return storage
 	}
 
-	// Get all block devices with their partitions
-	cmd := exec.Command("lsblk", "-b", "-n", "-o", "NAME,SIZE,FSUSED,TYPE")
+	// Use -r to get raw output (no tree structure)
+	cmd := exec.Command("lsblk", "-b", "-n", "-r", "-o", "NAME,SIZE,FSUSED,TYPE")
 	output, err := cmd.Output()
 	if err != nil {
 		return storage
 	}
 
 	// Parse lsblk output to find disk devices
+
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+
 	deviceMap := make(map[string]*StorageInfo) // Map device name to storage info
-	partitionMap := make(map[string]string)    // Map partition to parent disk
+
+	partitionMap := make(map[string]string) // Map partition to parent disk
 
 	for _, line := range lines {
+
 		fields := strings.Fields(line)
+
 		if len(fields) < 3 {
+
 			continue
+
 		}
 
-		name := strings.TrimLeft(fields[0], "├─└│")
+		// Raw output implies no tree chars
+
+		name := fields[0]
+
 		sizeStr := fields[1]
+
 		devType := fields[len(fields)-1]
 
 		// Parse size
+
 		size, _ := strconv.ParseInt(sizeStr, 10, 64)
 
 		// For disk devices (not partitions), initialize entry
+
 		switch devType {
+
 		case "disk":
+
 			deviceMap[name] = &StorageInfo{
-				Device:     name,
-				Size:       size,
-				Used:       0,
+
+				Device: name,
+
+				Size: size,
+
+				Used: 0,
+
 				MountPoint: "",
 			}
+
 		case "part":
+
 			// Map partition to parent disk
+
 			parentDisk := name
+
 			if strings.Contains(name, "nvme") && strings.Contains(name, "p") {
+
 				if idx := strings.LastIndex(name, "p"); idx != -1 {
+
 					parentDisk = name[:idx]
+
 				}
+
 			} else {
+
 				parentDisk = strings.TrimRight(name, "0123456789")
+
 			}
+
 			partitionMap[name] = parentDisk
 
 			// If we have FSUSED from lsblk, add it to the parent disk
+
 			if len(fields) >= 4 {
+
 				used, _ := strconv.ParseInt(fields[2], 10, 64)
+
 				if info, exists := deviceMap[parentDisk]; exists {
+
 					info.Used += used
+
 				}
+
 			}
+
 		}
+
 	}
 
-	// Use findmnt to get mount points for each partition
-	findmntCmd := exec.Command("findmnt", "-b", "-n", "-o", "TARGET,SOURCE,USED")
+	// Use findmnt to get mount points and usage for each partition
+
+	// Use -r to get raw output
+
+	findmntCmd := exec.Command("findmnt", "-b", "-n", "-r", "-o", "TARGET,SOURCE,USED")
+
 	findmntOutput, err := findmntCmd.Output()
+
 	if err == nil {
+
 		findmntLines := strings.Split(strings.TrimSpace(string(findmntOutput)), "\n")
 
 		for _, line := range findmntLines {
+
 			fields := strings.Fields(line)
+
 			if len(fields) < 2 {
+
 				continue
+
 			}
 
 			mountPoint := fields[0]
+
 			source := fields[1]
 
 			// Extract device name from source (e.g., /dev/sda2[/@] -> sda2)
+
 			deviceName := strings.TrimPrefix(source, "/dev/")
+
 			if idx := strings.Index(deviceName, "["); idx != -1 {
+
 				deviceName = deviceName[:idx]
+
 			}
 
 			// Find parent disk for this partition
+
 			parentDisk, exists := partitionMap[deviceName]
+
 			if !exists {
+
 				continue
+
 			}
 
 			info, exists := deviceMap[parentDisk]
+
 			if !exists {
+
 				continue
+
 			}
 
 			// Prioritize root mount point, otherwise shortest path
+
 			if mountPoint == "/" {
+
 				info.MountPoint = mountPoint
+
 			} else if info.MountPoint != "/" {
+
 				if info.MountPoint == "" || len(mountPoint) < len(info.MountPoint) {
+
 					info.MountPoint = mountPoint
+
 				}
+
 			}
+
 		}
+
 	}
 
 	// Convert map to slice
