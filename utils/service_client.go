@@ -89,9 +89,15 @@ func FetchURL(url string, timeout time.Duration) (string, error) {
 	return string(body), nil
 }
 
+var SuppressEvents bool
+
 // SendEvent sends an event to the event service and waits for completion.
 // In a CLI tool, this must be synchronous to ensure events are sent before the process exits.
 func SendEvent(eventType string, eventData map[string]interface{}) {
+	if SuppressEvents {
+		return
+	}
+
 	defer func() {
 		if r := recover(); r != nil {
 			// Prevent crash on panic

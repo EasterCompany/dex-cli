@@ -22,6 +22,18 @@ var (
 
 func main() {
 	cmd.RunningVersion = version
+
+	// Globally filter out --no-event flag
+	newArgs := []string{}
+	for _, arg := range os.Args {
+		if arg == "--no-event" {
+			utils.SuppressEvents = true
+		} else {
+			newArgs = append(newArgs, arg)
+		}
+	}
+	os.Args = newArgs
+
 	if len(os.Args) > 1 && os.Args[1] != "version" {
 		command := os.Args[1]
 		isVerboseCommand := command == "build" || command == "update" || command == "test"
@@ -240,6 +252,10 @@ func runCommand(commandFunc func() error) {
 func printUsage() {
 	ui.PrintHeader("DEX")
 	ui.PrintSection("A CLI program for interfacing with local and/or remote Dexter services as a user and/or developer.")
+
+	ui.PrintSubHeader("Global Flags")
+	ui.PrintInfo("--no-event | Suppress event emission for the command")
+	fmt.Println()
 
 	ui.PrintSubHeader("Local/User System Commands")
 	if config.IsCommandAvailable("system") {
