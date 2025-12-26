@@ -79,7 +79,9 @@ func bootstrapSpecificVenv(version string, silent bool) error {
 
 // bootstrapPythonEnvironment sets up the initial python environments managed by dex-cli.
 func bootstrapPythonEnvironment(silent bool) error {
-	ui.PrintHeader("Setting up Dexter's Python Environments")
+	if !silent {
+		ui.PrintHeader("Setting up Dexter's Python Environments")
+	}
 
 	if err := bootstrapSpecificVenv("3.13", silent); err != nil {
 		return err
