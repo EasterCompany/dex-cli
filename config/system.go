@@ -575,6 +575,24 @@ func getPackageVersion(pkgName string) string {
 
 	// Parse version from output
 	versionStr := strings.TrimSpace(string(output))
+
+	// Special handling for nvidia-smi to extract just the driver version
+	if pkgName == "nvidia-smi" {
+		lines := strings.Split(versionStr, "\n")
+		for _, line := range lines {
+			if strings.Contains(line, "DRIVER version") || strings.Contains(line, "Driver Version") {
+				parts := strings.Split(line, ":")
+				if len(parts) >= 2 {
+					return strings.TrimSpace(parts[1])
+				}
+			}
+		}
+		// Fallback if specific line not found, but try to be cleaner
+		if len(lines) > 0 {
+			return lines[0]
+		}
+	}
+
 	return versionStr
 }
 
