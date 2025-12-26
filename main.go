@@ -26,9 +26,11 @@ func main() {
 	// Globally filter out --no-event flag
 	newArgs := []string{}
 	for _, arg := range os.Args {
-		if arg == "--no-event" {
+		if arg == "--no-event" || arg == "--json" {
 			utils.SuppressEvents = true
-		} else {
+		}
+
+		if arg != "--no-event" {
 			newArgs = append(newArgs, arg)
 		}
 	}
