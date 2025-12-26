@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,7 +12,13 @@ import (
 
 // System displays and manages system configuration
 func System(args []string) error {
+	outputJSON := false
+	filteredArgs := []string{}
 	for _, arg := range args {
+		if arg == "--json" {
+			outputJSON = true
+			continue
+		}
 		if arg == "--help" || arg == "-h" {
 			ui.PrintHeader("System Command Help")
 			ui.PrintInfo("Usage: dex system [command] [args...]")
@@ -22,8 +29,11 @@ func System(args []string) error {
 			ui.PrintInfo("  validate   Check for missing required packages")
 			ui.PrintInfo("  install    [package] Install missing package(s)")
 			ui.PrintInfo("  upgrade    [package] Upgrade installed package(s)")
+			ui.PrintInfo("Flags:")
+			ui.PrintInfo("  --json     Output system info as JSON")
 			return nil
 		}
+		filteredArgs = append(filteredArgs, arg)
 	}
 
 	logFile, err := config.LogFile()
@@ -38,40 +48,40 @@ func System(args []string) error {
 
 	log(fmt.Sprintf("System command called with args: %v", args))
 
-	if len(args) == 0 {
-		return systemInfo(log)
+	if len(filteredArgs) == 0 {
+		return systemInfo(log, outputJSON)
 	}
 
-	switch args[0] {
+	switch filteredArgs[0] {
 	case "info":
-		return systemInfo(log)
+		return systemInfo(log, outputJSON)
 	case "scan":
-		return systemScan(log)
+		return systemScan(log, outputJSON)
 	case "validate":
 		return systemValidate(log)
 	case "install":
-		return systemInstall(args[1:], log)
+		return systemInstall(filteredArgs[1:], log)
 	case "upgrade":
-		return systemUpgrade(args[1:], log)
+		return systemUpgrade(filteredArgs[1:], log)
 	default:
-		log(fmt.Sprintf("Unknown system subcommand: %s", args[0]))
-		fmt.Printf("Unknown command: %s\n", args[0])
-		fmt.Println("Available commands:")
-		fmt.Println("  dex system         # Show system info")
-		fmt.Println("  dex system scan    # Re-scan hardware/software")
-		fmt.Println("  dex system validate # Check for missing packages")
-		fmt.Println("  dex system install [package] # Install missing package(s)")
-		fmt.Println("  dex system upgrade [package] # Upgrade installed package(s)")
+		log(fmt.Sprintf("Unknown system subcommand: %s", filteredArgs[0]))
+		fmt.Printf("Unknown command: %s\n", filteredArgs[0])
 		return fmt.Errorf("unknown command")
 	}
 }
 
 // systemInfo shows current system configuration
-func systemInfo(log func(string)) error {
+func systemInfo(log func(string), jsonOutput bool) error {
 	log("Displaying system information.")
 	sys, err := config.LoadSystemConfig()
 	if err != nil {
 		return fmt.Errorf("failed to load system config: %w", err)
+	}
+
+	if jsonOutput {
+		enc := json.NewEncoder(os.Stdout)
+		enc.SetIndent("", "  ")
+		return enc.Encode(sys)
 	}
 
 	table := ui.NewTable([]string{"Category", "Value"})
@@ -157,7 +167,7 @@ func systemInfo(log func(string)) error {
 }
 
 // systemScan re-scans hardware and updates system.json
-func systemScan(log func(string)) error {
+func systemScan(log func(string), jsonOutput bool) error {
 	log("Scanning system hardware and software.")
 	sys, err := config.IntrospectSystem()
 	if err != nil {
@@ -172,9 +182,11 @@ func systemScan(log func(string)) error {
 		return fmt.Errorf("failed to ensure config files: %w", err)
 	}
 
-	fmt.Println("✓ System scan complete")
+	if !jsonOutput {
+		fmt.Println("✓ System scan complete")
+	}
 	log("System scan complete.")
-	return systemInfo(log)
+	return systemInfo(log, jsonOutput)
 }
 
 // systemValidate checks for missing required packages
