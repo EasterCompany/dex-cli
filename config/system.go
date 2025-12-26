@@ -594,6 +594,15 @@ func getPackageVersion(pkgName string) string {
 		}
 	}
 
+	// Special handling for golangci-lint
+	if pkgName == "golangci-lint" {
+		// Output: golangci-lint has version 2.7.2 built with ...
+		parts := strings.Fields(versionStr)
+		if len(parts) >= 4 && parts[2] == "version" {
+			return parts[3]
+		}
+	}
+
 	// Special handling for python3
 	if pkgName == "python3" {
 		// Output: Python 3.13.11
