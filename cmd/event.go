@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -16,7 +17,9 @@ import (
 func handleDefaultEventOutput() error {
 	ui.PrintHeader("Event Command Usage")
 	ui.PrintInfo("event service          | Show the raw status from the /service endpoint")
-	ui.PrintInfo("event log              | Show the last 10 human-readable event logs")
+	ui.PrintInfo("event log              | Human-readable event logs")
+	ui.PrintInfo("                       | -n <count> (default 20)")
+	ui.PrintInfo("                       | -t <type>  (e.g., system.test.completed)")
 	ui.PrintInfo("event analyst status   | Show current analyst tier timers")
 	ui.PrintInfo("event analyst reset    | Reset analyst strategist timer")
 	ui.PrintInfo("event delete <pattern> | Delete events matching a pattern (e.g., 'event delete all')")
@@ -125,24 +128,110 @@ func handleEventDelete(args []string) error {
 	return cmd.Run()
 }
 
-func handleEventLog() error {
+func handleEventLog(args []string) error {
 	def, err := config.Resolve("event")
 	if err != nil {
 		return err
 	}
 
-	logs, _, err := utils.GetHTTPBody(def.GetHTTP("/events?ml=10&format=text"))
+	// Parse filtering arguments
+	limit := "20"
+	filterType := ""
+	for i, arg := range args {
+		if arg == "-n" && i+1 < len(args) {
+			limit = args[i+1]
+		}
+		if (arg == "-t" || arg == "--type") && i+1 < len(args) {
+			filterType = args[i+1]
+		}
+	}
+
+	url := fmt.Sprintf("%s?ml=%s&format=json", def.GetHTTP("/events"), limit)
+	if filterType != "" {
+		url += fmt.Sprintf("&event.type=%s", filterType)
+	}
+
+	body, _, err := utils.GetHTTPBody(url)
 	if err != nil {
 		return fmt.Errorf("failed to get event logs: %w", err)
 	}
 
-	if strings.TrimSpace(string(logs)) == "" {
-		ui.PrintInfo("No events found.")
+	var response struct {
+		Events []struct {
+			Service   string          `json:"service"`
+			Timestamp int64           `json:"timestamp"`
+			Event     json.RawMessage `json:"event"`
+		} `json:"events"`
+	}
+
+	if err := json.Unmarshal(body, &response); err != nil {
+		// Fallback to text if JSON fails
+		ui.PrintSubHeader("Last Events (Raw Text)")
+		fmt.Println(string(body))
 		return nil
 	}
 
-	ui.PrintSubHeader("Last 10 Events")
-	fmt.Println(string(logs))
+	if len(response.Events) == 0 {
+		ui.PrintInfo("No events found matching criteria.")
+		return nil
+	}
+
+	ui.PrintSubHeader(fmt.Sprintf("Last %d Events", len(response.Events)))
+
+	// We want to print them in chronological order (oldest first) like a tail
+	for i := len(response.Events) - 1; i >= 0; i-- {
+		e := response.Events[i]
+		var data map[string]interface{}
+		_ = json.Unmarshal(e.Event, &data)
+
+		t := time.Unix(e.Timestamp, 0).Format("15:04:05")
+		eventType, _ := data["type"].(string)
+
+		// Categorize for coloring
+		color := ui.ColorCyan
+		if strings.HasPrefix(eventType, "messaging") || strings.Contains(eventType, "message") {
+			color = ui.ColorBlue
+		} else if strings.HasPrefix(eventType, "system.analysis") || strings.HasPrefix(eventType, "analysis") || strings.HasPrefix(eventType, "engagement") {
+			color = ui.ColorPurple
+		} else if strings.HasPrefix(eventType, "error") || strings.Contains(eventType, "fail") {
+			color = ui.ColorRed
+		} else if strings.HasPrefix(eventType, "system.cli") || strings.HasPrefix(eventType, "system.build") || strings.HasPrefix(eventType, "system.test") {
+			color = ui.ColorBrightRed // Orange-like
+		} else if strings.HasPrefix(eventType, "system.roadmap") || strings.HasPrefix(eventType, "system.process") {
+			color = ui.ColorGreen
+		}
+
+		// Simplified summary logic mirroring templates.js
+		summary := eventType
+		switch eventType {
+		case "messaging.user.sent_message":
+			summary = fmt.Sprintf("%s: %s", data["user_name"], data["content"])
+		case "messaging.bot.sent_message":
+			summary = fmt.Sprintf("Dexter: %s", data["content"])
+		case "system.cli.command":
+			summary = fmt.Sprintf("CMD: dex %v %v (%v)", data["command"], data["args"], data["status"])
+		case "system.cli.status":
+			summary = fmt.Sprintf("STATUS: %v", data["message"])
+		case "system.test.completed":
+			summary = fmt.Sprintf("TESTS: %v (%v)", data["service_name"], data["duration"])
+		case "system.roadmap.created":
+			summary = fmt.Sprintf("ROADMAP+: %v", data["content"])
+		case "system.roadmap.updated":
+			summary = fmt.Sprintf("ROADMAP~: %v -> %v", data["id"], data["state"])
+		case "system.process.registered":
+			summary = fmt.Sprintf("PROC+: %v (%v)", data["id"], data["state"])
+		case "system.process.unregistered":
+			summary = fmt.Sprintf("PROC-: %v", data["id"])
+		case "log_entry":
+			summary = fmt.Sprintf("[%v] %v", data["level"], data["message"])
+		}
+
+		fmt.Printf("%s %s%-15s%s | %s%s%s\n",
+			ui.ColorDarkGray+t+ui.ColorReset,
+			ui.ColorDarkGray, e.Service, ui.ColorReset,
+			color, summary, ui.ColorReset)
+	}
+
 	return nil
 }
 
@@ -160,7 +249,7 @@ func Event(args []string) error {
 	case "delete":
 		return handleEventDelete(args[1:])
 	case "log":
-		return handleEventLog()
+		return handleEventLog(args[1:])
 	default:
 		return fmt.Errorf("unknown event subcommand: %s", subcommand)
 	}
