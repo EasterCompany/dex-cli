@@ -80,6 +80,7 @@ func systemInfo(log func(string), jsonOutput bool) error {
 
 	if jsonOutput {
 		enc := json.NewEncoder(os.Stdout)
+		enc.SetEscapeHTML(false)
 		enc.SetIndent("", "  ")
 		return enc.Encode(sys)
 	}
