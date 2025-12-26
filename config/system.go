@@ -83,25 +83,21 @@ var RequiredPackages = []Package{
 
 // LoadSystemConfig loads or creates system.json
 func LoadSystemConfig() (*SystemConfig, error) {
-	configPath, err := ExpandPath(filepath.Join(DexterRoot, "config", "system.json"))
+	// Always perform a fresh scan to ensure data is accurate
+	sys, err := IntrospectSystem()
 	if err != nil {
 		return nil, err
 	}
 
-	// Try to load existing
-	if data, err := os.ReadFile(configPath); err == nil {
-		var sys SystemConfig
-		if err := json.Unmarshal(data, &sys); err == nil {
-			return &sys, nil
-		}
-	}
+	// Save the fresh scan
+	_ = SaveSystemConfig(sys)
 
-	// Create new
-	return IntrospectSystem()
+	return sys, nil
 }
 
 // IntrospectSystem scans hardware and software
 func IntrospectSystem() (*SystemConfig, error) {
+	fmt.Println("Starting system introspection...")
 	sys := &SystemConfig{
 		CPU:      detectCPU(),
 		GPU:      detectGPU(),
@@ -111,6 +107,8 @@ func IntrospectSystem() (*SystemConfig, error) {
 
 	// Detect RAM
 	sys.MemoryBytes = detectRAM()
+	fmt.Printf("Introspection complete. RAM: %d, CPU: %d, GPU: %d, Storage: %d\n",
+		sys.MemoryBytes, len(sys.CPU), len(sys.GPU), len(sys.Storage))
 
 	return sys, nil
 }
@@ -229,6 +227,8 @@ func detectGPU() []GPUInfo {
 				vramStr := strings.Fields(vramPart)[0]
 
 				vram, _ := strconv.ParseInt(vramStr, 10, 64)
+
+				fmt.Printf("GPU: %s, Raw VRAM: %s, Parsed: %d MiB\n", name, vramPart, vram)
 
 				vram *= 1024 * 1024 // Convert MB to bytes
 
@@ -354,6 +354,8 @@ func detectStorage() []StorageInfo {
 			continue
 
 		}
+
+		fmt.Printf("Disk: %s, Size: %d, Children: %d\n", device.Name, device.Size, len(device.Children))
 
 		info := StorageInfo{
 
