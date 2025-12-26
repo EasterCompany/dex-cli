@@ -77,6 +77,11 @@ func GetCommandRequirements() map[string]CommandRequirement {
 			Description: "Run all tests",
 			Check:       HasSourceServices,
 		},
+		"guardian": {
+			Name:        "guardian",
+			Description: "Run the Tier 1 Guardian Analyst",
+			Check:       HasEventService,
+		},
 		"system": {
 			Name:        "system",
 			Description: "Show system info and manage packages",

@@ -263,6 +263,9 @@ func printUsage() {
 	if config.IsCommandAvailable("test") {
 		ui.PrintInfo("test       | Run service tests")
 	}
+	if config.IsCommandAvailable("guardian") {
+		ui.PrintInfo("guardian   | Run the Tier 1 Guardian Analyst")
+	}
 	if config.IsCommandAvailable("build") {
 		ui.PrintInfo("build      | [major|minor|patch] Build and install CLI and services")
 	}
