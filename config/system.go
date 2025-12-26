@@ -96,106 +96,175 @@ func LoadSystemConfig() (*SystemConfig, error) {
 }
 
 // IntrospectSystem scans hardware and software
+
 func IntrospectSystem() (*SystemConfig, error) {
-	fmt.Println("Starting system introspection...")
+
 	sys := &SystemConfig{
-		CPU:      detectCPU(),
-		GPU:      detectGPU(),
-		Storage:  detectStorage(),
+
+		CPU: detectCPU(),
+
+		GPU: detectGPU(),
+
+		Storage: detectStorage(),
+
 		Packages: detectPackages(RequiredPackages),
 	}
 
 	// Detect RAM
+
 	sys.MemoryBytes = detectRAM()
-	fmt.Printf("Introspection complete. RAM: %d, CPU: %d, GPU: %d, Storage: %d\n",
-		sys.MemoryBytes, len(sys.CPU), len(sys.GPU), len(sys.Storage))
 
 	return sys, nil
+
 }
 
 // SaveSystemConfig saves system.json
+
 func SaveSystemConfig(sys *SystemConfig) error {
+
 	configPath, err := ExpandPath(filepath.Join(DexterRoot, "config", "system.json"))
+
 	if err != nil {
+
 		return err
+
 	}
 
 	data, err := json.MarshalIndent(sys, "", "  ")
+
 	if err != nil {
+
 		return err
+
 	}
 
 	return os.WriteFile(configPath, data, 0644)
+
 }
 
 // detectCPU introspects CPU information
+
 func detectCPU() []CPUInfo {
+
 	threads := runtime.NumCPU()
+
 	cores := threads / 2 // Assume hyperthreading
 
 	cpuInfo := CPUInfo{
-		Label:   "Unknown CPU",
-		Count:   cores,
+
+		Label: "Unknown CPU",
+
+		Count: cores,
+
 		Threads: threads,
-		AvgGHz:  0,
-		MaxGHz:  0,
+
+		AvgGHz: 0,
+
+		MaxGHz: 0,
 	}
 
 	// Try to get CPU model and core count from /proc/cpuinfo on Linux
+
 	if runtime.GOOS == "linux" {
+
 		if data, err := os.ReadFile("/proc/cpuinfo"); err == nil {
+
 			lines := strings.Split(string(data), "\n")
+
 			coreIDs := make(map[string]bool)
+
 			var frequencies []float64
 
 			for _, line := range lines {
+
 				if strings.HasPrefix(line, "model name") {
+
 					parts := strings.Split(line, ":")
+
 					if len(parts) > 1 {
+
 						cpuInfo.Label = strings.TrimSpace(parts[1])
+
 					}
+
 				}
+
 				// Count unique physical cores
+
 				if strings.HasPrefix(line, "core id") {
+
 					parts := strings.Split(line, ":")
+
 					if len(parts) > 1 {
+
 						coreIDs[strings.TrimSpace(parts[1])] = true
+
 					}
+
 				}
+
 				// Collect CPU frequencies
+
 				if strings.HasPrefix(line, "cpu MHz") {
+
 					parts := strings.Split(line, ":")
+
 					if len(parts) > 1 {
+
 						mhzStr := strings.TrimSpace(parts[1])
+
 						if mhz, err := strconv.ParseFloat(mhzStr, 64); err == nil {
+
 							frequencies = append(frequencies, mhz/1000.0) // Convert MHz to GHz
+
 						}
+
 					}
+
 				}
+
 			}
 
 			// If we found core IDs, use that count
+
 			if len(coreIDs) > 0 {
+
 				cpuInfo.Count = len(coreIDs)
+
 			}
 
 			// Calculate average and max frequencies
+
 			if len(frequencies) > 0 {
+
 				var sum float64
+
 				maxFreq := frequencies[0]
+
 				for _, freq := range frequencies {
+
 					sum += freq
+
 					if freq > maxFreq {
+
 						maxFreq = freq
+
 					}
+
 				}
+
 				cpuInfo.AvgGHz = sum / float64(len(frequencies))
+
 				cpuInfo.MaxGHz = maxFreq
+
 			}
+
 		}
+
 	}
 
 	return []CPUInfo{cpuInfo}
+
 }
 
 // detectGPU introspects GPU information
@@ -227,8 +296,6 @@ func detectGPU() []GPUInfo {
 				vramStr := strings.Fields(vramPart)[0]
 
 				vram, _ := strconv.ParseInt(vramStr, 10, 64)
-
-				fmt.Printf("GPU: %s, Raw VRAM: %s, Parsed: %d MiB\n", name, vramPart, vram)
 
 				vram *= 1024 * 1024 // Convert MB to bytes
 
@@ -354,8 +421,6 @@ func detectStorage() []StorageInfo {
 			continue
 
 		}
-
-		fmt.Printf("Disk: %s, Size: %d, Children: %d\n", device.Name, device.Size, len(device.Children))
 
 		info := StorageInfo{
 
