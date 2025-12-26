@@ -62,7 +62,7 @@ var RequiredPackages = []Package{
 	{Name: "bun", Required: true, MinVersion: "1.0", InstallCommand: "curl -fsSL https://bun.sh/install | bash", UpgradeCommand: "bun upgrade"},
 	{Name: "golangci-lint", Required: true, MinVersion: "1.50", InstallCommand: "go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest", UpgradeCommand: "go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"},
 	{Name: "make", Required: true, MinVersion: "4.0", InstallCommand: "sudo pacman -S --noconfirm make || sudo apt install -y make", UpgradeCommand: "sudo pacman -Syu --noconfirm make || (sudo apt update && sudo apt upgrade -y make)"},
-	{Name: "pip3", Required: true, MinVersion: "20.0", InstallCommand: "sudo pacman -S --noconfirm python-pip || sudo apt install -y python3-pip", UpgradeCommand: "pip3 install --upgrade pip"},
+	{Name: "pip3", Required: true, MinVersion: "20.0", InstallCommand: "sudo pacman -S --noconfirm python-pip || sudo apt install -y python3-pip", UpgradeCommand: "~/Dexter/python/bin/python -m pip install --upgrade pip"},
 	{Name: "lsblk", Required: true, MinVersion: "", InstallCommand: "sudo pacman -S --noconfirm util-linux || sudo apt install -y util-linux", UpgradeCommand: "sudo pacman -Syu --noconfirm util-linux || (sudo apt update && sudo apt upgrade -y util-linux)"},
 	{Name: "findmnt", Required: true, MinVersion: "", InstallCommand: "sudo pacman -S --noconfirm util-linux || sudo apt install -y util-linux", UpgradeCommand: "sudo pacman -Syu --noconfirm util-linux || (sudo apt update && sudo apt upgrade -y util-linux)"},
 	{Name: "redis-server", Required: false, MinVersion: "6.0", InstallCommand: "sudo pacman -S --noconfirm redis || sudo apt install -y redis-server", UpgradeCommand: "sudo pacman -Syu --noconfirm redis || (sudo apt update && sudo apt upgrade -y redis-server)"},
@@ -590,6 +590,15 @@ func getPackageVersion(pkgName string) string {
 		// Fallback if specific line not found, but try to be cleaner
 		if len(lines) > 0 {
 			return lines[0]
+		}
+	}
+
+	// Special handling for pip to extract just the version number
+	if pkgName == "pip3" || pkgName == "pip" {
+		// Output: pip 25.3 from /path/to/site-packages/pip (python 3.13)
+		parts := strings.Fields(versionStr)
+		if len(parts) >= 2 && parts[0] == "pip" {
+			return parts[1]
 		}
 	}
 
