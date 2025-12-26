@@ -593,6 +593,21 @@ func getPackageVersion(pkgName string) string {
 		}
 	}
 
+	// Special handling for nvcc
+	if pkgName == "nvcc" {
+		lines := strings.Split(versionStr, "\n")
+		for _, line := range lines {
+			if strings.Contains(line, "release") {
+				parts := strings.Split(line, ",")
+				for _, part := range parts {
+					if strings.Contains(part, "V") {
+						return strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(part), "V"))
+					}
+				}
+			}
+		}
+	}
+
 	// Special handling for pip to extract just the version number
 	if pkgName == "pip3" || pkgName == "pip" {
 		// Output: pip 25.3 from /path/to/site-packages/pip (python 3.13)
