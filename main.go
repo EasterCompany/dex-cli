@@ -136,6 +136,9 @@ func main() {
 	case "whisper":
 		runCommand(func() error { return cmd.Whisper(os.Args[2:]) })
 
+	case "guardian":
+		runCommand(func() error { return cmd.Guardian(os.Args[2:]) })
+
 	case "serve": // New serve command
 		runCommand(func() error { return cmd.Serve(os.Args[2:], version, branch, commit, buildDate) })
 

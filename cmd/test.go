@@ -38,8 +38,20 @@ type ServiceTestSummary struct {
 // Test runs format, lint, and test for all services, or a specific service if provided.
 func Test(args []string) error {
 	var serviceName string
-	if len(args) > 0 {
-		serviceName = args[0]
+	testModels := false
+
+	// Parse arguments
+	var cleanArgs []string
+	for _, arg := range args {
+		if arg == "--models" {
+			testModels = true
+		} else {
+			cleanArgs = append(cleanArgs, arg)
+		}
+	}
+
+	if len(cleanArgs) > 0 {
+		serviceName = cleanArgs[0]
 	}
 
 	logFile, err := config.LogFile()
@@ -115,7 +127,7 @@ func Test(args []string) error {
 		// Run format, lint, test
 		formatResult := runFormatCheck(def, sourcePath, log)
 		lintResult := runLintCheck(def, sourcePath, log)
-		testResult := runTestCheck(def, sourcePath, log)
+		testResult := runTestCheck(def, sourcePath, log, testModels)
 
 		totalDuration := time.Since(startTime)
 
@@ -321,14 +333,21 @@ func runLintCheck(def config.ServiceDefinition, sourcePath string, log func(stri
 }
 
 // runTestCheck runs unit tests for a service
-func runTestCheck(def config.ServiceDefinition, sourcePath string, log func(string)) TestResult {
+func runTestCheck(def config.ServiceDefinition, sourcePath string, log func(string), includeModels bool) TestResult {
 	startTime := time.Now()
 
 	ui.PrintInfo("Running tests...")
 
 	// For Go projects, run go test
 	if def.Type == "cli" || strings.HasPrefix(def.ID, "dex-") {
-		cmd := exec.Command("go", "test", "-v", "-cover", "./...")
+		testArgs := []string{"test", "-v", "-cover"}
+		if includeModels {
+			testArgs = append(testArgs, "-tags=model_test")
+			ui.PrintInfo(fmt.Sprintf("%s  (Including model tests)", ui.ColorDarkGray))
+		}
+		testArgs = append(testArgs, "./...")
+
+		cmd := exec.Command("go", testArgs...)
 		cmd.Dir = sourcePath
 		output, err := cmd.CombinedOutput()
 		duration := time.Since(startTime)

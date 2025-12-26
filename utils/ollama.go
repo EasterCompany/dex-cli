@@ -723,6 +723,90 @@ func CreateModelFromBase(customName, baseModel, systemPrompt string) error {
 	return nil
 }
 
+// ChatRequest is the JSON body sent to /api/chat.
+type ChatRequest struct {
+	Model    string    `json:"model"`
+	Messages []Message `json:"messages"`
+	Stream   bool      `json:"stream"`
+}
+
+// Message represents a chat message.
+type Message struct {
+	Role    string `json:"role"`
+	Content string `json:"content"`
+}
+
+// ChatResponse handles a single chunk from the streaming response of /api/chat.
+type ChatResponse struct {
+	Model     string    `json:"model"`
+	CreatedAt time.Time `json:"created_at"`
+	Message   Message   `json:"message"`
+	Done      bool      `json:"done"`
+}
+
+// ChatStream sends a chat request to Ollama and streams the response to the provided callback.
+func ChatStream(modelID string, messages []Message, onChunk func(string)) error {
+	url := DefaultOllamaURL + "/api/chat"
+	reqBody := ChatRequest{
+		Model:    modelID,
+		Messages: messages,
+		Stream:   true,
+	}
+
+	reqBytes, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal chat request: %w", err)
+	}
+
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(reqBytes))
+	if err != nil {
+		return fmt.Errorf("failed to create chat request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 0} // No timeout for streaming
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to connect to Ollama at %s: %w", url, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("ollama API chat failed (status %d): %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
+	}
+
+	reader := bufio.NewReader(resp.Body)
+
+	for {
+		line, err := reader.ReadString('\n')
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("error reading chat response stream: %w", err)
+		}
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		var chunk ChatResponse
+		if jsonErr := json.Unmarshal([]byte(line), &chunk); jsonErr != nil {
+			continue
+		}
+
+		if chunk.Message.Content != "" {
+			onChunk(chunk.Message.Content)
+		}
+
+		if chunk.Done {
+			break
+		}
+	}
+
+	return nil
+}
+
 // GenerateContent sends a prompt to a specified model and waits for the complete response.
 // It uses the non-streaming mode of the /api/generate endpoint.
 func GenerateContent(modelID, prompt string) (string, error) {
