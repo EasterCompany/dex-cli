@@ -576,6 +576,77 @@ func getPackageVersion(pkgName string) string {
 	// Parse version from output
 	versionStr := strings.TrimSpace(string(output))
 
+	// Special handling for git
+	if pkgName == "git" {
+		// Output: git version 2.52.0
+		parts := strings.Fields(versionStr)
+		if len(parts) >= 3 && parts[0] == "git" && parts[1] == "version" {
+			return parts[2]
+		}
+	}
+
+	// Special handling for go
+	if pkgName == "go" {
+		// Output: go version go1.25.5 ...
+		parts := strings.Fields(versionStr)
+		if len(parts) >= 3 && parts[0] == "go" && parts[1] == "version" {
+			return strings.TrimPrefix(parts[2], "go")
+		}
+	}
+
+	// Special handling for python3
+	if pkgName == "python3" {
+		// Output: Python 3.13.11
+		parts := strings.Fields(versionStr)
+		if len(parts) >= 2 && parts[0] == "Python" {
+			return parts[1]
+		}
+	}
+
+	// Special handling for redis-server
+	if pkgName == "redis-server" {
+		// Output: Redis server v=8.4.0 ...
+		parts := strings.Fields(versionStr)
+		for _, part := range parts {
+			if strings.HasPrefix(part, "v=") {
+				return strings.TrimPrefix(part, "v=")
+			}
+		}
+	}
+
+	// Special handling for htop
+	if pkgName == "htop" {
+		// Output: htop 3.4.1-3.4.1
+		parts := strings.Fields(versionStr)
+		if len(parts) >= 2 && parts[0] == "htop" {
+			return strings.Split(parts[1], "-")[0]
+		}
+	}
+
+	// Special handling for lsblk / findmnt
+	if pkgName == "lsblk" || pkgName == "findmnt" {
+		// Output: lsblk from util-linux 2.41.3
+		parts := strings.Fields(versionStr)
+		if len(parts) >= 4 && parts[2] == "util-linux" {
+			return parts[3]
+		}
+	}
+
+	// Special handling for jq
+	if pkgName == "jq" {
+		// Output: jq-1.8.1
+		return strings.TrimPrefix(versionStr, "jq-")
+	}
+
+	// Special handling for chromium
+	if pkgName == "chromium" {
+		// Output: Chromium 143.0.7499.169 Arch Linux
+		parts := strings.Fields(versionStr)
+		if len(parts) >= 2 && parts[0] == "Chromium" {
+			return parts[1]
+		}
+	}
+
 	// Special handling for nvidia-smi to extract just the driver version
 	if pkgName == "nvidia-smi" {
 		lines := strings.Split(versionStr, "\n")
@@ -623,6 +694,15 @@ func getPackageVersion(pkgName string) string {
 		parts := strings.Fields(versionStr)
 		if len(parts) >= 2 && parts[0] == "curl" {
 			return parts[1]
+		}
+	}
+
+	// Special handling for make
+	if pkgName == "make" {
+		// Output: GNU Make 4.4.1 ...
+		parts := strings.Fields(versionStr)
+		if len(parts) >= 3 && parts[0] == "GNU" && parts[1] == "Make" {
+			return parts[2]
 		}
 	}
 
