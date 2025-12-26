@@ -113,6 +113,8 @@ func handleDiscordContacts() error {
 	for _, m := range resp.Members {
 		levelColor := ui.ColorDarkGray
 		switch m.Level {
+		case "Me":
+			levelColor = ui.ColorPurple
 		case "Master User":
 			levelColor = ui.ColorPurple
 		case "Admin":
@@ -136,8 +138,13 @@ func handleDiscordContacts() error {
 			statusColor = ui.ColorRed
 		}
 
+		levelStr := m.Level
+		if m.Level == "Me" {
+			levelStr = "DEXTER (ME)"
+		}
+
 		table.AddRow([]string{
-			ui.Colorize(m.Level, levelColor),
+			ui.Colorize(levelStr, levelColor),
 			m.Username,
 			ui.Colorize(statusStr, statusColor),
 			ui.Colorize(m.ID, ui.ColorDarkGray),
