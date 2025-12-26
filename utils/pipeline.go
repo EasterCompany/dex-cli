@@ -90,8 +90,8 @@ func runPythonBuildPipeline(ctx context.Context, service config.ServiceDefinitio
 		cmd := exec.CommandContext(ctx, "python3.10", "-m", "venv", "venv")
 		cmd.Dir = sourcePath
 		if out, err := cmd.CombinedOutput(); err != nil {
-			log(fmt.Sprintf("python3.10 failed: %s. Trying python3...", strings.TrimSpace(string(out))))
-			cmd = exec.CommandContext(ctx, "python3", "-m", "venv", "venv")
+			log(fmt.Sprintf("python3.10 failed: %s. Trying python3.13...", strings.TrimSpace(string(out))))
+			cmd = exec.CommandContext(ctx, "python3.13", "-m", "venv", "venv")
 			cmd.Dir = sourcePath
 			if out2, err2 := cmd.CombinedOutput(); err2 != nil {
 				return false, fmt.Errorf("failed to create venv: %v\nOutput: %s", err2, string(out2))

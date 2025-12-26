@@ -58,11 +58,12 @@ type Package struct {
 var RequiredPackages = []Package{
 	{Name: "git", Required: true, MinVersion: "2.0", InstallCommand: "sudo pacman -S --noconfirm git || sudo apt install -y git", UpgradeCommand: "sudo pacman -Syu --noconfirm git || (sudo apt update && sudo apt upgrade -y git)"},
 	{Name: "go", Required: true, MinVersion: "1.20", InstallCommand: "sudo pacman -S --noconfirm go || sudo apt install -y golang-go", UpgradeCommand: "sudo pacman -Syu --noconfirm go || (sudo apt update && sudo apt upgrade -y golang-go)"},
-	{Name: "python3", Required: true, MinVersion: "3.13", InstallCommand: "sudo pacman -S --noconfirm python || sudo apt install -y python3", UpgradeCommand: "sudo pacman -Syu --noconfirm python || (sudo apt update && sudo apt upgrade -y python3)"},
+	{Name: "python3.13", Required: true, MinVersion: "3.13", InstallCommand: "sudo pacman -S --noconfirm python3.13 || sudo apt install -y python3.13", UpgradeCommand: "sudo pacman -Syu --noconfirm python3.13 || (sudo apt update && sudo apt upgrade -y python3.13)"},
+	{Name: "python3.10", Required: true, MinVersion: "3.10", InstallCommand: "sudo pacman -S --noconfirm python3.10 || sudo apt install -y python3.10", UpgradeCommand: "sudo pacman -Syu --noconfirm python3.10 || (sudo apt update && sudo apt upgrade -y python3.10)"},
 	{Name: "bun", Required: true, MinVersion: "1.0", InstallCommand: "curl -fsSL https://bun.sh/install | bash", UpgradeCommand: "bun upgrade"},
 	{Name: "golangci-lint", Required: true, MinVersion: "1.50", InstallCommand: "go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest", UpgradeCommand: "go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"},
 	{Name: "make", Required: true, MinVersion: "4.0", InstallCommand: "sudo pacman -S --noconfirm make || sudo apt install -y make", UpgradeCommand: "sudo pacman -Syu --noconfirm make || (sudo apt update && sudo apt upgrade -y make)"},
-	{Name: "pip3", Required: true, MinVersion: "20.0", InstallCommand: "sudo pacman -S --noconfirm python-pip || sudo apt install -y python3-pip", UpgradeCommand: "~/Dexter/python/bin/python -m pip install --upgrade pip"},
+	{Name: "pip3", Required: true, MinVersion: "20.0", InstallCommand: "sudo pacman -S --noconfirm python-pip || sudo apt install -y python3-pip", UpgradeCommand: "~/Dexter/python3.13/bin/python -m pip install --upgrade pip"},
 	{Name: "lsblk", Required: true, MinVersion: "", InstallCommand: "sudo pacman -S --noconfirm util-linux || sudo apt install -y util-linux", UpgradeCommand: "sudo pacman -Syu --noconfirm util-linux || (sudo apt update && sudo apt upgrade -y util-linux)"},
 	{Name: "findmnt", Required: true, MinVersion: "", InstallCommand: "sudo pacman -S --noconfirm util-linux || sudo apt install -y util-linux", UpgradeCommand: "sudo pacman -Syu --noconfirm util-linux || (sudo apt update && sudo apt upgrade -y util-linux)"},
 	{Name: "redis-server", Required: false, MinVersion: "6.0", InstallCommand: "sudo pacman -S --noconfirm redis || sudo apt install -y redis-server", UpgradeCommand: "sudo pacman -Syu --noconfirm redis || (sudo apt update && sudo apt upgrade -y redis-server)"},
@@ -517,26 +518,31 @@ func detectPackages(requiredPackages []Package) []Package {
 		}
 	}
 
-	// Add Python venv check
-	venvPath, err := ExpandPath(filepath.Join(DexterRoot, "python"))
-	if err == nil {
-		venvExists := false
-		if info, err := os.Stat(venvPath); err == nil && info.IsDir() {
-			// Check for activate script to confirm it's a venv
-			activatePath := filepath.Join(venvPath, "bin", "activate")
-			if _, err := os.Stat(activatePath); err == nil {
-				venvExists = true
+	// Add Python venv checks for 3.13 and 3.10
+	checkVenv := func(version string) {
+		venvPath, err := ExpandPath(filepath.Join(DexterRoot, "python"+version))
+		if err == nil {
+			venvExists := false
+			if info, err := os.Stat(venvPath); err == nil && info.IsDir() {
+				// Check for activate script to confirm it's a venv
+				activatePath := filepath.Join(venvPath, "bin", "activate")
+				if _, err := os.Stat(activatePath); err == nil {
+					venvExists = true
+				}
 			}
-		}
 
-		packages = append(packages, Package{
-			Name:           "dexter-venv",
-			Version:        venvPath,
-			Required:       true,
-			Installed:      venvExists,
-			InstallCommand: "python3 -m venv ~/Dexter/python",
-		})
+			packages = append(packages, Package{
+				Name:           "dexter-venv-" + version,
+				Version:        venvPath,
+				Required:       true,
+				Installed:      venvExists,
+				InstallCommand: fmt.Sprintf("python%s -m venv ~/Dexter/python%s", version, version),
+			})
+		}
 	}
+
+	checkVenv("3.13")
+	checkVenv("3.10")
 
 	return packages
 }
@@ -546,7 +552,8 @@ func getPackageVersion(pkgName string) string {
 	versionArgs := map[string][]string{
 		"git":           {"--version"},
 		"go":            {"version"},
-		"python3":       {"--version"},
+		"python3.13":    {"--version"},
+		"python3.10":    {"--version"},
 		"bun":           {"--version"},
 		"golangci-lint": {"--version"},
 		"make":          {"--version"},
@@ -603,8 +610,8 @@ func getPackageVersion(pkgName string) string {
 		}
 	}
 
-	// Special handling for python3
-	if pkgName == "python3" {
+	// Special handling for python3.13/3.10
+	if strings.HasPrefix(pkgName, "python") {
 		// Output: Python 3.13.11
 		parts := strings.Fields(versionStr)
 		if len(parts) >= 2 && parts[0] == "Python" {

@@ -27,7 +27,7 @@ func InitWhisper() error {
 	ui.PrintHeader("Initializing Whisper (Faster-Whisper)")
 
 	// Get python paths
-	_, pythonExecutable, pipExecutable, _, err := getPythonPaths()
+	_, pythonExecutable, pipExecutable, _, err := getPythonPaths("3.13")
 	if err != nil {
 		return err
 	}
@@ -134,7 +134,7 @@ func TranscribeFile(filePath string) error {
 	fmt.Fprintf(os.Stderr, "\n=== Transcribing: %s ===\n", filePath)
 
 	// Get python paths
-	_, pythonExecutable, _, _, err := getPythonPaths()
+	_, pythonExecutable, _, _, err := getPythonPaths("3.13")
 	if err != nil {
 		return err
 	}
