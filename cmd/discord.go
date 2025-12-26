@@ -3,6 +3,7 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/EasterCompany/dex-cli/config"
@@ -105,6 +106,26 @@ func handleDiscordContacts() error {
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return fmt.Errorf("failed to parse contacts: %w", err)
 	}
+
+	// Sort: Me > Master > Admin > Moderator > Contributor > User > Anyone
+	levelOrder := map[string]int{
+		"Me":          0,
+		"Master User": 1,
+		"Admin":       2,
+		"Moderator":   3,
+		"Contributor": 4,
+		"User":        5,
+		"Anyone":      6,
+	}
+
+	sort.Slice(resp.Members, func(i, j int) bool {
+		orderI := levelOrder[resp.Members[i].Level]
+		orderJ := levelOrder[resp.Members[j].Level]
+		if orderI != orderJ {
+			return orderI < orderJ
+		}
+		return resp.Members[i].Username < resp.Members[j].Username
+	})
 
 	ui.PrintSubHeader(fmt.Sprintf("Server: %s (%d members)", resp.GuildName, len(resp.Members)))
 
