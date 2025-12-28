@@ -196,6 +196,16 @@ func LogFile() (*os.File, error) {
 	return file, nil
 }
 
+// Log writes a message to the dex-cli log file.
+func Log(message string) {
+	f, err := LogFile()
+	if err != nil {
+		return
+	}
+	defer func() { _ = f.Close() }()
+	_, _ = fmt.Fprintln(f, message)
+}
+
 // IsDevMode checks if the EasterCompany source directory exists.
 func IsDevMode() bool {
 	// Check if the source code directory exists

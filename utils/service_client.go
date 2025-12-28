@@ -138,7 +138,13 @@ func SendEvent(eventType string, eventData map[string]interface{}) {
 
 	resp, err := client.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
+		config.Log(fmt.Sprintf("Failed to send event %s: %v", eventType, err))
 		return
 	}
 	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		config.Log(fmt.Sprintf("Event service returned %d for %s: %s", resp.StatusCode, eventType, string(body)))
+	}
 }
