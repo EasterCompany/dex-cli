@@ -107,15 +107,14 @@ func handleDiscordContacts() error {
 		return fmt.Errorf("failed to parse contacts: %w", err)
 	}
 
-	// Sort: Me > Master > Admin > Moderator > Contributor > User > Anyone
+	// Sort: Me > Master > Admin > Moderator > Contributor > User
 	levelOrder := map[string]int{
 		"Me":          0,
-		"Master User": 1,
+		"Master":      1,
 		"Admin":       2,
 		"Moderator":   3,
 		"Contributor": 4,
 		"User":        5,
-		"Anyone":      6,
 	}
 
 	sort.Slice(resp.Members, func(i, j int) bool {
@@ -136,7 +135,7 @@ func handleDiscordContacts() error {
 		switch m.Level {
 		case "Me":
 			levelColor = ui.ColorPurple
-		case "Master User":
+		case "Master":
 			levelColor = ui.ColorPurple
 		case "Admin":
 			levelColor = ui.ColorRed
