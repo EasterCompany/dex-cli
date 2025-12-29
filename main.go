@@ -252,92 +252,114 @@ func runCommand(commandFunc func() error) {
 }
 
 func printUsage() {
-	ui.PrintHeader("DEX")
-	ui.PrintSection("A CLI program for interfacing with local and/or remote Dexter services as a user and/or developer.")
+	ui.PrintHeader("DEX - The Digital Executive Interface")
+	ui.PrintSection("A unified CLI for managing the Easter Company AI ecosystem.")
 
-	ui.PrintSubHeader("Global Flags")
-	ui.PrintInfo("--no-event | Suppress event emission for the command")
-	fmt.Println()
+	ui.PrintSubHeader("CORE LIFECYCLE")
+	ui.PrintKeyValBlock("build", []ui.KeyVal{
+		{Key: "Usage", Value: "dex build [major|minor|patch] [-f|--force]"},
+		{Key: "Desc", Value: "Build and install services from local source."},
+		{Key: "Args", Value: "Increment version: 'patch' (default), 'minor', or 'major'."},
+		{Key: "Flags", Value: "--force: Rebuild all services even without changes."},
+	})
+	ui.PrintKeyValBlock("update", []ui.KeyVal{
+		{Key: "Usage", Value: "dex update"},
+		{Key: "Desc", Value: "Update CLI and services. In DEV mode: Rebuilds from source. In USER mode: Downloads binaries."},
+	})
+	ui.PrintKeyValBlock("test", []ui.KeyVal{
+		{Key: "Usage", Value: "dex test [service] [--models]"},
+		{Key: "Desc", Value: "Run format, lint, and unit tests."},
+		{Key: "Args", Value: "[service]: specific service to test. Defaults to all."},
+		{Key: "Flags", Value: "--models: Include comprehensive model tests (slow)."},
+	})
 
-	ui.PrintSubHeader("Local/User System Commands")
-	if config.IsCommandAvailable("system") {
-		ui.PrintInfo("system     | Show system info and manage packages")
-	}
-	if config.IsCommandAvailable("config") {
-		ui.PrintInfo("config     | <service> [field...] Show service config or a specific field")
-		ui.PrintInfo("           | reset                Reset service-map.json to default configuration")
-	}
-	if config.IsCommandAvailable("cache") {
-		ui.PrintInfo("cache      | [clear|list] Manage the local cache")
-	}
-	if config.IsCommandAvailable("logs") {
-		ui.PrintInfo("logs       | <service> [-f] View service logs")
-	}
-	if config.IsCommandAvailable("serve") {
-		ui.PrintInfo("serve      | -d <dir> -p <port> Serve static files from a directory")
-	}
+	ui.PrintSubHeader("SERVICE MANAGEMENT")
+	ui.PrintKeyValBlock("start/stop/restart", []ui.KeyVal{
+		{Key: "Usage", Value: "dex [start|stop|restart] <service|all>"},
+		{Key: "Desc", Value: "Manage background systemd services."},
+	})
+	ui.PrintKeyValBlock("status", []ui.KeyVal{
+		{Key: "Usage", Value: "dex status [service|all]"},
+		{Key: "Desc", Value: "Check connectivity and health of services."},
+	})
+	ui.PrintKeyValBlock("logs", []ui.KeyVal{
+		{Key: "Usage", Value: "dex logs <service> [-f]"},
+		{Key: "Desc", Value: "View service logs."},
+		{Key: "Flags", Value: "-f: Follow log output in real-time."},
+	})
 
-	ui.PrintSubHeader("Developer Lifecycle Commands")
-	if config.IsCommandAvailable("test") {
-		ui.PrintInfo("test       | Run service tests")
-	}
-	if config.IsCommandAvailable("guardian") {
-		ui.PrintInfo("guardian   | Run the Guardian Technical Sentry")
-	}
-	if config.IsCommandAvailable("build") {
-		ui.PrintInfo("build      | [major|minor|patch] Build and install CLI and services")
-	}
-	if config.IsCommandAvailable("update") {
-		ui.PrintInfo("update     | Update CLI and services")
-	}
+	ui.PrintSubHeader("SYSTEM & CONFIGURATION")
+	ui.PrintKeyValBlock("system", []ui.KeyVal{
+		{Key: "Usage", Value: "dex system [command]"},
+		{Key: "Commands", Value: "info (default): Show hardware/software specs."},
+		{Key: "", Value: "scan: Re-scan hardware and update config."},
+		{Key: "", Value: "validate: Check for missing required packages."},
+		{Key: "", Value: "install [pkg]: Install missing system package(s)."},
+		{Key: "", Value: "upgrade [pkg]: Upgrade installed system package(s)."},
+	})
+	ui.PrintKeyValBlock("config", []ui.KeyVal{
+		{Key: "Usage", Value: "dex config <service> [field] | reset"},
+		{Key: "Desc", Value: "View or manage service configuration (service-map.json)."},
+		{Key: "Examples", Value: "'dex config event http_port' or 'dex config reset'."},
+	})
+	ui.PrintKeyValBlock("cache", []ui.KeyVal{
+		{Key: "Usage", Value: "dex cache [clear|list]"},
+		{Key: "Desc", Value: "Manage the local CLI cache (GitHub access, etc)."},
+	})
 
-	ui.PrintSubHeader("Global Service Management Commands")
-	if config.IsCommandAvailable("status") {
-		ui.PrintInfo("status     | [service|all] Check the status of CLI and services")
-	}
-	if config.IsCommandAvailable("add") {
-		ui.PrintInfo("add        | Add (install) a new service")
-	}
-	if config.IsCommandAvailable("remove") {
-		ui.PrintInfo("remove     | Remove (uninstall) a service")
-	}
-	if config.IsCommandAvailable("start") {
-		ui.PrintInfo("start      | Start all manageable services")
-	}
-	if config.IsCommandAvailable("stop") {
-		ui.PrintInfo("stop       | Stop all manageable services")
-	}
-	if config.IsCommandAvailable("restart") {
-		ui.PrintInfo("restart    | Restart all manageable services")
-	}
+	ui.PrintSubHeader("INTELLIGENCE & ANALYSIS")
+	ui.PrintKeyValBlock("guardian", []ui.KeyVal{
+		{Key: "Usage", Value: "dex guardian [tier] [-f|--force]"},
+		{Key: "Desc", Value: "Trigger the Guardian Technical Sentry analysis."},
+		{Key: "Tiers", Value: "0 (Default): Full Analysis (T1 + T2)."},
+		{Key: "", Value: "1: Tier 1 (Technical Sentry - Reports)."},
+		{Key: "", Value: "2: Tier 2 (Architect - Blueprints)."},
+		{Key: "Flags", Value: "--force: Bypass idle and cooldown checks."},
+	})
+	ui.PrintKeyValBlock("event", []ui.KeyVal{
+		{Key: "Usage", Value: "dex event [subcommand]"},
+		{Key: "Desc", Value: "Interact with the Event Service."},
+		{Key: "Subcommands", Value: "log [-n count] [-t type]: View raw event log."},
+		{Key: "", Value: "service: Show raw service status JSON."},
+		{Key: "", Value: "guardian status: Show guardian timers."},
+		{Key: "", Value: "guardian reset: Reset guardian timers."},
+		{Key: "", Value: "delete <pattern>: Delete events matching pattern."},
+	})
+	ui.PrintKeyValBlock("discord", []ui.KeyVal{
+		{Key: "Usage", Value: "dex discord [subcommand]"},
+		{Key: "Desc", Value: "Interact with the Discord Service."},
+		{Key: "Subcommands", Value: "contacts: List members and levels."},
+		{Key: "", Value: "channels: List guild channel structure."},
+		{Key: "", Value: "quiet [on|off]: Toggle quiet mode."},
+		{Key: "", Value: "service: Show raw service status JSON."},
+	})
 
-	ui.PrintSubHeader("Proxy Commands")
-	if config.IsCommandAvailable("python") {
-		ui.PrintInfo("python     | Run commands in the Python virtual environment")
-	}
-	if config.IsCommandAvailable("bun") {
-		ui.PrintInfo("bun        | Run the system 'bun' executable")
-	}
-	if config.IsCommandAvailable("bunx") {
-		ui.PrintInfo("bunx       | Run the system 'bunx' executable")
-	}
-	if config.IsCommandAvailable("ollama") {
-		ui.PrintInfo("ollama     | Run the system 'ollama' executable")
-	}
-	if config.IsCommandAvailable("whisper") {
-		ui.PrintInfo("whisper    | Transcribe audio using Whisper")
-	}
+	ui.PrintSubHeader("TOOLS & UTILITIES")
+	ui.PrintKeyValBlock("ollama", []ui.KeyVal{
+		{Key: "Usage", Value: "dex ollama [pull|list|rm]"},
+		{Key: "Desc", Value: "Manage local LLM models."},
+	})
+	ui.PrintKeyValBlock("whisper", []ui.KeyVal{
+		{Key: "Usage", Value: "dex whisper [file]"},
+		{Key: "Desc", Value: "Transcribe audio file using local Whisper model."},
+	})
+	ui.PrintKeyValBlock("serve", []ui.KeyVal{
+		{Key: "Usage", Value: "dex serve -d <dir> -p <port>"},
+		{Key: "Desc", Value: "Serve static files from a directory."},
+	})
+	ui.PrintKeyValBlock("python/bun", []ui.KeyVal{
+		{Key: "Usage", Value: "dex [python|bun|bunx] [args...]"},
+		{Key: "Desc", Value: "Run command within the project's environment."},
+	})
 
-	ui.PrintSubHeader("Service Commands")
-	if config.IsCommandAvailable("event") {
-		ui.PrintInfo("event      | Interact with the Event Service")
-	}
-	if config.IsCommandAvailable("discord") {
-		ui.PrintInfo("discord    | Interact with the Discord Service")
-	}
+	ui.PrintSubHeader("PACKAGE MANAGEMENT")
+	ui.PrintKeyValBlock("add/remove", []ui.KeyVal{
+		{Key: "Usage", Value: "dex [add|remove] <service>"},
+		{Key: "Desc", Value: "Install or uninstall a service from the ecosystem."},
+	})
 
-	ui.PrintSubHeader("CLI Basic commands")
-	ui.PrintInfo("version    Show version information")
-	ui.PrintInfo("help       Show this help message")
+	ui.PrintSubHeader("GLOBAL FLAGS")
+	ui.PrintInfo("--no-event  | Suppress event emission for the command.")
+	ui.PrintInfo("--json      | Output result as JSON where supported.")
 	fmt.Println()
 }
