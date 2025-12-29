@@ -200,9 +200,11 @@ func Serve(args []string, version, branch, commit, buildDate string) error {
 
 func serve404(w http.ResponseWriter, r *http.Request, root string) {
 	fourOhFourPath := filepath.Join(root, "404.html")
-	if _, err := os.Stat(fourOhFourPath); err == nil {
+	if content, err := os.ReadFile(fourOhFourPath); err == nil {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.WriteHeader(http.StatusNotFound)
-		http.ServeFile(w, r, fourOhFourPath)
+		_, _ = w.Write(content)
 	} else {
 		http.NotFound(w, r)
 	}
