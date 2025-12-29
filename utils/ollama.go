@@ -498,7 +498,9 @@ Your secondary objective (if no primary issues are found) is to detect any anoma
 
 If no issues can be found, you may simply output "<NO_ISSUES/>".
 
-The reports you output should be structured like this:
+Each report should only contain 1 issue. Always report the lowest hanging fruit available.
+
+The report you output MUST be structured like this, otherwise they will be rejected automatically:
 
 # Guardian Alert
 **Priority**: [critical|high|medium|low]
@@ -525,7 +527,9 @@ And this will (re)install and upgrade any system requirements for the current ve
 
 If no possible solution exists, or the report is seems incomplete, or not worth fixing, or simply misunderstood, just output "<NO_ISSUES/>".
 
-The blueprints you output should be structured like this:
+Each blueprint should only solve 1 issue. Always generate a blueprint to solve the lowest hanging fruit available.
+
+The blueprint you output MUST be structured like this, otherwise they will be rejected automatically:
 
 # Guardian Blueprint
 **Priority**: [critical|high|medium|low] (the attention you think this blueprint deserves)
