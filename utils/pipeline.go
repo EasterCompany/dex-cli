@@ -184,7 +184,7 @@ func runGoBuildPipeline(ctx context.Context, service config.ServiceDefinition, s
 		cmd.Dir = sourcePath
 		// Inject environment variables for binaries that need them during build or runtime
 		cmd.Env = append(os.Environ(),
-			fmt.Sprintf("DEX_BUILD_VERSION=%s", versionStr),
+			fmt.Sprintf("DEX_VERSION=%s", versionStr),
 		)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
