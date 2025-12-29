@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -34,6 +35,17 @@ func waitForActiveProcesses(ctx context.Context) error {
 
 	spinFrame := 0
 	for {
+		// Register in queue (heartbeat style)
+		queueInfo := map[string]interface{}{
+			"channel_id": "system-cli-op",
+			"state":      "Waiting for active processes",
+			"start_time": time.Now().Unix(),
+			"pid":        os.Getpid(),
+			"updated_at": time.Now().Unix(),
+		}
+		qBytes, _ := json.Marshal(queueInfo)
+		_ = redisClient.Set(ctx, "process:queued:system-cli-op", qBytes, 15*time.Second).Err()
+
 		// Check for active process keys
 		keys, err := redisClient.Keys(ctx, "process:info:*").Result()
 		if err != nil {
@@ -58,6 +70,7 @@ func waitForActiveProcesses(ctx context.Context) error {
 		}
 		if len(activeKeys) == 0 {
 			ui.ClearLine()
+			_ = redisClient.Del(ctx, "process:queued:system-cli-op").Err()
 			return nil
 		}
 
@@ -68,6 +81,7 @@ func waitForActiveProcesses(ctx context.Context) error {
 
 		select {
 		case <-ctx.Done():
+			_ = redisClient.Del(ctx, "process:queued:system-cli-op").Err()
 			return ctx.Err()
 		case <-time.After(1 * time.Second):
 			// Check again

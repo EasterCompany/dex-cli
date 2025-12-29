@@ -1,12 +1,15 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
+	"github.com/EasterCompany/dex-cli/cache"
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/ui"
 	"github.com/EasterCompany/dex-cli/utils"
@@ -34,7 +37,30 @@ func Guardian(args []string) error {
 	// 1. Wait for system idle and no ongoing processes
 	if !force {
 		ui.PrintRunningStatus("Verifying system state...")
+
+		// Setup Redis for queue registration
+		ctx := context.Background()
+		redisClient, _ := cache.GetLocalClient(ctx)
+		if redisClient != nil {
+			defer func() {
+				_ = redisClient.Del(ctx, "process:queued:system-guardian").Err()
+				_ = redisClient.Close()
+			}()
+		}
+
 		for {
+			if redisClient != nil {
+				queueInfo := map[string]interface{}{
+					"channel_id": "system-guardian",
+					"state":      "Waiting for system idle/cooldown",
+					"start_time": time.Now().Unix(),
+					"pid":        os.Getpid(),
+					"updated_at": time.Now().Unix(),
+				}
+				qBytes, _ := json.Marshal(queueInfo)
+				_ = redisClient.Set(ctx, "process:queued:system-guardian", qBytes, 15*time.Second).Err()
+			}
+
 			// Check busy processes (busy_ref_count > 0)
 			// Note: We need a way to get the ref count or just check active processes
 			statusBody, _, err := utils.GetHTTPBody(def.GetHTTP("/processes"))

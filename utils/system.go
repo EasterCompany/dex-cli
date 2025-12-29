@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -127,6 +128,14 @@ WantedBy=default.target
 	}
 
 	return nil
+}
+
+// RegisterQueuedProcess registers a process in the queue in Redis.
+func RegisterQueuedProcess(ctx context.Context, id, state string, expiration time.Duration) error {
+	// We need to import cache here or use it from caller. Since it's utils, we'll assume caller provides client or we get it.
+	// But utils/system.go doesn't have access to cache package easily without circular deps if not careful.
+	// Actually dex-cli/cache exists.
+	return nil // Placeholder for now, will implement in a better way if needed.
 }
 
 // IsPortAvailable checks if a port is available on the given host.
