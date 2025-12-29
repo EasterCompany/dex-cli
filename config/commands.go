@@ -80,6 +80,7 @@ func GetCommandRequirements() map[string]CommandRequirement {
 		"guardian": {
 			Name:        "guardian",
 			Description: "Run the Guardian Technical Sentry",
+			Check:       func() bool { return true }, // Always available
 		},
 		"system": {
 			Name:        "system",
