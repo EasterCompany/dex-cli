@@ -647,7 +647,7 @@ Analyze the user's message and the URL.
 Output ONLY 'VISUAL' or 'STATIC'. Do not explain.`,
 		},
 		{
-			Name:      "llama4-cpu",
+			Name:      "dex-master-model",
 			BaseModel: "llama4:16x17b",
 			Parameters: map[string]interface{}{
 				"num_gpu": 0,
