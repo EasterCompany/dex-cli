@@ -501,10 +501,9 @@ If no issues can be found, you may simply output "<NO_ISSUES/>".
 The reports you output should be structured like this:
 
 # Guardian Alert
-**Type**: alert
 **Priority**: [critical|high|medium|low]
 **Category**: [system|service]
-**Affected**: dex-tts-service, dex-web-service (the service/system or services/systems which are affected)
+**Affected**: [event|web|tts|discord|other] (the services which are affected)
 **Related IDs**: none (list any ids of events or logs which are relevant to the issue you are raising, or "none")
 
 ## Summary
@@ -529,10 +528,9 @@ If no possible solution exists, or the report is seems incomplete, or not worth 
 The blueprints you output should be structured like this:
 
 # Guardian Blueprint
-**Type**: blueprint
-**Priority**: [critical|high|medium|low]
-**Category**: [fix|feature|add|remove|other]
-**Affected**: dex-tts-service, dex-web-service (the service/system or services/systems which are affected)
+**Priority**: [critical|high|medium|low] (the attention you think this blueprint deserves)
+**Category**: [fix|feature|add|remove|other] (the type of work this is)
+**Affected**: [event|web|tts|discord|other] (the services which are affected)
 **Related IDs**: none (list any ids of events or logs which are relevant to the issue you are raising, or "none")
 
 ## Summary
