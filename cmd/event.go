@@ -16,33 +16,33 @@ import (
 
 func handleDefaultEventOutput() error {
 	ui.PrintHeader("Event Command Usage")
-	ui.PrintInfo("event service          | Show the raw status from the /service endpoint")
-	ui.PrintInfo("event log              | Human-readable event logs")
-	ui.PrintInfo("                       | -n <count> (default 20)")
-	ui.PrintInfo("                       | -t <type>  (e.g., system.test.completed)")
-	ui.PrintInfo("event analyst status   | Show current analyst tier timers")
-	ui.PrintInfo("event analyst reset    | Reset analyst strategist timer")
-	ui.PrintInfo("event delete <pattern> | Delete events matching a pattern (e.g., 'event delete all')")
+	ui.PrintInfo("event service           | Show the raw status from the /service endpoint")
+	ui.PrintInfo("event log               | Human-readable event logs")
+	ui.PrintInfo("                        | -n <count> (default 20)")
+	ui.PrintInfo("                        | -t <type>  (e.g., system.test.completed)")
+	ui.PrintInfo("event guardian status   | Show current guardian tier timers")
+	ui.PrintInfo("event guardian reset    | Reset guardian tier timers")
+	ui.PrintInfo("event delete <pattern>  | Delete events matching a pattern")
 	return nil
 }
 
-func handleAnalystStatus() error {
+func handleGuardianStatus() error {
 	def, err := config.Resolve("event")
 	if err != nil {
 		return err
 	}
 
-	status, _, err := utils.GetHTTPBody(def.GetHTTP("/analyst/status"))
+	status, _, err := utils.GetHTTPBody(def.GetHTTP("/guardian/status"))
 	if err != nil {
-		return fmt.Errorf("failed to get analyst status: %w", err)
+		return fmt.Errorf("failed to get guardian status: %w", err)
 	}
 
-	ui.PrintCodeBlockFromBytes(status, "analyst-status", "json")
+	ui.PrintCodeBlockFromBytes(status, "guardian-status", "json")
 	return nil
 }
 
-func handleAnalystReset(args []string) error {
-	tier := "strategist"
+func handleGuardianReset(args []string) error {
+	tier := "all"
 	if len(args) > 0 {
 		tier = args[0]
 	}
@@ -52,7 +52,7 @@ func handleAnalystReset(args []string) error {
 		return err
 	}
 
-	url := fmt.Sprintf("%s?tier=%s", def.GetHTTP("/analyst/reset"), tier)
+	url := fmt.Sprintf("%s?tier=%s", def.GetHTTP("/guardian/reset"), tier)
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
 		return err
@@ -61,31 +61,31 @@ func handleAnalystReset(args []string) error {
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to reset analyst: %w", err)
+		return fmt.Errorf("failed to reset guardian: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("analyst reset failed with status: %d", resp.StatusCode)
+		return fmt.Errorf("guardian reset failed with status: %d", resp.StatusCode)
 	}
 
-	ui.PrintSuccess(fmt.Sprintf("Successfully reset %s analyst timer", tier))
+	ui.PrintSuccess(fmt.Sprintf("Successfully reset %s guardian timer", tier))
 	return nil
 }
 
-func handleEventAnalyst(args []string) error {
+func handleEventGuardian(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("missing analyst subcommand. Usage: event analyst [status|reset]")
+		return fmt.Errorf("missing guardian subcommand. Usage: event guardian [status|reset]")
 	}
 
 	sub := args[0]
 	switch sub {
 	case "status":
-		return handleAnalystStatus()
+		return handleGuardianStatus()
 	case "reset":
-		return handleAnalystReset(args[1:])
+		return handleGuardianReset(args[1:])
 	default:
-		return fmt.Errorf("unknown analyst subcommand: %s", sub)
+		return fmt.Errorf("unknown guardian subcommand: %s", sub)
 	}
 }
 
@@ -109,7 +109,6 @@ func handleEventDelete(args []string) error {
 		return fmt.Errorf("missing pattern for event delete. Usage: event delete <pattern>")
 	}
 
-	// Handle "all" keyword to safely delete everything without shell expansion issues with "*"
 	if len(args) == 1 && (strings.EqualFold(args[0], "all") || args[0] == "--all") {
 		args = []string{"*"}
 	}
@@ -123,7 +122,7 @@ func handleEventDelete(args []string) error {
 	cmd := exec.Command(eventServicePath, cmdArgs...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin // Connect stdin for interactive confirmation
+	cmd.Stdin = os.Stdin
 
 	return cmd.Run()
 }
@@ -134,7 +133,6 @@ func handleEventLog(args []string) error {
 		return err
 	}
 
-	// Parse filtering arguments
 	limit := "20"
 	filterType := ""
 	for i, arg := range args {
@@ -165,7 +163,6 @@ func handleEventLog(args []string) error {
 	}
 
 	if err := json.Unmarshal(body, &response); err != nil {
-		// Fallback to text if JSON fails
 		ui.PrintSubHeader("Last Events (Raw Text)")
 		fmt.Println(string(body))
 		return nil
@@ -178,7 +175,6 @@ func handleEventLog(args []string) error {
 
 	ui.PrintSubHeader(fmt.Sprintf("Last %d Events", len(response.Events)))
 
-	// We want to print them in chronological order (oldest first) like a tail
 	for i := len(response.Events) - 1; i >= 0; i-- {
 		e := response.Events[i]
 		var data map[string]interface{}
@@ -187,7 +183,6 @@ func handleEventLog(args []string) error {
 		t := time.Unix(e.Timestamp, 0).Format("15:04:05")
 		eventType, _ := data["type"].(string)
 
-		// Categorize for coloring
 		color := ui.ColorCyan
 		if strings.HasPrefix(eventType, "messaging") || strings.Contains(eventType, "message") {
 			color = ui.ColorBlue
@@ -196,12 +191,11 @@ func handleEventLog(args []string) error {
 		} else if strings.HasPrefix(eventType, "error") || strings.Contains(eventType, "fail") {
 			color = ui.ColorRed
 		} else if strings.HasPrefix(eventType, "system.cli") || strings.HasPrefix(eventType, "system.build") || strings.HasPrefix(eventType, "system.test") {
-			color = ui.ColorBrightRed // Orange-like
+			color = ui.ColorBrightRed
 		} else if strings.HasPrefix(eventType, "system.roadmap") || strings.HasPrefix(eventType, "system.process") {
 			color = ui.ColorGreen
 		}
 
-		// Simplified summary logic mirroring templates.js
 		summary := eventType
 		switch eventType {
 		case "messaging.user.sent_message":
@@ -244,8 +238,8 @@ func Event(args []string) error {
 	switch subcommand {
 	case "service":
 		return handleEventServiceStatus()
-	case "analyst":
-		return handleEventAnalyst(args[1:])
+	case "guardian":
+		return handleEventGuardian(args[1:])
 	case "delete":
 		return handleEventDelete(args[1:])
 	case "log":

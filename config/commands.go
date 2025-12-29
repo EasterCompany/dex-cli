@@ -79,8 +79,7 @@ func GetCommandRequirements() map[string]CommandRequirement {
 		},
 		"guardian": {
 			Name:        "guardian",
-			Description: "Run the Tier 1 Guardian Analyst",
-			Check:       HasEventService,
+			Description: "Run the Guardian Technical Sentry",
 		},
 		"system": {
 			Name:        "system",

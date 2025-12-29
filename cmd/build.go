@@ -44,11 +44,17 @@ func waitForActiveProcesses(ctx context.Context) error {
 		var activeKeys []string
 		for _, k := range keys {
 			// We ignore our own build op and the persistent discord connection
-			// We DO NOT ignore system-analyst, because that is a heavy resource-consuming task
-			if !strings.HasSuffix(k, ":system-cli-op") &&
-				!strings.HasSuffix(k, ":system-discord") {
-				activeKeys = append(activeKeys, k)
+			if strings.HasSuffix(k, ":system-cli-op") || strings.HasSuffix(k, ":system-discord") {
+				continue
 			}
+
+			// We DO NOT ignore system-guardian, because that is a heavy resource-consuming task
+			if strings.HasSuffix(k, ":system-guardian") {
+				activeKeys = append(activeKeys, k)
+				continue
+			}
+
+			activeKeys = append(activeKeys, k)
 		}
 		if len(activeKeys) == 0 {
 			ui.ClearLine()

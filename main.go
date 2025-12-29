@@ -282,7 +282,7 @@ func printUsage() {
 		ui.PrintInfo("test       | Run service tests")
 	}
 	if config.IsCommandAvailable("guardian") {
-		ui.PrintInfo("guardian   | Run the Tier 1 Guardian Analyst")
+		ui.PrintInfo("guardian   | Run the Guardian Technical Sentry")
 	}
 	if config.IsCommandAvailable("build") {
 		ui.PrintInfo("build      | [major|minor|patch] Build and install CLI and services")
