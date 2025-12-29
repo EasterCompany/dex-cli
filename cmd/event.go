@@ -32,7 +32,7 @@ func handleGuardianStatus() error {
 		return err
 	}
 
-	status, _, err := utils.GetHTTPBody(def.GetHTTP("/guardian/status"))
+	status, _, err := utils.GetHTTPBody(def.GetHTTP("/agent/status"))
 	if err != nil {
 		return fmt.Errorf("failed to get guardian status: %w", err)
 	}
