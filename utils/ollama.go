@@ -505,7 +505,6 @@ Your output MUST be structured like this:
 **Priority**: [critical|high|medium|low]
 **Category**: [system|service]
 **Affected**: [event|web|tts|discord|other] (the services which are affected)
-**Related IDs**: none (list any ids of events or logs which are relevant to the issue you are raising, or "none")
 
 ## Summary
 (Brief description of the issue)
@@ -532,7 +531,6 @@ Your output MUST be structured like this:
 **Priority**: [critical|high|medium|low] (the attention you think this blueprint deserves)
 **Category**: [fix|feature|add|remove|other] (the type of work this is)
 **Affected**: [event|web|tts|discord|other] (the services which are affected)
-**Related IDs**: none (list any ids of events or logs which are relevant to the issue you are raising, or "none")
 
 ## Summary
 (A summary of the issue and the proposed fix)
