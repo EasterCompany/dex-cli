@@ -63,8 +63,8 @@ func Guardian(args []string) error {
 							_ = json.Unmarshal(guardianStatusBody, &gsFull)
 
 							now := time.Now().Unix()
-							t1Ready := (now - gsFull.Tier1.LastRun) >= 300
-							t2Ready := (now - gsFull.Tier2.LastRun) >= 900
+							t1Ready := (now - gsFull.Tier1.LastRun) >= 1800
+							t2Ready := (now - gsFull.Tier2.LastRun) >= 1800
 							idleReady := gs.SystemIdleTime >= 300
 
 							if idleReady && t1Ready && t2Ready {
