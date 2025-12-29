@@ -357,6 +357,7 @@ type CustomModel struct {
 	Name         string
 	BaseModel    string
 	SystemPrompt string
+	Parameters   map[string]interface{}
 }
 
 func CreateCustomModels() error {
@@ -645,6 +646,13 @@ Analyze the user's message and the URL.
 
 Output ONLY 'VISUAL' or 'STATIC'. Do not explain.`,
 		},
+		{
+			Name:      "llama4-cpu",
+			BaseModel: "llama4:16x17b",
+			Parameters: map[string]interface{}{
+				"num_gpu": 0,
+			},
+		},
 	}
 
 	for _, model := range customModels {
@@ -653,7 +661,7 @@ Output ONLY 'VISUAL' or 'STATIC'. Do not explain.`,
 		_ = DeleteModel(model.Name) // Ignore error - model might not exist yet
 
 		// Create fresh custom model
-		if err := CreateModelFromBase(model.Name, model.BaseModel, model.SystemPrompt); err != nil {
+		if err := CreateModelFromBase(model.Name, model.BaseModel, model.SystemPrompt, model.Parameters); err != nil {
 			ui.PrintWarning(fmt.Sprintf("  Failed to create %s: %v", model.Name, err))
 			continue
 		}
@@ -664,14 +672,15 @@ Output ONLY 'VISUAL' or 'STATIC'. Do not explain.`,
 }
 
 // CreateModelFromBase creates a custom model from a base model using the Ollama API.
-func CreateModelFromBase(customName, baseModel, systemPrompt string) error {
+func CreateModelFromBase(customName, baseModel, systemPrompt string, parameters map[string]interface{}) error {
 	// Use explicit API fields instead of a modelfile string
 	url := DefaultOllamaURL + "/api/create"
 	reqBody := map[string]interface{}{
-		"name":   customName,
-		"from":   baseModel,
-		"system": systemPrompt,
-		"stream": false,
+		"name":       customName,
+		"from":       baseModel,
+		"system":     systemPrompt,
+		"stream":     false,
+		"parameters": parameters,
 	}
 
 	reqBytes, err := json.Marshal(reqBody)
