@@ -75,9 +75,12 @@ func waitForActiveProcesses(ctx context.Context) error {
 	}
 }
 
-// getServiceVersion gets the current version for a service from bin/data.json (primary) or git tags (fallback)
+// getServiceVersion gets the current version for a service by checking multiple sources
+// and returning the highest valid version found.
 func getServiceVersion(def config.ServiceDefinition) (major, minor, patch int, err error) {
-	// 1. Try to read from data.json (The Truth)
+	var versions []*git.Version
+
+	// 1. Try to read from data.json (The Truth for distributed releases)
 	feDef := config.GetServiceDefinition("easter-company")
 	feSource, err := config.ExpandPath(feDef.Source)
 	if err == nil {
@@ -85,41 +88,48 @@ func getServiceVersion(def config.ServiceDefinition) (major, minor, patch int, e
 		rd, err := release.LoadReleaseData(dataPath)
 		if err == nil && rd != nil {
 			if svcInfo, ok := rd.Services[def.ID]; ok && svcInfo.Current != "" {
-				// Parse the "Current" version string
 				v, err := git.Parse(svcInfo.Current)
 				if err == nil {
-					major, _ = strconv.Atoi(v.Major)
-					minor, _ = strconv.Atoi(v.Minor)
-					patch, _ = strconv.Atoi(v.Patch)
-					return major, minor, patch, nil
+					versions = append(versions, v)
 				}
 			}
 		}
 	}
 
-	// 2. Fallback to Git Tags (Legacy / Bootstrapping)
-	sourcePath, expandErr := config.ExpandPath(def.Source)
-	if expandErr != nil {
-		return 0, 0, 0, fmt.Errorf("failed to expand source path: %w", expandErr)
+	// 2. Try Git Tags (The Truth for source control)
+	sourcePath, err := config.ExpandPath(def.Source)
+	if err == nil {
+		if tag, err := git.GetLatestTag(sourcePath); err == nil {
+			if v, err := git.Parse(tag); err == nil {
+				versions = append(versions, v)
+			}
+		}
 	}
 
-	// Get latest tag from the service's git repo
-	tag, tagErr := git.GetLatestTag(sourcePath)
-	if tagErr != nil {
-		// No tags found, start at 0.0.0
+	// 3. Try Installed Binary (The Truth for the current machine)
+	binVersionStr := utils.GetBinaryVersion(def)
+	if binVersionStr != "" && binVersionStr != "N/A" && binVersionStr != "unknown" {
+		if v, err := git.Parse(binVersionStr); err == nil {
+			versions = append(versions, v)
+		}
+	}
+
+	// If no versions found, default to 0.0.0
+	if len(versions) == 0 {
 		return 0, 0, 0, nil
 	}
 
-	// Parse the tag
-	parsedVer, parseErr := git.Parse(tag)
-	if parseErr != nil {
-		// Invalid tag format, start at 0.0.0
-		return 0, 0, 0, nil
+	// Find the highest version
+	highest := versions[0]
+	for i := 1; i < len(versions); i++ {
+		if versions[i].Compare(highest) > 0 {
+			highest = versions[i]
+		}
 	}
 
-	major, _ = strconv.Atoi(parsedVer.Major)
-	minor, _ = strconv.Atoi(parsedVer.Minor)
-	patch, _ = strconv.Atoi(parsedVer.Patch)
+	major, _ = strconv.Atoi(highest.Major)
+	minor, _ = strconv.Atoi(highest.Minor)
+	patch, _ = strconv.Atoi(highest.Patch)
 	return major, minor, patch, nil
 }
 
