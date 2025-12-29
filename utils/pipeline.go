@@ -39,7 +39,7 @@ func RunUnifiedBuildPipeline(ctx context.Context, service config.ServiceDefiniti
 			versionStr, branch, commit, buildDate, buildYear, buildHash,
 		)
 
-		return runGoBuildPipeline(ctx, service, sourcePath, log, ldflags, versionStr)
+		return runGoBuildPipeline(ctx, service, sourcePath, log, ldflags, versionStr, branch, commit)
 	}
 
 	// Check for Python service (marker: requirements.txt or main.py)
@@ -74,7 +74,7 @@ func RunUnifiedBuildPipeline(ctx context.Context, service config.ServiceDefiniti
 		versionStr, branch, commit, buildDate, buildYear, buildHash,
 	)
 
-	return runGoBuildPipeline(ctx, service, sourcePath, log, ldflags, versionStr)
+	return runGoBuildPipeline(ctx, service, sourcePath, log, ldflags, versionStr, branch, commit)
 }
 
 func runPythonBuildPipeline(ctx context.Context, service config.ServiceDefinition, sourcePath string, log func(message string)) (bool, error) {
@@ -123,7 +123,7 @@ func runPythonBuildPipeline(ctx context.Context, service config.ServiceDefinitio
 	return true, nil
 }
 
-func runGoBuildPipeline(ctx context.Context, service config.ServiceDefinition, sourcePath string, log func(message string), ldflags string, versionStr string) (bool, error) {
+func runGoBuildPipeline(ctx context.Context, service config.ServiceDefinition, sourcePath string, log func(message string), ldflags string, versionStr string, branch string, commit string) (bool, error) {
 	log("Stopping service if running...")
 	_ = exec.CommandContext(ctx, "systemctl", "--user", "stop", service.SystemdName).Run()
 
@@ -185,6 +185,8 @@ func runGoBuildPipeline(ctx context.Context, service config.ServiceDefinition, s
 		// Inject environment variables for binaries that need them during build or runtime
 		cmd.Env = append(os.Environ(),
 			fmt.Sprintf("DEX_VERSION=%s", versionStr),
+			fmt.Sprintf("DEX_BRANCH=%s", branch),
+			fmt.Sprintf("DEX_COMMIT=%s", commit),
 		)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
