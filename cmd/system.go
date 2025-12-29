@@ -87,6 +87,10 @@ func systemInfo(log func(string), jsonOutput bool) error {
 
 	table := ui.NewTable([]string{"Category", "Value"})
 
+	// System Info
+	table.AddRow([]string{"Operating System", sys.OS})
+	table.AddRow([]string{"Architecture", sys.Architecture})
+
 	// CPU
 	for _, cpu := range sys.CPU {
 		table.AddRow([]string{fmt.Sprintf("CPU (%s)", cpu.Label), fmt.Sprintf("Cores: %d, Threads: %d", cpu.Count, cpu.Threads)})

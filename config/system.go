@@ -13,12 +13,14 @@ import (
 
 // SystemConfig represents the hardware and software state of the system
 type SystemConfig struct {
-	MemoryBytes int64         `json:"MEMORY_BYTES"`
-	CPU         []CPUInfo     `json:"CPU"`
-	GPU         []GPUInfo     `json:"GPU"`
-	Storage     []StorageInfo `json:"STORAGE"`
-	Packages    []Package     `json:"PACKAGES"`
-	LastUpdated int64         `json:"LAST_UPDATED,omitempty"`
+	OS           string        `json:"OS"`
+	Architecture string        `json:"ARCHITECTURE"`
+	MemoryBytes  int64         `json:"MEMORY_BYTES"`
+	CPU          []CPUInfo     `json:"CPU"`
+	GPU          []GPUInfo     `json:"GPU"`
+	Storage      []StorageInfo `json:"STORAGE"`
+	Packages     []Package     `json:"PACKAGES"`
+	LastUpdated  int64         `json:"LAST_UPDATED,omitempty"`
 }
 
 type StorageInfo struct {
@@ -97,26 +99,33 @@ func LoadSystemConfig() (*SystemConfig, error) {
 }
 
 // IntrospectSystem scans hardware and software
-
 func IntrospectSystem() (*SystemConfig, error) {
-
 	sys := &SystemConfig{
+		OS:           runtime.GOOS,
+		Architecture: runtime.GOARCH,
+		CPU:          detectCPU(),
+		GPU:          detectGPU(),
+		Storage:      detectStorage(),
+		Packages:     detectPackages(RequiredPackages),
+	}
 
-		CPU: detectCPU(),
-
-		GPU: detectGPU(),
-
-		Storage: detectStorage(),
-
-		Packages: detectPackages(RequiredPackages),
+	// Try to get a more descriptive OS name on Linux
+	if runtime.GOOS == "linux" {
+		if data, err := os.ReadFile("/etc/os-release"); err == nil {
+			lines := strings.Split(string(data), "\n")
+			for _, line := range lines {
+				if strings.HasPrefix(line, "PRETTY_NAME=") {
+					sys.OS = strings.Trim(strings.TrimPrefix(line, "PRETTY_NAME="), "\"")
+					break
+				}
+			}
+		}
 	}
 
 	// Detect RAM
-
 	sys.MemoryBytes = detectRAM()
 
 	return sys, nil
-
 }
 
 // SaveSystemConfig saves system.json
