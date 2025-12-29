@@ -52,7 +52,7 @@ func Guardian(args []string) error {
 			if redisClient != nil {
 				queueInfo := map[string]interface{}{
 					"channel_id": "system-guardian",
-					"state":      "Waiting for system idle/cooldown",
+					"state":      "Waiting...",
 					"start_time": time.Now().Unix(),
 					"pid":        os.Getpid(),
 					"updated_at": time.Now().Unix(),

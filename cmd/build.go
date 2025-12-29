@@ -38,7 +38,7 @@ func waitForActiveProcesses(ctx context.Context) error {
 		// Register in queue (heartbeat style)
 		queueInfo := map[string]interface{}{
 			"channel_id": "system-cli-op",
-			"state":      "Waiting for active processes",
+			"state":      "Waiting...",
 			"start_time": time.Now().Unix(),
 			"pid":        os.Getpid(),
 			"updated_at": time.Now().Unix(),
