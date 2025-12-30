@@ -651,6 +651,23 @@ Analyze the user's message and the URL.
 Output ONLY 'VISUAL' or 'STATIC'. Do not explain.`,
 		},
 		{
+			Name:      "dex-moderation-model",
+			BaseModel: "gemma3:4b",
+			SystemPrompt: `You are a specialized content moderation sentry. Your job is to analyze text metadata (titles, descriptions, URLs) for explicit pornographic content.
+
+OBJECTIVE:
+Identify hardcore pornography and explicit sexual content.
+
+RULES:
+1. Output '<EXPLICIT_CONTENT_DETECTED/>' ONLY if the metadata describes clear pornography, adult websites, or explicit sexual acts.
+2. Output '<SAFE_CONTENT/>' if the content is a meme, a GIF, a car, general internet humor, or anything else that is not explicit pornography.
+3. BE CONSERVATIVE: If you are not 100% sure the content is prohibited pornography, you MUST output '<SAFE_CONTENT/>'.
+4. Common GIF sites (Tenor, Giphy) and social media memes are almost always SAFE.
+
+OUTPUT FORMAT:
+Output ONLY the specialized tag. Do not explain.`,
+		},
+		{
 			Name:      "dex-master-model",
 			BaseModel: "llama4:16x17b",
 			Parameters: map[string]interface{}{
