@@ -20,8 +20,8 @@ func handleDefaultEventOutput() error {
 	ui.PrintInfo("event log               | Human-readable event logs")
 	ui.PrintInfo("                        | -n <count> (default 20)")
 	ui.PrintInfo("                        | -t <type>  (e.g., system.test.completed)")
-	ui.PrintInfo("event guardian status   | Show current guardian tier timers")
-	ui.PrintInfo("event guardian reset    | Reset guardian tier timers")
+	ui.PrintInfo("event guardian status   | Show current guardian protocol timers")
+	ui.PrintInfo("event guardian reset    | Reset guardian protocol timers")
 	ui.PrintInfo("event delete <pattern>  | Delete events matching a pattern")
 	return nil
 }
@@ -42,9 +42,9 @@ func handleGuardianStatus() error {
 }
 
 func handleGuardianReset(args []string) error {
-	tier := "all"
+	protocol := "all"
 	if len(args) > 0 {
-		tier = args[0]
+		protocol = args[0]
 	}
 
 	def, err := config.Resolve("event")
@@ -52,7 +52,7 @@ func handleGuardianReset(args []string) error {
 		return err
 	}
 
-	url := fmt.Sprintf("%s?tier=%s", def.GetHTTP("/guardian/reset"), tier)
+	url := fmt.Sprintf("%s?protocol=%s", def.GetHTTP("/guardian/reset"), protocol)
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
 		return err
@@ -69,7 +69,7 @@ func handleGuardianReset(args []string) error {
 		return fmt.Errorf("guardian reset failed with status: %d", resp.StatusCode)
 	}
 
-	ui.PrintSuccess(fmt.Sprintf("Successfully reset %s guardian timer", tier))
+	ui.PrintSuccess(fmt.Sprintf("Successfully reset %s guardian timer", protocol))
 	return nil
 }
 

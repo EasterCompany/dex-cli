@@ -76,7 +76,7 @@ func Guardian(args []string) error {
 							SystemIdleTime int64 `json:"system_idle_time"`
 						}
 						if json.Unmarshal(guardianStatusBody, &gs) == nil {
-							// Check if all tiers are off cooldown
+							// Check if all protocols are off cooldown
 							var gsFull struct {
 								Tier1 struct {
 									LastRun int64 `json:"last_run"`
@@ -96,7 +96,7 @@ func Guardian(args []string) error {
 							if idleReady && t1Ready && t2Ready {
 								break // All clear
 							} else {
-								ui.PrintRunningStatus(fmt.Sprintf("Waiting for cooldown/idle... (Idle: %ds, T1 Ready: %v, T2 Ready: %v)", gs.SystemIdleTime, t1Ready, t2Ready))
+								ui.PrintRunningStatus(fmt.Sprintf("Waiting for cooldown/idle... (Idle: %ds, Sentry Ready: %v, Architect Ready: %v)", gs.SystemIdleTime, t1Ready, t2Ready))
 							}
 						}
 					}
@@ -108,20 +108,20 @@ func Guardian(args []string) error {
 		}
 	}
 
-	tierNames := map[int]string{
-		0: "Full Analysis (T1 + T2)",
-		1: "Tier 1: Technical Sentry",
-		2: "Tier 2: Architect",
+	protocolNames := map[int]string{
+		0: "Full Analysis (Sentry + Architect)",
+		1: "Sentry Protocol (T1)",
+		2: "Architect Protocol (T2)",
 	}
 
-	ui.PrintInfo(fmt.Sprintf("Triggering %s...", tierNames[tier]))
+	ui.PrintInfo(fmt.Sprintf("Triggering %s...", protocolNames[tier]))
 
 	// 2. Trigger analysis via Event Service
 	url := fmt.Sprintf("%s?tier=%d", def.GetHTTP("/guardian/run"), tier)
 	req, _ := http.NewRequest("POST", url, nil)
 	client := &http.Client{Timeout: 15 * time.Minute} // Analysis + Tests can take a while
 
-	ui.PrintRunningStatus("Executing Guardian tiers...")
+	ui.PrintRunningStatus("Executing Guardian protocols...")
 	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to trigger guardian: %w", err)
