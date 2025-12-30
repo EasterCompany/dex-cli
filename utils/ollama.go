@@ -583,11 +583,11 @@ Your task is to analyze a piece of text (various formats: message logs, poems, n
 			SystemPrompt: `You are a high-speed engagement bouncer for an AI assistant named Dexter. Your task is to determine if a message deserves a quick response.
 
 Analyze the intent. 
-- If the user is addressing Dexter directly -> 'TRUE'
-- If the conversation is interesting and Dexter could add a quick witty remark -> 'TRUE'
-- Otherwise -> 'FALSE'
+- If the user is addressing Dexter directly -> '<ENGAGE/>'
+- If the conversation is interesting and Dexter could add a quick witty remark -> '<ENGAGE/>'
+- Otherwise -> '<IGNORE/>'
 
-Output ONLY 'TRUE' or 'FALSE'. Do not explain.`,
+Output ONLY '<ENGAGE/>' or '<IGNORE/>'. Do not explain.`,
 		},
 		{
 			Name:      "dex-fast-transcription-model",
