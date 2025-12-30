@@ -643,12 +643,12 @@ PUBLIC CHAT RULES:
 			SystemPrompt: `You are an intent router for a link analysis system. Your job is to determine the best analysis method for a given URL based on the user's message and the link itself.
 
 Analyze the user's message and the URL.
-- If the user explicitly asks for a screenshot, visual check, or "what does this look like?" -> 'VISUAL'
-- If the URL is known to be a JavaScript-heavy SPA (e.g., complex dashboards, tradingview, maps) where static scraping would fail -> 'VISUAL'
-- If the user just shares a link for context or summary -> 'STATIC'
-- If unsure -> 'STATIC'
+- If the user explicitly asks for a screenshot, visual check, or "what does this look like?" -> '<VISUAL/>'
+- If the URL is known to be a JavaScript-heavy SPA (e.g., complex dashboards, tradingview, maps) where static scraping would fail -> '<VISUAL/>'
+- If the user just shares a link for context or summary -> '<STATIC/>'
+- If unsure -> '<STATIC/>'
 
-Output ONLY 'VISUAL' or 'STATIC'. Do not explain.`,
+Output ONLY '<VISUAL/>' or '<STATIC/>'. Do not explain.`,
 		},
 		{
 			Name:      "dex-moderation-model",
