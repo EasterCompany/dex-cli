@@ -464,6 +464,10 @@ func printTestSummaryTable(summaries []ServiceTestSummary) {
 		testStatus := formatStatusForTable(s.TestResult)
 		duration := s.TotalDuration
 
+		if d, err := time.ParseDuration(duration); err == nil {
+			duration = d.Round(time.Millisecond).String()
+		}
+
 		table.AddRow(ui.TableRow{
 			s.ServiceName,
 			formatStatus,
