@@ -197,15 +197,6 @@ func Test(args []string) error {
 	fmt.Println()
 	if allPassed {
 		ui.PrintSuccess("All tests passed!")
-		// Optional: Emit a positive summary notification if multiple services were tested
-		if len(summaries) > 1 {
-			utils.SendEvent("system.notification.generated", map[string]interface{}{
-				"title":    "All Systems Verified",
-				"priority": "low",
-				"category": "system",
-				"body":     fmt.Sprintf("Successfully ran tests for %d services. All checks (Format, Lint, Test) passed.", len(summaries)),
-			})
-		}
 	} else {
 		ui.PrintError("Some tests failed.")
 	}
