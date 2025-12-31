@@ -374,8 +374,8 @@ func runTestCheck(def config.ServiceDefinition, sourcePath string, log func(stri
 			}
 		}
 
-		// Check if there are no test files
-		if strings.Contains(outputStr, "[no test files]") {
+		// Check if there are no test files across all packages
+		if testCount == 0 && strings.Contains(outputStr, "[no test files]") {
 			return TestResult{
 				Status:      "SKIPPED",
 				Message:     "no test files found",
@@ -521,10 +521,12 @@ func parseGoTestOutput(output string) (testCount, failCount int, coverage float6
 
 	// Count tests and failures
 	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
 		// Look for test result lines like "--- PASS: TestName" or "--- FAIL: TestName"
-		if strings.HasPrefix(line, "--- PASS:") {
+		// or "PASS" / "FAIL" for summary lines
+		if strings.HasPrefix(trimmed, "--- PASS:") {
 			testCount++
-		} else if strings.HasPrefix(line, "--- FAIL:") {
+		} else if strings.HasPrefix(trimmed, "--- FAIL:") {
 			testCount++
 			failCount++
 		}
