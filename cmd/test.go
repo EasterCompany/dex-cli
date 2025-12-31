@@ -86,7 +86,7 @@ func Test(args []string) error {
 	} else {
 		// Test all buildable services
 		for _, s := range allServices {
-			if s.IsBuildable() {
+			if s.IsBuildable() && s.IsTestable() {
 				sourcePath, err := config.ExpandPath(s.Source)
 				if err == nil {
 					if _, err := os.Stat(sourcePath); err == nil {

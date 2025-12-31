@@ -100,6 +100,12 @@ func (def *ServiceDefinition) IsBuildable() bool {
 	return def.Type == "cli" || def.IsManageable()
 }
 
+// IsTestable indicates if a service supports testing/formatting/linting (primarily Go programs).
+func (def *ServiceDefinition) IsTestable() bool {
+	// Skip Frontend (HTML/JS) and OS services
+	return def.Type != "fe" && def.Type != "os"
+}
+
 // serviceDefinitions holds the hardcoded master list of all services.
 var serviceDefinitions = []ServiceDefinition{
 	// CLI
