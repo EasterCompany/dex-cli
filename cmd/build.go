@@ -813,16 +813,6 @@ func runBuild(ctx context.Context, args []string) error {
 
 	ui.PrintSuccess("Build complete.")
 
-	// EMIT FINAL SUCCESS NOTIFICATION
-	if len(builtServices) > 0 {
-		utils.SendEvent("system.notification.generated", map[string]interface{}{
-			"title":    "System Build Complete",
-			"priority": "low",
-			"category": "system",
-			"body":     fmt.Sprintf("Successfully built and deployed %d service(s). The system is now running the latest version.", len(builtServices)),
-		})
-	}
-
 	// ---
 	// 9. Run release script if version increment was requested (post-build actions)
 	// ---
