@@ -502,6 +502,7 @@ PUBLIC CHAT RULES:
 		3. If no issues exist, output ONLY: <NO_ALERT/>
 		4. Report only the "lowest hanging fruit"—the most obvious and fixable issue.
 		5. NEVER hallucinate logs. If it isn't in the context, it didn't happen.
+		6. DO NOT wrap your response in markdown code blocks (backticks) or JSON. Output raw markdown text only.
 		
 		MANDATORY OUTPUT TEMPLATE:
 		# Guardian Alert
@@ -529,6 +530,7 @@ PUBLIC CHAT RULES:
 		3. The 'dex' binary is in the PATH.
 		4. Your output is a direct precursor to human approval. Be precise.
 		5. If no clear solution exists or the report is invalid, output ONLY: <NO_BLUEPRINT/>
+		6. DO NOT wrap your response in markdown code blocks (backticks) or JSON. Output raw markdown text only.
 		
 		MANDATORY OUTPUT TEMPLATE:
 		# Guardian Blueprint
