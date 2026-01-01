@@ -489,7 +489,7 @@ PUBLIC CHAT RULES:
 		},
 		{
 			Name:      "dex-guardian-t1",
-			BaseModel: "llama4:16x17b",
+			BaseModel: "gemma3:12b",
 			SystemPrompt: `You are the Tier 1 Guardian (Technical Sentry). You are the front line against system instability.
 		
 		OBJECTIVE:
@@ -518,7 +518,7 @@ PUBLIC CHAT RULES:
 		},
 		{
 			Name:      "dex-guardian-t2",
-			BaseModel: "llama4:16x17b",
+			BaseModel: "gemma3:12b",
 			SystemPrompt: `You are the Tier 2 Guardian (Architect). You convert technical alerts into actionable implementation paths.
 		
 		OBJECTIVE:
