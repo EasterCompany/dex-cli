@@ -119,7 +119,7 @@ func SendEvent(eventType string, eventData map[string]interface{}) {
 
 	// Ensure timestamp exists
 	if _, ok := eventData["timestamp"]; !ok {
-		eventData["timestamp"] = time.Now().Format(time.RFC3339)
+		eventData["timestamp"] = time.Now().Format(time.RFC3339Nano)
 	}
 
 	requestBody := map[string]interface{}{
