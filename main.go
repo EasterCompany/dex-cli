@@ -312,12 +312,9 @@ func printUsage() {
 
 	ui.PrintSubHeader("INTELLIGENCE & ANALYSIS")
 	ui.PrintKeyValBlock("guardian", []ui.KeyVal{
-		{Key: "Usage", Value: "dex guardian [tier] [-f|--force]"},
-		{Key: "Desc", Value: "Trigger the Guardian Technical Sentry analysis."},
-		{Key: "Tiers", Value: "0 (Default): Full Analysis (T1 + T2)."},
-		{Key: "", Value: "1: Tier 1 (Technical Sentry - Reports)."},
-		{Key: "", Value: "2: Tier 2 (Architect - Blueprints)."},
-		{Key: "Flags", Value: "--force: Bypass idle and cooldown checks."},
+		{Key: "Usage", Value: "dex guardian [run|reset] [-f|--force]"},
+		{Key: "Desc", Value: "Manage the Guardian Technical Sentry protocol."},
+		{Key: "Flags", Value: "--force: Bypass idle and cooldown checks during run."},
 	})
 	ui.PrintKeyValBlock("analyst", []ui.KeyVal{
 		{Key: "Usage", Value: "dex analyst [run|reset]"},
