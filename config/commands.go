@@ -82,6 +82,11 @@ func GetCommandRequirements() map[string]CommandRequirement {
 			Description: "Run the Guardian Technical Sentry",
 			Check:       func() bool { return true }, // Always available
 		},
+		"analyst": {
+			Name:        "analyst",
+			Description: "Run the Analyst Biographical Synthesis",
+			Check:       func() bool { return true }, // Always available
+		},
 		"system": {
 			Name:        "system",
 			Description: "Show system info and manage packages",

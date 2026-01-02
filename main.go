@@ -153,6 +153,9 @@ func main() {
 	case "guardian":
 		runCommand(func() error { return cmd.Guardian(os.Args[2:]) })
 
+	case "analyst":
+		runCommand(func() error { return cmd.Analyst(os.Args[2:]) })
+
 	case "serve": // New serve command
 		runCommand(func() error { return cmd.Serve(os.Args[2:], version, branch, commit, buildDate) })
 
@@ -315,6 +318,10 @@ func printUsage() {
 		{Key: "", Value: "1: Tier 1 (Technical Sentry - Reports)."},
 		{Key: "", Value: "2: Tier 2 (Architect - Blueprints)."},
 		{Key: "Flags", Value: "--force: Bypass idle and cooldown checks."},
+	})
+	ui.PrintKeyValBlock("analyst", []ui.KeyVal{
+		{Key: "Usage", Value: "dex analyst [run|reset]"},
+		{Key: "Desc", Value: "Manage the Analyst Biographical Synthesis protocol."},
 	})
 	ui.PrintKeyValBlock("event", []ui.KeyVal{
 		{Key: "Usage", Value: "dex event [subcommand]"},
