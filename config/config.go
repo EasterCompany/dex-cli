@@ -78,6 +78,31 @@ func EnsureDirectoryStructure() error {
 		return fmt.Errorf("failed to create EasterCompany directory: %w", err)
 	}
 
+	// Ensure log files exist for all services (including Upstash/OS)
+	if err := EnsureServiceLogFiles(); err != nil {
+		return fmt.Errorf("failed to ensure service log files: %w", err)
+	}
+
+	return nil
+}
+
+// EnsureServiceLogFiles creates empty log files for all services if they don't exist
+func EnsureServiceLogFiles() error {
+	for _, def := range serviceDefinitions {
+		logPath, err := ExpandPath(def.GetLogPath())
+		if err != nil {
+			continue
+		}
+
+		if _, err := os.Stat(logPath); os.IsNotExist(err) {
+			// Create an empty log file
+			f, err := os.Create(logPath)
+			if err != nil {
+				continue
+			}
+			_ = f.Close()
+		}
+	}
 	return nil
 }
 
