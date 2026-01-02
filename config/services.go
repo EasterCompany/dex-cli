@@ -201,6 +201,26 @@ var serviceDefinitions = []ServiceDefinition{
 		},
 	},
 	{
+		ID:        "upstash-redis-ro",
+		ShortName: "upstash-ro",
+		Type:      "os",
+		Domain:    "sterling-javelin-12539.upstash.io",
+		Port:      "443",
+		Credentials: &ServiceCredentials{
+			Password: "AjD7AAIgcDLTsB2z5ZUJmdu6PPARA5_w2VGIiEdO34oEKjK3VKsuiw",
+		},
+	},
+	{
+		ID:        "upstash-redis-rw",
+		ShortName: "upstash-rw",
+		Type:      "os",
+		Domain:    "sterling-javelin-12539.upstash.io",
+		Port:      "443",
+		Credentials: &ServiceCredentials{
+			Password: "ATD7AAIncDIxMmMzYWFjY2NkNmU0NWI4YjJiNTI1Yjg1NzZkMTNkZHAyMTI1Mzk",
+		},
+	},
+	{
 		ID:        "local-ollama-0",
 		ShortName: "ollama",
 		Type:      "os",
