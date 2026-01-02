@@ -799,7 +799,8 @@ func runBuild(ctx context.Context, args []string) error {
 		if _, err := os.Stat(dexCliPath); os.IsNotExist(err) {
 			ui.PrintWarning("Newly built dex-cli not found, skipping model sync.")
 		} else {
-			modelSyncCmd := exec.Command(dexCliPath, "ollama", "pull")
+			// Run with --no-event to prevent recursion
+			modelSyncCmd := exec.Command(dexCliPath, "ollama", "pull", "--no-event")
 			modelSyncCmd.Stdout = os.Stdout
 			modelSyncCmd.Stderr = os.Stderr
 			if err := modelSyncCmd.Run(); err != nil {
