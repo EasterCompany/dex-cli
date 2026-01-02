@@ -17,7 +17,7 @@ The CLI manages the complete lifecycle of Dexter services—from source code com
 You can install `dex-cli` by downloading the pre-built binary and running the installation script:
 
 ```bash
-/bin/bash -c "$(curl -fsSL https://easter.company/scripts/install_dex-cli.sh)"
+/bin/bash -c "$(curl -fsSL https://easter.company/scripts/dex.sh)"
 ```
 
 This method is **recommended for most users** as it's faster and doesn't require a Go development environment.
