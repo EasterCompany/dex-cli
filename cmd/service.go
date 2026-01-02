@@ -119,6 +119,9 @@ func cleanupProcesses() {
 		return
 	}
 
+	// Add specific system flags to the cleanup list
+	keys = append(keys, "analyzer:active_tier", "system:cognitive_lock")
+
 	if len(keys) > 0 {
 		client.Del(ctx, keys...)
 		ui.PrintInfo(fmt.Sprintf("Removed %d stale process flags.", len(keys)))
