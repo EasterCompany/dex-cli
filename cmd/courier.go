@@ -111,16 +111,26 @@ func executeChore(eventDef config.ServiceDefinition, chore Chore) error {
 		query := chore.NaturalInstruction
 		if chore.ExecutionPlan.SearchQuery != "" {
 			query = chore.ExecutionPlan.SearchQuery
+		} else {
+			// Refine query using LLM
+			refined := refineSearchQuery(query)
+			if refined != "" {
+				query = refined
+			}
 		}
 		targetURL = fmt.Sprintf("https://html.duckduckgo.com/html?q=%s", url.QueryEscape(query))
-		ui.PrintInfo(fmt.Sprintf("No Entry URL provided. Defaulting to search: %s", targetURL))
+		ui.PrintInfo(fmt.Sprintf("No Entry URL. Search: %s (Query: %s)", targetURL, query))
 	}
 
 	ui.PrintRunningStatus(fmt.Sprintf("Fetching content from %s...", targetURL))
 	metaURL := fmt.Sprintf("%s?url=%s", webDef.GetHTTP("/metadata"), url.QueryEscape(targetURL))
-	metaBody, _, err := utils.GetHTTPBody(metaURL)
+	metaBody, statusCode, err := utils.GetHTTPBody(metaURL)
 	if err != nil {
 		return fmt.Errorf("failed to fetch metadata: %w", err)
+	}
+
+	if statusCode != 200 {
+		return fmt.Errorf("web service returned status %d: %s", statusCode, string(metaBody))
 	}
 
 	var meta MetadataResponse
@@ -248,4 +258,14 @@ Output JSON ONLY. No markdown.`,
 	}
 
 	return nil
+}
+
+// refineSearchQuery uses a small LLM to convert a natural instruction into a search query.
+func refineSearchQuery(instruction string) string {
+	prompt := fmt.Sprintf("Convert this user request into a concise 3-5 word web search query: '%s'. Output ONLY the query.", instruction)
+	response, err := utils.GenerateContent("dex-fast-summary-model", prompt)
+	if err != nil {
+		return instruction // Fallback
+	}
+	return strings.TrimSpace(strings.Trim(strings.TrimSpace(response), "\"'"))
 }
