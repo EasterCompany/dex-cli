@@ -163,7 +163,8 @@ Your Task:
 1. Scan the content for SPECIFIC items matching the user's instruction.
 2. CRITICAL: IGNORE all advertisements, sponsored listings, navigation menus (Home, About), generic footers, and tracking links.
 3. IGNORE any items represented by these IDs/Strings (Already Seen): %v.
-4. Return a JSON object ONLY.
+4. FIND MULTIPLE ITEMS: If more than one relevant item exists, list as many as possible (up to 10). Do not stop at the first match.
+5. Return a JSON object ONLY.
 
 Format:
 {
