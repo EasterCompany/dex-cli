@@ -168,11 +168,11 @@ Format:
 {
   "found": true/false,
   "items": ["unique_id_1", "unique_id_2"], // List of NEW unique identifiers (titles, links, or IDs) found.
-  "summary": "Found X new items: [Item 1], [Item 2]..." // A message to send to the user.
+  "summary": "Detailed message with bullet points and markdown links: \n- [Item Title](Item URL) - brief snippet\n- ..." // Detailed report including direct links to relevant findings.
 }
 If no new items are found, set "found": false and "items": [].
 
-Output JSON ONLY. No markdown.`,
+Output JSON ONLY. No markdown wrapper.`,
 		chore.NaturalInstruction,
 		chore.ExecutionPlan.SearchQuery,
 		chore.ExecutionPlan.ExtractionFocus,
