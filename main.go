@@ -153,6 +153,9 @@ func main() {
 	case "guardian":
 		runCommand(func() error { return cmd.Guardian(os.Args[2:]) })
 
+	case "courier":
+		runCommand(func() error { return cmd.Courier(os.Args[2:]) })
+
 	case "analyst":
 		runCommand(func() error { return cmd.Analyst(os.Args[2:]) })
 
@@ -315,6 +318,10 @@ func printUsage() {
 		{Key: "Usage", Value: "dex guardian [run|reset] [-f|--force]"},
 		{Key: "Desc", Value: "Manage the Guardian Technical Sentry protocol."},
 		{Key: "Flags", Value: "--force: Bypass idle and cooldown checks during run."},
+	})
+	ui.PrintKeyValBlock("courier", []ui.KeyVal{
+		{Key: "Usage", Value: "dex courier [run]"},
+		{Key: "Desc", Value: "Run the Courier Protocol to execute active chores."},
 	})
 	ui.PrintKeyValBlock("analyst", []ui.KeyVal{
 		{Key: "Usage", Value: "dex analyst [run|reset]"},

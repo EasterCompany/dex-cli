@@ -89,6 +89,26 @@ func FetchURL(url string, timeout time.Duration) (string, error) {
 	return string(body), nil
 }
 
+// PostHTTP sends a POST request with a JSON body
+func PostHTTP(url string, jsonData []byte) ([]byte, int, error) {
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	resp, err := client.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, 0, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, resp.StatusCode, err
+	}
+
+	return body, resp.StatusCode, nil
+}
+
 var SuppressEvents bool
 
 // SendEvent sends an event to the event service and waits for completion.
