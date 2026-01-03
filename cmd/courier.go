@@ -217,7 +217,7 @@ Output JSON ONLY. No markdown.`,
 		// Send Discord Notification
 		discordDef, err := config.Resolve("discord")
 		if err == nil && discordDef != nil {
-			msgContent := fmt.Sprintf("📦 **Courier Update**\n\nTask: *%s*\n\n%s\n\n[Source Link](%s)", chore.NaturalInstruction, result.Summary, chore.ExecutionPlan.EntryURL)
+			msgContent := fmt.Sprintf("📦 **Courier Update**\n\nTask: *%s*\n\n%s\n\n[Source Link](%s)", chore.NaturalInstruction, result.Summary, targetURL)
 
 			// Use POST /post with user_id
 			postURL := discordDef.GetHTTP("/post")
