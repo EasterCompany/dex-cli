@@ -160,9 +160,10 @@ Here is the text content of the webpage:
 """
 
 Your Task:
-1. Scan the content for items matching the user's instruction.
-2. Ignore any items represented by these IDs/Strings (Already Seen): %v.
-3. Return a JSON object ONLY.
+1. Scan the content for SPECIFIC items matching the user's instruction.
+2. CRITICAL: IGNORE all advertisements, sponsored listings, navigation menus (Home, About), generic footers, and tracking links.
+3. IGNORE any items represented by these IDs/Strings (Already Seen): %v.
+4. Return a JSON object ONLY.
 
 Format:
 {
