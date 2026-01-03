@@ -198,6 +198,26 @@ Output JSON ONLY. No markdown.`,
 			"priority": "low",
 		})
 
+		// Send Discord Notification
+		discordDef, err := config.Resolve("discord")
+		if err == nil && discordDef != nil {
+			msgContent := fmt.Sprintf("📦 **Courier Update**\n\nTask: *%s*\n\n%s\n\n[Source Link](%s)", chore.NaturalInstruction, result.Summary, chore.ExecutionPlan.EntryURL)
+
+			// Use POST /post with user_id
+			postURL := discordDef.GetHTTP("/post")
+			postBody := map[string]interface{}{
+				"user_id": chore.OwnerID,
+				"content": msgContent,
+			}
+			jsonBody, _ := json.Marshal(postBody)
+
+			if _, _, err := utils.PostHTTP(postURL, jsonBody); err != nil {
+				ui.PrintWarning(fmt.Sprintf("Failed to send DM: %v", err))
+			} else {
+				ui.PrintSuccess("Sent DM to owner.")
+			}
+		}
+
 		// Update Memory
 		if len(result.Items) > 0 {
 			newMemory := append(chore.Memory, result.Items...)
