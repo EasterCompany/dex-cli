@@ -107,7 +107,13 @@ func executeChore(eventDef config.ServiceDefinition, chore Chore) error {
 
 	targetURL := chore.ExecutionPlan.EntryURL
 	if targetURL == "" {
-		return fmt.Errorf("no entry_url in execution plan")
+		// Fallback to DuckDuckGo HTML search if no URL is provided
+		query := chore.NaturalInstruction
+		if chore.ExecutionPlan.SearchQuery != "" {
+			query = chore.ExecutionPlan.SearchQuery
+		}
+		targetURL = fmt.Sprintf("https://html.duckduckgo.com/html?q=%s", url.QueryEscape(query))
+		ui.PrintInfo(fmt.Sprintf("No Entry URL provided. Defaulting to search: %s", targetURL))
 	}
 
 	ui.PrintRunningStatus(fmt.Sprintf("Fetching content from %s...", targetURL))
