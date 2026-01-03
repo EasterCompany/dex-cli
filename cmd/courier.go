@@ -264,7 +264,7 @@ Output JSON ONLY. No markdown wrapper.`,
 
 // refineSearchQuery uses a small LLM to convert a natural instruction into a search query.
 func refineSearchQuery(instruction string) string {
-	prompt := fmt.Sprintf("Convert this user request into a concise 3-5 word web search query: '%s'. Output ONLY the query.", instruction)
+	prompt := fmt.Sprintf("Convert this user request into an optimal web search query (3-10 words). Keep key qualifiers (e.g. 'sale', 'rent', 'news'). Output ONLY the query: '%s'", instruction)
 	response, err := utils.GenerateContent("dex-fast-summary-model", prompt)
 	if err != nil {
 		return instruction // Fallback
