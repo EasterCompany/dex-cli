@@ -149,6 +149,20 @@ func executeChore(eventDef config.ServiceDefinition, chore Chore) error {
 		content = content[:12000] + "...(truncated)"
 	}
 
+	// Store in Web History via Event Service (Non-fatal)
+	go func() {
+		historyItem := map[string]interface{}{
+			"url":        targetURL,
+			"title":      meta.Title,
+			"timestamp":  time.Now().Unix(),
+			"content":    content,
+			"screenshot": "", // No screenshot available from metadata fetch
+		}
+		historyJSON, _ := json.Marshal(historyItem)
+		historyURL := eventDef.GetHTTP("/web/history")
+		_, _, _ = utils.PostHTTP(historyURL, historyJSON)
+	}()
+
 	prompt := fmt.Sprintf(`You are an AI Courier Agent.
 User Instruction: "%s"
 Search Context: "%s"
