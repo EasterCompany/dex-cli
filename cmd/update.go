@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/release"
 	"github.com/EasterCompany/dex-cli/ui"
+	"github.com/EasterCompany/dex-cli/utils"
 )
 
 const (
@@ -22,6 +24,11 @@ const (
 
 // Update performs different update strategies based on environment
 func Update(args []string) error {
+	// Wipe Redis to ensure a clean state
+	if err := utils.WipeRedis(context.Background()); err != nil {
+		ui.PrintWarning(fmt.Sprintf("Failed to wipe Redis: %v", err))
+	}
+
 	// Check if this is a developer environment
 	isDev := isDeveloperEnvironment()
 

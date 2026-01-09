@@ -270,6 +270,11 @@ func Build(args []string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// Wipe Redis to ensure a clean state
+	if err := utils.WipeRedis(ctx); err != nil {
+		ui.PrintWarning(fmt.Sprintf("Failed to wipe Redis: %v", err))
+	}
+
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 

@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"os"
@@ -9,8 +10,27 @@ import (
 	"strings"
 	"time"
 
+	"github.com/EasterCompany/dex-cli/cache"
 	"github.com/EasterCompany/dex-cli/config"
+	"github.com/EasterCompany/dex-cli/ui"
 )
+
+// WipeRedis clears the entire Redis database.
+func WipeRedis(ctx context.Context) error {
+	ui.PrintInfo("Wiping Redis database (clearing runtime state)...")
+	redisClient, err := cache.GetLocalClient(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to connect to Redis: %w", err)
+	}
+	defer func() { _ = redisClient.Close() }()
+
+	if err := redisClient.FlushAll(ctx).Err(); err != nil {
+		return fmt.Errorf("failed to wipe Redis: %w", err)
+	}
+
+	ui.PrintSuccess("Redis database wiped.")
+	return nil
+}
 
 // GetConfiguredServices loads the service-map.json and merges its values
 // with the master service definitions. This ensures user-configured
