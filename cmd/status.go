@@ -194,7 +194,9 @@ func checkCLIStatus(service config.ServiceDefinition, serviceID, address string)
 
 // isCloudDomain checks if the domain is a known cloud Redis provider requiring TLS.
 func isCloudDomain(domain string) bool {
-	return strings.Contains(domain, "redis-cloud.com") || strings.Contains(domain, "redns.redis-cloud.com")
+	return strings.Contains(domain, "redis-cloud.com") ||
+		strings.Contains(domain, "redns.redis-cloud.com") ||
+		strings.Contains(domain, "upstash.io")
 }
 
 // isLocalAddress checks if the address is a local/localhost address
