@@ -442,16 +442,16 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 	var err error
 	useTLS := false
 
-	// Try plain TCP connection first
-	conn, err = dialer.Dial("tcp", host)
-
-	// If plain connection fails and this is a cloud domain, try TLS
-	if err != nil && isCloudDomain(service.Domain) {
+	// If this is a known cloud domain, force TLS immediately
+	if isCloudDomain(service.Domain) {
 		useTLS = true
 		tlsConfig := &tls.Config{
 			ServerName: service.Domain, // Proper SNI for cloud Redis
 		}
 		conn, err = tls.DialWithDialer(dialer, "tcp", host, tlsConfig)
+	} else {
+		// Otherwise, try plain TCP
+		conn, err = dialer.Dial("tcp", host)
 	}
 
 	if err != nil {
