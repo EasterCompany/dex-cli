@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -112,13 +113,93 @@ func checkServiceStatus(service config.ServiceDefinition) ui.TableRow {
 	case "cli":
 		return checkCLIStatus(service, serviceID, address)
 	case "os":
-		// Special handling for ollama (check by ID or short name)
+		// Specialized handling for Ollama
 		if strings.Contains(strings.ToLower(service.ID), "ollama") || strings.Contains(strings.ToLower(service.ShortName), "ollama") {
 			return checkOllamaStatus(service, serviceID, address)
+		}
+		// Specialized handling for Upstash (REST API)
+		if strings.Contains(strings.ToLower(service.Domain), "upstash.io") {
+			return checkUpstashStatus(service, serviceID, address)
 		}
 		return checkCacheStatus(service, serviceID, address)
 	default: // All other service types are assumed to be HTTP-based (fe, be, cs, th)
 		return checkHTTPStatus(service, serviceID, address)
+	}
+}
+
+// checkUpstashStatus checks an Upstash service via its HTTP REST API.
+func checkUpstashStatus(service config.ServiceDefinition, serviceID, address string) ui.TableRow {
+	badStatusRow := func(reason string) ui.TableRow {
+		// Log the failure reason for debugging
+		logFile, _ := config.LogFile()
+		if logFile != nil {
+			_, _ = fmt.Fprintf(logFile, "[%s] Upstash check failed: %s\n", serviceID, reason)
+		}
+		return []string{
+			serviceID,
+			address,
+			colorizeNA("Cloud"),   // VERSION
+			colorizeNA("--"),      // BRANCH
+			colorizeNA("--"),      // COMMIT
+			colorizeStatus("BAD"), // STATUS
+			colorizeNA("∞"),       // UPTIME
+			colorizeNA("--"),      // CPU
+			colorizeNA("--"),      // MEM
+		}
+	}
+
+	url := fmt.Sprintf("https://%s/ping", service.Domain)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return badStatusRow(fmt.Sprintf("failed to create request: %v", err))
+	}
+
+	if service.Credentials != nil && service.Credentials.Password != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", service.Credentials.Password))
+	}
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return badStatusRow(fmt.Sprintf("request failed: %v", err))
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return badStatusRow(fmt.Sprintf("HTTP %d", resp.StatusCode))
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return badStatusRow(fmt.Sprintf("failed to read body: %v", err))
+	}
+
+	var result struct {
+		Result string `json:"result"`
+		Error  string `json:"error"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return badStatusRow(fmt.Sprintf("failed to parse JSON: %v", err))
+	}
+
+	if result.Error != "" {
+		return badStatusRow(result.Error)
+	}
+
+	if result.Result != "PONG" {
+		return badStatusRow(fmt.Sprintf("unexpected result: %s", result.Result))
+	}
+
+	return []string{
+		serviceID,
+		address,
+		colorizeNA("Cloud"), // VERSION
+		colorizeNA("--"),    // BRANCH
+		colorizeNA("--"),    // COMMIT
+		colorizeStatus("OK"),
+		colorizeNA("∞"),
+		colorizeNA("--"),
+		colorizeNA("--"),
 	}
 }
 
