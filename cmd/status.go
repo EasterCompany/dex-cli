@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -417,6 +418,7 @@ func checkOllamaStatus(service config.ServiceDefinition, serviceID, address stri
 // Returns 9 columns: SERVICE, ADDRESS, VERSION, BRANCH, COMMIT, STATUS, UPTIME, CPU, MEM
 func checkCacheStatus(service config.ServiceDefinition, serviceID, address string) ui.TableRow {
 	badStatusRow := func(reason string) ui.TableRow {
+		fmt.Fprintf(os.Stderr, "[DEBUG] Cache check failed for %s: %s\n", serviceID, reason)
 		// Log the failure reason for debugging
 		logFile, _ := config.LogFile()
 		if logFile != nil {
