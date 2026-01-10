@@ -472,32 +472,42 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 
 	reader := bufio.NewReader(conn)
 
-	// 1. Authenticate if password is provided
+	// 2. Authenticate if password is provided
 	if service.Credentials != nil && service.Credentials.Password != "" {
-		// Try AUTH with username first (Redis 6+)
-		authCmd := fmt.Sprintf("AUTH %s %s\r\n", service.Credentials.Username, service.Credentials.Password)
+		var authCmd string
+		if service.Credentials.Username != "" {
+			authCmd = fmt.Sprintf("AUTH %s %s\r\n", service.Credentials.Username, service.Credentials.Password)
+		} else {
+			authCmd = fmt.Sprintf("AUTH %s\r\n", service.Credentials.Password)
+		}
+
 		if _, err = conn.Write([]byte(authCmd)); err != nil {
 			return badStatusRow(fmt.Sprintf("failed to send AUTH command: %v", err))
 		}
-		response, err := reader.ReadString('\n')
 
-		// If 2-arg AUTH failed, try simple password AUTH (Redis <6 or ACL not used)
-		if err != nil || !strings.HasPrefix(response, "+OK") {
-			simpleAuthCmd := fmt.Sprintf("AUTH %s\r\n", service.Credentials.Password)
-			if _, err = conn.Write([]byte(simpleAuthCmd)); err != nil {
-				return badStatusRow(fmt.Sprintf("failed to send simple AUTH: %v", err))
+		response, err := reader.ReadString('\n')
+		if err != nil {
+			return badStatusRow(fmt.Sprintf("AUTH read error: %v", err))
+		}
+
+		if !strings.HasPrefix(response, "+OK") {
+			// If we tried with username and failed, try one more time with JUST password as fallback
+			if service.Credentials.Username != "" {
+				// We need a fresh connection or to clear the buffer, but let's try a simple fallback first
+				retryAuth := fmt.Sprintf("AUTH %s\r\n", service.Credentials.Password)
+				if _, err = conn.Write([]byte(retryAuth)); err == nil {
+					response, err = reader.ReadString('\n')
+					if err == nil && strings.HasPrefix(response, "+OK") {
+						goto authSuccess
+					}
+				}
 			}
-			response, err = reader.ReadString('\n')
-			if err != nil {
-				return badStatusRow(fmt.Sprintf("AUTH read error: %v", err))
-			}
-			if !strings.HasPrefix(response, "+OK") {
-				return badStatusRow(fmt.Sprintf("AUTH failed: %s", strings.TrimSpace(response)))
-			}
+			return badStatusRow(fmt.Sprintf("AUTH failed: %s", strings.TrimSpace(response)))
 		}
 	}
 
-	// 2. Ping check
+authSuccess:
+	// 3. Ping check
 	if _, err = conn.Write([]byte("PING\r\n")); err != nil {
 		return badStatusRow(fmt.Sprintf("PING write failed: %v", err))
 	}
