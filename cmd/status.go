@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -418,7 +417,6 @@ func checkOllamaStatus(service config.ServiceDefinition, serviceID, address stri
 // Returns 9 columns: SERVICE, ADDRESS, VERSION, BRANCH, COMMIT, STATUS, UPTIME, CPU, MEM
 func checkCacheStatus(service config.ServiceDefinition, serviceID, address string) ui.TableRow {
 	badStatusRow := func(reason string) ui.TableRow {
-		fmt.Fprintf(os.Stderr, "[DEBUG] Cache check failed for %s: %s\n", serviceID, reason)
 		// Log the failure reason for debugging
 		logFile, _ := config.LogFile()
 		if logFile != nil {
@@ -444,13 +442,20 @@ func checkCacheStatus(service config.ServiceDefinition, serviceID, address strin
 	var err error
 	useTLS := false
 
-	// If this is a known cloud domain, force TLS immediately
+	// 1. Connection attempt with Protocol Intelligence
 	if isCloudDomain(service.Domain) {
 		useTLS = true
 		tlsConfig := &tls.Config{
 			ServerName: service.Domain, // Proper SNI for cloud Redis
 		}
 		conn, err = tls.DialWithDialer(dialer, "tcp", host, tlsConfig)
+
+		// FALLBACK: If TLS handshake fails (port expects plain text), try PLAIN TCP
+		if err != nil && (strings.Contains(err.Error(), "first record does not look like a TLS handshake") ||
+			strings.Contains(err.Error(), "handshake failure")) {
+			useTLS = false
+			conn, err = dialer.Dial("tcp", host)
+		}
 	} else {
 		// Otherwise, try plain TCP
 		conn, err = dialer.Dial("tcp", host)

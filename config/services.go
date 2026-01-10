@@ -205,7 +205,7 @@ var serviceDefinitions = []ServiceDefinition{
 		ShortName: "upstash-ro",
 		Type:      "os",
 		Domain:    "sterling-javelin-12539.upstash.io",
-		Port:      "443",
+		Port:      "6379",
 		Credentials: &ServiceCredentials{
 			Password: "AjD7AAIgcDLTsB2z5ZUJmdu6PPARA5_w2VGIiEdO34oEKjK3VKsuiw",
 		},
@@ -215,7 +215,7 @@ var serviceDefinitions = []ServiceDefinition{
 		ShortName: "upstash-rw",
 		Type:      "os",
 		Domain:    "sterling-javelin-12539.upstash.io",
-		Port:      "443",
+		Port:      "6379",
 		Credentials: &ServiceCredentials{
 			Password: "ATD7AAIncDIxMmMzYWFjY2NkNmU0NWI4YjJiNTI1Yjg1NzZkMTNkZHAyMTI1Mzk",
 		},
