@@ -77,14 +77,9 @@ func GetCommandRequirements() map[string]CommandRequirement {
 			Description: "Run all tests",
 			Check:       HasSourceServices,
 		},
-		"guardian": {
-			Name:        "guardian",
-			Description: "Run the Guardian Technical Sentry",
-			Check:       func() bool { return true }, // Always available
-		},
-		"analyst": {
-			Name:        "analyst",
-			Description: "Run the Analyst Biographical Synthesis",
+		"agent": {
+			Name:        "agent",
+			Description: "Manage and trigger Dexter Agents",
 			Check:       func() bool { return true }, // Always available
 		},
 		"system": {
