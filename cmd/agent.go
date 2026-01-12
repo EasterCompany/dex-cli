@@ -40,8 +40,10 @@ func Agent(args []string) error {
 		return handleGuardian(def, command, force)
 	case "analyst", "analyzer": // Alias for flexibility
 		return handleAnalyst(def, command, force)
+	case "imaginator":
+		return handleImaginator(def, command, force)
 	default:
-		return fmt.Errorf("unknown agent: %s. Available agents: guardian, analyzer", agentName)
+		return fmt.Errorf("unknown agent: %s. Available agents: guardian, analyzer, imaginator", agentName)
 	}
 }
 
@@ -84,10 +86,9 @@ func handleGuardian(def *config.ServiceDefinition, command string, force bool) e
 						Active []interface{} `json:"active"`
 					}
 					if json.Unmarshal(statusBody, &procData) == nil && len(procData.Active) == 0 {
-						// Check system idle time via guardian status (using legacy endpoint for compat or agent status)
-						guardianStatusBody, _, err := utils.GetHTTPBody(def.GetHTTP("/agent/status"))
+						// Check system idle time via agent status
+						agentStatusBody, _, err := utils.GetHTTPBody(def.GetHTTP("/agent/status"))
 						if err == nil {
-							// Parse new structure
 							var status struct {
 								Agents struct {
 									Guardian struct {
@@ -102,26 +103,19 @@ func handleGuardian(def *config.ServiceDefinition, command string, force bool) e
 									} `json:"guardian"`
 								} `json:"agents"`
 								System struct {
-									Metrics struct {
-										Idle int64 `json:"total_idle_time"`
-									} `json:"metrics"`
-									StateTime int64  `json:"state_time"`
 									State     string `json:"state"`
+									StateTime int64  `json:"state_time"`
 								} `json:"system"`
 							}
 
-							if json.Unmarshal(guardianStatusBody, &status) == nil {
+							if json.Unmarshal(agentStatusBody, &status) == nil {
 								now := time.Now().Unix()
-								// Accessing safe properties
 								t1Next := status.Agents.Guardian.Protocols.Sentry.NextRun
 								t2Next := status.Agents.Guardian.Protocols.Architect.NextRun
 
-								// Logic: Ready if Now > NextRun
 								t1Ready := now >= t1Next
 								t2Ready := now >= t2Next
 
-								// Idle time check: System must be idle for > 300s (5m)
-								// Or specifically using the "state_time" if state is idle
 								idleSecs := int64(0)
 								if status.System.State == "idle" {
 									idleSecs = status.System.StateTime
@@ -146,7 +140,7 @@ func handleGuardian(def *config.ServiceDefinition, command string, force bool) e
 
 		ui.PrintInfo("Triggering Full Analysis (Sentry + Architect)...")
 
-		// 2. Trigger analysis via Event Service (Default to tier 0 for all)
+		// 2. Trigger analysis via Event Service
 		url := fmt.Sprintf("%s?tier=0", def.GetHTTP("/guardian/run"))
 		req, _ := http.NewRequest("POST", url, nil)
 		client := &http.Client{Timeout: 15 * time.Minute}
@@ -168,7 +162,7 @@ func handleGuardian(def *config.ServiceDefinition, command string, force bool) e
 		ui.PrintHeader("Guardian Reset")
 		ui.PrintInfo("Resetting Guardian protocols...")
 
-		url := def.GetHTTP("/guardian/reset")
+		url := fmt.Sprintf("%s?tier=all", def.GetHTTP("/guardian/reset"))
 		req, _ := http.NewRequest("POST", url, nil)
 		client := &http.Client{Timeout: 10 * time.Second}
 
@@ -235,6 +229,55 @@ func handleAnalyst(def *config.ServiceDefinition, command string, force bool) er
 
 	default:
 		return fmt.Errorf("unknown analyst command: %s", command)
+	}
+	return nil
+}
+
+func handleImaginator(def *config.ServiceDefinition, command string, force bool) error {
+	switch command {
+	case "run":
+		ui.PrintHeader("Imaginator Agent")
+		ui.PrintInfo("Triggering Alert Review Protocol...")
+
+		// Trigger Alert Review via Guardian endpoint (shared logic)
+		url := fmt.Sprintf("%s?tier=alert_review", def.GetHTTP("/guardian/run"))
+		req, _ := http.NewRequest("POST", url, nil)
+		client := &http.Client{Timeout: 5 * time.Minute}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("failed to trigger imaginator: %w", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("imaginator run failed with status: %d", resp.StatusCode)
+		}
+
+		ui.PrintSuccess("Imaginator alert review protocol triggered successfully.")
+
+	case "reset":
+		ui.PrintHeader("Imaginator Reset")
+		ui.PrintInfo("Resetting Imaginator protocols...")
+
+		url := fmt.Sprintf("%s?tier=alert_review", def.GetHTTP("/guardian/reset"))
+		req, _ := http.NewRequest("POST", url, nil)
+		client := &http.Client{Timeout: 10 * time.Second}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("failed to reset imaginator: %w", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("imaginator reset failed with status: %d", resp.StatusCode)
+		}
+
+		ui.PrintSuccess("Imaginator protocols reset successfully.")
+
+	default:
+		return fmt.Errorf("unknown imaginator command: %s", command)
 	}
 	return nil
 }
