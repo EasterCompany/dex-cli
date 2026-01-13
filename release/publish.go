@@ -21,6 +21,13 @@ const (
 // PublishRelease publishes binaries to easter.company for major/minor releases
 // version is the FULL version string (e.g., 2.1.0.main.abc123.2025-11-27-09-30-45.linux-amd64.xyz789)
 func PublishRelease(fullVersion, shortVersion, releaseType string, services []config.ServiceDefinition) error {
+	// 1. SKIP PATCH RELEASES
+	// Patch releases are source-only and not published to the public bin directory to save space/bandwidth.
+	if releaseType == "patch" {
+		ui.PrintInfo("Skipping binary publish for patch release (source-only distribution)")
+		return nil
+	}
+
 	// Expand easter.company path
 	repoPath, err := config.ExpandPath(EasterCompanyRepo)
 	if err != nil {
