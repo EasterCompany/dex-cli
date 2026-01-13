@@ -210,9 +210,9 @@ func HasAnySystemdService() bool {
 	return false
 }
 
-// HasPythonVenv checks if the Python virtual environment is installed and set up at ~/Dexter/python3.13
+// HasPythonVenv checks if the Python virtual environment is installed and set up at ~/Dexter/python3.14
 func HasPythonVenv() bool {
-	pythonVenvPath, err := ExpandPath(filepath.Join(DexterRoot, "python3.13"))
+	pythonVenvPath, err := ExpandPath(filepath.Join(DexterRoot, "python3.14"))
 	if err != nil {
 		return false
 	}

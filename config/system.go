@@ -60,12 +60,12 @@ type Package struct {
 var RequiredPackages = []Package{
 	{Name: "git", Required: true, MinVersion: "2.0", InstallCommand: "sudo pacman -S --noconfirm git || sudo apt install -y git", UpgradeCommand: "sudo pacman -Syu --noconfirm git || (sudo apt update && sudo apt upgrade -y git)"},
 	{Name: "go", Required: true, MinVersion: "1.20", InstallCommand: "sudo pacman -S --noconfirm go || sudo apt install -y golang-go", UpgradeCommand: "sudo pacman -Syu --noconfirm go || (sudo apt update && sudo apt upgrade -y golang-go)"},
-	{Name: "python3.13", Required: true, MinVersion: "3.13", InstallCommand: "sudo pacman -S --noconfirm python3.13 || sudo apt install -y python3.13", UpgradeCommand: "sudo pacman -Syu --noconfirm python3.13 || (sudo apt update && sudo apt upgrade -y python3.13)"},
+	{Name: "python3.14", Required: true, MinVersion: "3.14", InstallCommand: "sudo pacman -S --noconfirm python3.14 || sudo apt install -y python3.14", UpgradeCommand: "sudo pacman -Syu --noconfirm python3.14 || (sudo apt update && sudo apt upgrade -y python3.14)"},
 	{Name: "python3.10", Required: true, MinVersion: "3.10", InstallCommand: "sudo pacman -S --noconfirm python3.10 || sudo apt install -y python3.10", UpgradeCommand: "sudo pacman -Syu --noconfirm python3.10 || (sudo apt update && sudo apt upgrade -y python3.10)"},
 	{Name: "bun", Required: true, MinVersion: "1.0", InstallCommand: "curl -fsSL https://bun.sh/install | bash", UpgradeCommand: "bun upgrade"},
 	{Name: "golangci-lint", Required: true, MinVersion: "1.50", InstallCommand: "go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest", UpgradeCommand: "go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"},
 	{Name: "make", Required: true, MinVersion: "4.0", InstallCommand: "sudo pacman -S --noconfirm make || sudo apt install -y make", UpgradeCommand: "sudo pacman -Syu --noconfirm make || (sudo apt update && sudo apt upgrade -y make)"},
-	{Name: "pip3", Required: true, MinVersion: "20.0", InstallCommand: "sudo pacman -S --noconfirm python-pip || sudo apt install -y python3-pip", UpgradeCommand: "~/Dexter/python3.13/bin/python -m pip install --upgrade pip"},
+	{Name: "pip3", Required: true, MinVersion: "20.0", InstallCommand: "sudo pacman -S --noconfirm python-pip || sudo apt install -y python3-pip", UpgradeCommand: "~/Dexter/python3.14/bin/python -m pip install --upgrade pip"},
 	{Name: "lsblk", Required: true, MinVersion: "", InstallCommand: "sudo pacman -S --noconfirm util-linux || sudo apt install -y util-linux", UpgradeCommand: "sudo pacman -Syu --noconfirm util-linux || (sudo apt update && sudo apt upgrade -y util-linux)"},
 	{Name: "findmnt", Required: true, MinVersion: "", InstallCommand: "sudo pacman -S --noconfirm util-linux || sudo apt install -y util-linux", UpgradeCommand: "sudo pacman -Syu --noconfirm util-linux || (sudo apt update && sudo apt upgrade -y util-linux)"},
 	{Name: "redis-server", Required: false, MinVersion: "6.0", InstallCommand: "sudo pacman -S --noconfirm redis || sudo apt install -y redis-server", UpgradeCommand: "sudo pacman -Syu --noconfirm redis || (sudo apt update && sudo apt upgrade -y redis-server)"},
@@ -527,7 +527,7 @@ func detectPackages(requiredPackages []Package) []Package {
 		}
 	}
 
-	// Add Python venv checks for 3.13 and 3.10
+	// Add Python venv checks for 3.14 and 3.10
 	checkVenv := func(version string) {
 		venvPath, err := ExpandPath(filepath.Join(DexterRoot, "python"+version))
 		if err == nil {
@@ -550,7 +550,7 @@ func detectPackages(requiredPackages []Package) []Package {
 		}
 	}
 
-	checkVenv("3.13")
+	checkVenv("3.14")
 	checkVenv("3.10")
 
 	return packages
@@ -561,7 +561,7 @@ func getPackageVersion(pkgName string) string {
 	versionArgs := map[string][]string{
 		"git":           {"--version"},
 		"go":            {"version"},
-		"python3.13":    {"--version"},
+		"python3.14":    {"--version"},
 		"python3.10":    {"--version"},
 		"bun":           {"--version"},
 		"golangci-lint": {"--version"},
@@ -619,9 +619,9 @@ func getPackageVersion(pkgName string) string {
 		}
 	}
 
-	// Special handling for python3.13/3.10
+	// Special handling for python3.14/3.10
 	if strings.HasPrefix(pkgName, "python") {
-		// Output: Python 3.13.11
+		// Output: Python 3.14.1
 		parts := strings.Fields(versionStr)
 		if len(parts) >= 2 && parts[0] == "Python" {
 			return parts[1]
@@ -706,7 +706,7 @@ func getPackageVersion(pkgName string) string {
 
 	// Special handling for pip to extract just the version number
 	if pkgName == "pip3" || pkgName == "pip" {
-		// Output: pip 25.3 from /path/to/site-packages/pip (python 3.13)
+		// Output: pip 25.3 from /path/to/site-packages/pip (python 3.14)
 		parts := strings.Fields(versionStr)
 		if len(parts) >= 2 && parts[0] == "pip" {
 			return parts[1]

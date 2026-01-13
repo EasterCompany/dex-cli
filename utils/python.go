@@ -83,7 +83,7 @@ func bootstrapPythonEnvironment(silent bool) error {
 		ui.PrintHeader("Setting up Dexter's Python Environments")
 	}
 
-	if err := bootstrapSpecificVenv("3.13", silent); err != nil {
+	if err := bootstrapSpecificVenv("3.14", silent); err != nil {
 		return err
 	}
 	if err := bootstrapSpecificVenv("3.10", silent); err != nil {
@@ -136,18 +136,18 @@ func EnsurePythonVenv(silent bool) error {
 		ui.PrintHeader("Verifying Python Environments")
 	}
 
-	// Verify 3.13
+	// Verify 3.14
 	if !silent {
-		ui.PrintInfo("Checking Python 3.13...")
+		ui.PrintInfo("Checking Python 3.14...")
 	}
-	if err := CheckPythonVersion("3.13"); err != nil {
+	if err := CheckPythonVersion("3.14"); err != nil {
 		return err
 	}
-	if err := CheckPoetryInstalled("3.13"); err != nil {
+	if err := CheckPoetryInstalled("3.14"); err != nil {
 		return err
 	}
 	if !silent {
-		ui.PrintSuccess("Python 3.13 found.")
+		ui.PrintSuccess("Python 3.14 found.")
 	}
 
 	// Verify 3.10
@@ -167,10 +167,10 @@ func EnsurePythonVenv(silent bool) error {
 	return nil
 }
 
-// Python runs a command using the dexter-managed python executable (Defaults to 3.13).
+// Python runs a command using the dexter-managed python executable (Defaults to 3.14).
 func Python(args []string) error {
-	// Default to 3.13 for 'dex python' command
-	_, pythonExecutable, _, _, err := getPythonPaths("3.13")
+	// Default to 3.14 for 'dex python' command
+	_, pythonExecutable, _, _, err := getPythonPaths("3.14")
 	if err != nil {
 		return err
 	}
