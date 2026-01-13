@@ -179,28 +179,6 @@ var serviceDefinitions = []ServiceDefinition{
 		},
 	},
 	{
-		ID:        "cloud-cache-0",
-		ShortName: "cache1",
-		Type:      "os",
-		Domain:    "redis-18309.c243.eu-west-1-3.ec2.redns.redis-cloud.com",
-		Port:      "18309",
-		Credentials: &ServiceCredentials{
-			Username: "default",
-			Password: "Mi9mm7DfzWnP59PiMyCuuMr2AC7OMBLr",
-		},
-	},
-	{
-		ID:        "cloud-cache-1",
-		ShortName: "cache2",
-		Type:      "os",
-		Domain:    "redis-13647.c269.eu-west-1-3.ec2.redns.redis-cloud.com",
-		Port:      "13647",
-		Credentials: &ServiceCredentials{
-			Username: "default",
-			Password: "J3zfv4SPss8DjxIiefRQwOOokT0yHVqO",
-		},
-	},
-	{
 		ID:        "upstash-redis-ro",
 		ShortName: "upstash-ro",
 		Type:      "os",
