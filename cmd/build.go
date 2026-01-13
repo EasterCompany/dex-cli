@@ -334,6 +334,44 @@ func Build(args []string) error {
 }
 
 func runBuild(ctx context.Context, args []string) error {
+	// Check for --source flag to build from source via go run
+	buildFromSource := false
+	var filteredArgsSource []string
+	for _, arg := range args {
+		if arg == "--source" {
+			buildFromSource = true
+		} else {
+			filteredArgsSource = append(filteredArgsSource, arg)
+		}
+	}
+
+	if buildFromSource {
+		ui.PrintInfo("Building from source via 'go run'...")
+
+		// Get dex-cli source path
+		cliService := config.GetServiceDefinition("dex-cli")
+		sourcePath, err := config.ExpandPath(cliService.Source)
+		if err != nil {
+			return fmt.Errorf("failed to expand dex-cli source path: %w", err)
+		}
+
+		// Construct command: go run main.go build [args...] (without --source)
+		cmdArgs := append([]string{"run", "main.go", "build"}, filteredArgsSource...)
+		cmd := exec.CommandContext(ctx, "go", cmdArgs...)
+		cmd.Dir = sourcePath
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Stdin = os.Stdin
+
+		// Pass through environment
+		cmd.Env = os.Environ()
+
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("build from source failed: %w", err)
+		}
+		return nil
+	}
+
 	for _, arg := range args {
 		if arg == "--help" || arg == "-h" {
 			ui.PrintHeader("Build Command Help")
