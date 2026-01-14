@@ -112,6 +112,8 @@ func checkServiceStatus(service config.ServiceDefinition) ui.TableRow {
 	switch service.Type {
 	case "cli":
 		return checkCLIStatus(service, serviceID, address)
+	case "prd":
+		return checkProdStatus(service, serviceID, address)
 	case "os":
 		// Specialized handling for Ollama
 		if strings.Contains(strings.ToLower(service.ID), "ollama") || strings.Contains(strings.ToLower(service.ShortName), "ollama") {
@@ -196,6 +198,53 @@ func checkUpstashStatus(service config.ServiceDefinition, serviceID, address str
 		colorizeNA("Cloud"), // VERSION
 		colorizeNA("--"),    // BRANCH
 		colorizeNA("--"),    // COMMIT
+		colorizeStatus("OK"),
+		colorizeNA("∞"),
+		colorizeNA("--"),
+		colorizeNA("--"),
+	}
+}
+
+// checkProdStatus checks a production service via a simple HTTPS ping (ignoring port).
+func checkProdStatus(service config.ServiceDefinition, serviceID, address string) ui.TableRow {
+	badStatusRow := func(reason string) ui.TableRow {
+		// Log the failure reason for debugging
+		logFile, _ := config.LogFile()
+		if logFile != nil {
+			_, _ = fmt.Fprintf(logFile, "[%s] Production check failed: %s\n", serviceID, reason)
+		}
+		return []string{
+			serviceID,
+			address,
+			colorizeNA("Live"),    // VERSION
+			colorizeNA("--"),      // BRANCH
+			colorizeNA("--"),      // COMMIT
+			colorizeStatus("BAD"), // STATUS
+			colorizeNA("--"),      // UPTIME
+			colorizeNA("--"),      // CPU
+			colorizeNA("--"),      // MEM
+		}
+	}
+
+	// Use https://<domain> only, ignoring port for production sites
+	url := fmt.Sprintf("https://%s", service.Domain)
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		return badStatusRow(fmt.Sprintf("failed to reach production site: %v", err))
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return badStatusRow(fmt.Sprintf("HTTP %d", resp.StatusCode))
+	}
+
+	return []string{
+		serviceID,
+		address,
+		colorizeNA("Live"), // VERSION
+		colorizeNA("--"),   // BRANCH
+		colorizeNA("--"),   // COMMIT
 		colorizeStatus("OK"),
 		colorizeNA("∞"),
 		colorizeNA("--"),
