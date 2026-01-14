@@ -169,7 +169,7 @@ var serviceDefinitions = []ServiceDefinition{
 	{
 		ID:        "easter-company-production",
 		ShortName: "easter-prod",
-		Type:      "prod",
+		Type:      "prd",
 		Domain:    "easter.company",
 		Port:      "443",
 	},
@@ -281,6 +281,7 @@ type orderedServices struct {
 	CS  []ServiceEntry `json:"cs"`
 	BE  []ServiceEntry `json:"be"`
 	TH  []ServiceEntry `json:"th"`
+	PRD []ServiceEntry `json:"prd"`
 	OS  []ServiceEntry `json:"os"`
 }
 
@@ -314,6 +315,7 @@ func (s *ServiceMapConfig) MarshalJSON() ([]byte, error) {
 			CS:  s.Services["cs"],
 			BE:  s.Services["be"],
 			TH:  s.Services["th"],
+			PRD: s.Services["prd"],
 			OS:  s.Services["os"],
 		},
 	}
