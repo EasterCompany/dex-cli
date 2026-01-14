@@ -166,6 +166,13 @@ var serviceDefinitions = []ServiceDefinition{
 		Source:      "~/EasterCompany/easter.company",
 		Domain:      "127.0.0.1", Port: "8000",
 	},
+	{
+		ID:        "easter-company-production",
+		ShortName: "easter-prod",
+		Type:      "prod",
+		Domain:    "easter.company",
+		Port:      "443",
+	},
 	// OS Services (os)
 	{
 		ID:        "local-cache-0",
