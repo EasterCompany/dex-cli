@@ -42,7 +42,6 @@ func InitWhisper() error {
 	packages := []string{
 		"faster-whisper",
 		"numpy",
-		"torch",
 		"nvidia-cublas-cu12",
 		"nvidia-cudnn-cu12",
 	}
@@ -179,64 +178,40 @@ try:
     current_ld = os.environ.get("LD_LIBRARY_PATH", "")
     new_ld = f"{cudnn_lib}:{cublas_lib}:{current_ld}"
     os.environ["LD_LIBRARY_PATH"] = new_ld
-    
-    # Also add to sys.path or try to load explicitly if needed, but LD_LIBRARY_PATH is key for dlopen
 except Exception as e:
-    print(f"Warning: Failed to auto-inject nvidia libs: {e}", file=sys.stderr)
+    # Quietly fail if nvidia libs aren't found (might be CPU only)
+    pass
 
-import torch
 from faster_whisper import WhisperModel
 
 try:
-    # Intelligent GPU Selection
-    best_device_index = 0
-    best_capability = -1.0
-    device = "cpu"
-    compute_type = "int8"
-
-    if torch.cuda.is_available():
-        count = torch.cuda.device_count()
-        print(f"Found {count} CUDA devices.", file=sys.stderr)
-        for i in range(count):
-            try:
-                cap_major, cap_minor = torch.cuda.get_device_capability(i)
-                score = cap_major + (cap_minor / 10.0)
-                name = torch.cuda.get_device_name(i)
-                print(f"  GPU {i}: {name} (Capability {cap_major}.{cap_minor})", file=sys.stderr)
-                
-                if score > best_capability:
-                    best_capability = score
-                    best_device_index = i
-            except Exception as e:
-                print(f"  GPU {i}: Error getting capability: {e}", file=sys.stderr)
-        
-        # Select the best GPU
-        if best_capability > 0:
-            device = "cuda"
-            compute_type = "float16" # Optimal for GPU
-            print(f"Selected GPU {best_device_index} for inference.", file=sys.stderr)
-        else:
-            print("No suitable GPU capability found. Falling back to CPU.", file=sys.stderr)
-    else:
-        print("CUDA not available. Using CPU.", file=sys.stderr)
-
     print(f"Loading Faster-Whisper model from {r'%s'}...", file=sys.stderr)
     
-    # Initialize Model
-    model = WhisperModel(
-        r"%s", 
-        device=device, 
-        device_index=best_device_index, 
-        compute_type=compute_type
-    )
+    # Try to initialize with CUDA first
+    device = "cuda"
+    compute_type = "float16"
+    
+    try:
+        model = WhisperModel(
+            r"%s", 
+            device=device, 
+            compute_type=compute_type
+        )
+        print("Initialized Whisper on GPU (CUDA)", file=sys.stderr)
+    except Exception as e:
+        print(f"CUDA initialization failed ({e}), falling back to CPU...", file=sys.stderr)
+        device = "cpu"
+        compute_type = "int8"
+        model = WhisperModel(
+            r"%s", 
+            device=device, 
+            compute_type=compute_type
+        )
 
     audio_path = r"%s"
     print("Transcribing audio...", file=sys.stderr)
 
     # 1. Transcribe (Force English)
-    # beam_size=5 is standard for good quality. language="en" ensures no auto-detection weirdness.
-    # vad_filter=True helps ignore silence/noise that triggers hallucinations.
-    # condition_on_previous_text=False prevents loop-getting-stuck issues.
     segments, info = model.transcribe(
         audio_path, 
         task="transcribe", 
@@ -265,9 +240,7 @@ try:
 
         if is_hallucination:
             # Only keep if extremely confident
-            # avg_logprob closer to 0 is better. -0.25 is very confident.
             if segment.avg_logprob < -0.25:
-                print(f"Dropped potential hallucination: '{segment.text}' (score: {segment.avg_logprob})", file=sys.stderr)
                 continue
         
         original_text_parts.append(segment.text)
@@ -285,7 +258,7 @@ except Exception as e:
     import traceback
     traceback.print_exc(file=sys.stderr)
     sys.exit(1)
-`, modelDir, modelDir, absPath)
+`, modelDir, modelDir, modelDir, absPath)
 
 	fmt.Fprintf(os.Stderr, "Loading model and transcribing...\n")
 
