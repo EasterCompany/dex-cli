@@ -26,8 +26,8 @@ func getWhisperModelPath() (string, error) {
 func InitWhisper() error {
 	ui.PrintHeader("Initializing Whisper (Faster-Whisper)")
 
-	// Get python paths
-	_, pythonExecutable, pipExecutable, _, err := getPythonPaths("3.14")
+	// Get python paths (Use 3.10 for stability)
+	_, pythonExecutable, pipExecutable, _, err := getPythonPaths("3.10")
 	if err != nil {
 		return err
 	}
