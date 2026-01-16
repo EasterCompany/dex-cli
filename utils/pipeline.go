@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -32,11 +33,12 @@ func RunUnifiedBuildPipeline(ctx context.Context, service config.ServiceDefiniti
 		buildDate := time.Now().Format("2006-01-02")
 		buildYear := time.Now().Format("2006")
 		buildHash := commit // Use commit hash as build hash for now
+		arch := runtime.GOARCH
 
 		// Construct ldflags
 		ldflags := fmt.Sprintf(
-			"-X main.version=%s -X main.branch=%s -X main.commit=%s -X main.buildDate=%s -X main.buildYear=%s -X main.buildHash=%s",
-			versionStr, branch, commit, buildDate, buildYear, buildHash,
+			"-X main.version=%s -X main.branch=%s -X main.commit=%s -X main.buildDate=%s -X main.buildYear=%s -X main.buildHash=%s -X main.arch=%s",
+			versionStr, branch, commit, buildDate, buildYear, buildHash, arch,
 		)
 
 		return runGoBuildPipeline(ctx, service, sourcePath, log, ldflags, versionStr, branch, commit)
@@ -67,11 +69,12 @@ func RunUnifiedBuildPipeline(ctx context.Context, service config.ServiceDefiniti
 	buildDate := time.Now().Format("2006-01-02")
 	buildYear := time.Now().Format("2006")
 	buildHash := commit // Use commit hash as build hash for now
+	arch := runtime.GOARCH
 
 	// Construct ldflags
 	ldflags := fmt.Sprintf(
-		"-X main.version=%s -X main.branch=%s -X main.commit=%s -X main.buildDate=%s -X main.buildYear=%s -X main.buildHash=%s",
-		versionStr, branch, commit, buildDate, buildYear, buildHash,
+		"-X main.version=%s -X main.branch=%s -X main.commit=%s -X main.buildDate=%s -X main.buildYear=%s -X main.buildHash=%s -X main.arch=%s",
+		versionStr, branch, commit, buildDate, buildYear, buildHash, arch,
 	)
 
 	return runGoBuildPipeline(ctx, service, sourcePath, log, ldflags, versionStr, branch, commit)

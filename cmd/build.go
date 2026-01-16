@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -297,14 +298,20 @@ func buildFrontendService(ctx context.Context, def config.ServiceDefinition, log
 		log(fmt.Sprintf("[%s] Tests passed!", def.ShortName))
 	}
 
-	versionStr := fmt.Sprintf("%d.%d.%d", major, minor, patch)
-	log(fmt.Sprintf("[%s] Running frontend build script: %s (Version: %s)", def.ShortName, buildScriptPath, versionStr))
+	// Construct full version string for frontend
+	branch, commit := git.GetVersionInfo(sourcePath)
+	buildDate := time.Now().Format("2006-01-02")
+	arch := runtime.GOARCH
+	shortVersionStr := fmt.Sprintf("%d.%d.%d", major, minor, patch)
+	fullVersionStr := fmt.Sprintf("%s.%s.%s.%s.%s.%s", shortVersionStr, branch, commit, buildDate, arch, commit)
+
+	log(fmt.Sprintf("[%s] Running frontend build script: %s (Version: %s)", def.ShortName, buildScriptPath, fullVersionStr))
 
 	cmd := exec.CommandContext(ctx, "bash", buildScriptPath)
 	cmd.Dir = sourcePath // Execute the script from the service's source directory
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Env = append(os.Environ(), fmt.Sprintf("DEX_BUILD_VERSION=%s", versionStr))
+	cmd.Env = append(os.Environ(), fmt.Sprintf("DEX_BUILD_VERSION=%s", fullVersionStr))
 
 	if err := cmd.Run(); err != nil {
 		return false, fmt.Errorf("failed to build frontend service %s: %w", def.ShortName, err)
