@@ -132,6 +132,11 @@ func GetCommandRequirements() map[string]CommandRequirement {
 			Description: "Speech-to-text transcription with Whisper",
 			Check:       HasPythonVenv,
 		},
+		"verify": {
+			Name:        "verify",
+			Description: "Run deep system diagnostics",
+			Check:       func() bool { return true },
+		},
 	}
 }
 

@@ -73,6 +73,9 @@ func main() {
 	case "update":
 		runCommand(func() error { return cmd.Update(os.Args[2:]) })
 
+	case "verify":
+		runCommand(func() error { return cmd.Verify() })
+
 	case "system":
 		runCommand(func() error { return cmd.System(os.Args[2:]) })
 
