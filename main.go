@@ -113,6 +113,12 @@ func main() {
 		}
 		runCommand(func() error { return cmd.Logs(args, follow) })
 
+	case "fmt":
+		runCommand(func() error { return cmd.Fmt(os.Args[2:]) })
+
+	case "ollama":
+		runCommand(func() error { return cmd.Ollama(os.Args[2:]) })
+
 	case "test":
 		runCommand(func() error { return cmd.Test(os.Args[2:]) })
 
@@ -124,9 +130,6 @@ func main() {
 
 	case "bunx":
 		runCommand(func() error { return cmd.Bunx(os.Args[2:]) })
-
-	case "ollama":
-		runCommand(func() error { return cmd.Ollama(os.Args[2:]) })
 
 	case "add":
 		runCommand(func() error { return cmd.Add(os.Args[2:]) })
@@ -342,6 +345,10 @@ func printUsage() {
 	ui.PrintKeyValBlock("ollama", []ui.KeyVal{
 		{Key: "Usage", Value: "dex ollama [pull|list|rm]"},
 		{Key: "Desc", Value: "Manage local LLM models."},
+	})
+	ui.PrintKeyValBlock("fmt", []ui.KeyVal{
+		{Key: "Usage", Value: "dex fmt"},
+		{Key: "Desc", Value: "Format all source code (Go, JS, HTML, CSS, etc.)."},
 	})
 	ui.PrintKeyValBlock("whisper", []ui.KeyVal{
 		{Key: "Usage", Value: "dex whisper [file]"},

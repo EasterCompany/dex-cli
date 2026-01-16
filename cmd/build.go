@@ -206,6 +206,25 @@ func buildFrontendService(ctx context.Context, def config.ServiceDefinition, log
 
 	buildScriptPath := filepath.Join(sourcePath, "scripts", "build.sh")
 
+	// 0. Format Code (Prettier)
+	if _, err := exec.LookPath("prettier"); err == nil {
+		log(fmt.Sprintf("[%s] Formatting source code with Prettier...", def.ShortName))
+		// We format the source directory (where JS/CSS/HTML lives)
+		fmtCmd := exec.CommandContext(ctx, "prettier", "--write", "source")
+		fmtCmd.Dir = sourcePath
+		if out, err := fmtCmd.CombinedOutput(); err != nil {
+			log(fmt.Sprintf("[%s] Warning: Prettier failed: %v\n%s", def.ShortName, err, string(out)))
+			// We warn but proceed, or should we fail?
+			// The user requested strict tooling. Failing on format error (if it's a syntax error that prettier can't parse) is good.
+			// If it's just "I formatted it", it returns 0.
+			// So error here means Prettier couldn't parse the code.
+			// Let's fail the build if formatting fails, as that usually indicates syntax errors.
+			return false, fmt.Errorf("prettier formatting failed (syntax error?): %w\n%s", err, string(out))
+		}
+	} else {
+		log(fmt.Sprintf("[%s] Warning: 'prettier' not found, skipping formatting.", def.ShortName))
+	}
+
 	versionStr := fmt.Sprintf("%d.%d.%d", major, minor, patch)
 	log(fmt.Sprintf("[%s] Running frontend build script: %s (Version: %s)", def.ShortName, buildScriptPath, versionStr))
 
