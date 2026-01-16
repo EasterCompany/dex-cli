@@ -225,6 +225,44 @@ func buildFrontendService(ctx context.Context, def config.ServiceDefinition, log
 		log(fmt.Sprintf("[%s] Warning: 'prettier' not found, skipping formatting.", def.ShortName))
 	}
 
+	// 0.5. Lint Code
+	log(fmt.Sprintf("[%s] Linting source code...", def.ShortName))
+	lintFailed := false
+
+	// ESLint
+	if _, err := exec.LookPath("eslint"); err == nil {
+		lintCmd := exec.CommandContext(ctx, "eslint", "source", "--ext", ".js,.html")
+		lintCmd.Dir = sourcePath
+		if out, err := lintCmd.CombinedOutput(); err != nil {
+			log(fmt.Sprintf("[%s] ESLint failed: %v\n%s", def.ShortName, err, string(out)))
+			lintFailed = true
+		}
+	}
+
+	// Stylelint
+	if _, err := exec.LookPath("stylelint"); err == nil {
+		lintCmd := exec.CommandContext(ctx, "stylelint", "source/**/*.css")
+		lintCmd.Dir = sourcePath
+		if out, err := lintCmd.CombinedOutput(); err != nil {
+			log(fmt.Sprintf("[%s] Stylelint failed: %v\n%s", def.ShortName, err, string(out)))
+			lintFailed = true
+		}
+	}
+
+	// HTMLHint
+	if _, err := exec.LookPath("htmlhint"); err == nil {
+		lintCmd := exec.CommandContext(ctx, "htmlhint", "source/**/*.html")
+		lintCmd.Dir = sourcePath
+		if out, err := lintCmd.CombinedOutput(); err != nil {
+			log(fmt.Sprintf("[%s] HTMLHint failed: %v\n%s", def.ShortName, err, string(out)))
+			lintFailed = true
+		}
+	}
+
+	if lintFailed {
+		return false, fmt.Errorf("linting failed, check logs for details")
+	}
+
 	versionStr := fmt.Sprintf("%d.%d.%d", major, minor, patch)
 	log(fmt.Sprintf("[%s] Running frontend build script: %s (Version: %s)", def.ShortName, buildScriptPath, versionStr))
 

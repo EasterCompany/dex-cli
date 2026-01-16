@@ -114,9 +114,15 @@ func main() {
 		runCommand(func() error { return cmd.Logs(args, follow) })
 
 	case "fmt":
+
 		runCommand(func() error { return cmd.Fmt(os.Args[2:]) })
 
+	case "lint":
+
+		runCommand(func() error { return cmd.Lint(os.Args[2:]) })
+
 	case "ollama":
+
 		runCommand(func() error { return cmd.Ollama(os.Args[2:]) })
 
 	case "test":
@@ -349,6 +355,10 @@ func printUsage() {
 	ui.PrintKeyValBlock("fmt", []ui.KeyVal{
 		{Key: "Usage", Value: "dex fmt"},
 		{Key: "Desc", Value: "Format all source code (Go, JS, HTML, CSS, etc.)."},
+	})
+	ui.PrintKeyValBlock("lint", []ui.KeyVal{
+		{Key: "Usage", Value: "dex lint"},
+		{Key: "Desc", Value: "Run code quality checks (ESLint, Stylelint, HTMLHint, Go)."},
 	})
 	ui.PrintKeyValBlock("whisper", []ui.KeyVal{
 		{Key: "Usage", Value: "dex whisper [file]"},
