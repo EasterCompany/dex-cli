@@ -33,7 +33,7 @@ func Lint(args []string) error {
 		// Target specific directories or file types to avoid scanning node_modules or go files
 		// We scan the current directory but eslint ignores .gitignore/node_modules usually
 		// Better to target "." and let config handle ignores
-		eslintCmd := exec.Command("eslint", ".", "--ext", ".js,.html")
+		eslintCmd := exec.Command("eslint", ".")
 		eslintCmd.Dir = projectRoot
 		eslintCmd.Stdout = os.Stdout
 		eslintCmd.Stderr = os.Stderr
@@ -69,7 +69,8 @@ func Lint(args []string) error {
 	// 3. Run HTMLHint for HTML
 	ui.PrintInfo("Running HTMLHint (HTML)...")
 	if _, err := exec.LookPath("htmlhint"); err == nil {
-		htmlhintCmd := exec.Command("htmlhint", "**/*.html")
+		// Target active project directory only
+		htmlhintCmd := exec.Command("htmlhint", "easter.company/**/*.html")
 		htmlhintCmd.Dir = projectRoot
 		htmlhintCmd.Stdout = os.Stdout
 		htmlhintCmd.Stderr = os.Stderr

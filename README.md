@@ -1,6 +1,4 @@
-
 # Dexter CLI
-
 
 **A unified command-line interface for managing Dexter services and development workflows**
 

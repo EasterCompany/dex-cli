@@ -231,7 +231,8 @@ func buildFrontendService(ctx context.Context, def config.ServiceDefinition, log
 
 	// ESLint
 	if _, err := exec.LookPath("eslint"); err == nil {
-		lintCmd := exec.CommandContext(ctx, "eslint", "source", "--ext", ".js,.html")
+		// Run on source directory
+		lintCmd := exec.CommandContext(ctx, "eslint", "source")
 		lintCmd.Dir = sourcePath
 		if out, err := lintCmd.CombinedOutput(); err != nil {
 			log(fmt.Sprintf("[%s] ESLint failed: %v\n%s", def.ShortName, err, string(out)))
