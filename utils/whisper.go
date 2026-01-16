@@ -133,8 +133,8 @@ print(os.pathsep.join(paths))
 func TranscribeFile(filePath string) error {
 	fmt.Fprintf(os.Stderr, "\n=== Transcribing: %s ===\n", filePath)
 
-	// Get python paths
-	_, pythonExecutable, _, _, err := getPythonPaths("3.14")
+	// Get python paths (Use 3.10 for stability)
+	_, pythonExecutable, _, _, err := getPythonPaths("3.10")
 	if err != nil {
 		return err
 	}
