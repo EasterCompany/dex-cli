@@ -216,6 +216,16 @@ func buildFrontendService(ctx context.Context, def config.ServiceDefinition, log
 		}
 	}
 
+	// 0.2. Type Check (TypeScript)
+	if _, err := os.Stat(filepath.Join(sourcePath, "tsconfig.json")); err == nil {
+		log(fmt.Sprintf("[%s] Checking types with TypeScript...", def.ShortName))
+		tscCmd := exec.CommandContext(ctx, "bun", "run", "tsc", "--noEmit")
+		tscCmd.Dir = sourcePath
+		if out, err := tscCmd.CombinedOutput(); err != nil {
+			return false, fmt.Errorf("typescript check failed: %w\n%s", err, string(out))
+		}
+	}
+
 	// 0. Format Code (Prettier)
 	if _, err := exec.LookPath("prettier"); err == nil {
 		log(fmt.Sprintf("[%s] Formatting source code with Prettier...", def.ShortName))
@@ -241,8 +251,8 @@ func buildFrontendService(ctx context.Context, def config.ServiceDefinition, log
 
 	// ESLint
 	if _, err := exec.LookPath("eslint"); err == nil {
-		// Run on source directory
-		lintCmd := exec.CommandContext(ctx, "eslint", "source")
+		// Run on project directory (includes config files)
+		lintCmd := exec.CommandContext(ctx, "eslint", ".")
 		lintCmd.Dir = sourcePath
 		if out, err := lintCmd.CombinedOutput(); err != nil {
 			log(fmt.Sprintf("[%s] ESLint failed: %v\n%s", def.ShortName, err, string(out)))
