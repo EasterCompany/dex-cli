@@ -163,9 +163,6 @@ func handleGuardian(def *config.ServiceDefinition, command string, force bool) e
 											Sentry struct {
 												NextRun int64 `json:"next_run"`
 											} `json:"sentry"`
-											Architect struct {
-												NextRun int64 `json:"next_run"`
-											} `json:"architect"`
 										} `json:"protocols"`
 									} `json:"guardian"`
 								} `json:"agents"`
@@ -178,10 +175,8 @@ func handleGuardian(def *config.ServiceDefinition, command string, force bool) e
 							if json.Unmarshal(agentStatusBody, &status) == nil {
 								now := time.Now().Unix()
 								t1Next := status.Agents.Guardian.Protocols.Sentry.NextRun
-								t2Next := status.Agents.Guardian.Protocols.Architect.NextRun
 
 								t1Ready := now >= t1Next
-								t2Ready := now >= t2Next
 
 								idleSecs := int64(0)
 								if status.System.State == "idle" {
@@ -190,10 +185,10 @@ func handleGuardian(def *config.ServiceDefinition, command string, force bool) e
 
 								idleReady := idleSecs >= 300
 
-								if idleReady && t1Ready && t2Ready {
+								if idleReady && t1Ready {
 									break // All clear
 								} else {
-									ui.PrintRunningStatus(fmt.Sprintf("Waiting for cooldown/idle... (Idle: %ds, Sentry Ready: %v, Architect Ready: %v)", idleSecs, t1Ready, t2Ready))
+									ui.PrintRunningStatus(fmt.Sprintf("Waiting for cooldown/idle... (Idle: %ds, Sentry Ready: %v)", idleSecs, t1Ready))
 								}
 							}
 						}
@@ -205,7 +200,7 @@ func handleGuardian(def *config.ServiceDefinition, command string, force bool) e
 			}
 		}
 
-		ui.PrintInfo("Triggering Full Analysis (Sentry + Architect)...")
+		ui.PrintInfo("Triggering Sentry Analysis...")
 
 		// 2. Trigger analysis via Event Service
 		url := fmt.Sprintf("%s?tier=0", def.GetHTTP("/guardian/run"))
