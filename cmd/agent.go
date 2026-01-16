@@ -15,18 +15,28 @@ import (
 )
 
 func Agent(args []string) error {
-	if len(args) < 2 {
-		return fmt.Errorf("usage: dex agent <name> <command> [flags]")
+	if len(args) < 1 {
+		return fmt.Errorf("usage: dex agent <name> <command> [flags] OR dex agent pause/resume")
 	}
 
 	agentName := args[0]
-	command := args[1]
+	var command string
+	if len(args) > 1 {
+		command = args[1]
+	}
+
 	force := false
 
-	// Check flags starting from index 2
-	for _, arg := range args[2:] {
-		if arg == "-f" || arg == "--force" {
-			force = true
+	// Check flags starting from index 2 (or 1 if command is missing)
+	startIdx := 2
+	if len(args) < 2 {
+		startIdx = 1
+	}
+	if len(args) > startIdx {
+		for _, arg := range args[startIdx:] {
+			if arg == "-f" || arg == "--force" {
+				force = true
+			}
 		}
 	}
 
@@ -36,15 +46,72 @@ func Agent(args []string) error {
 	}
 
 	switch agentName {
+	case "pause":
+		return handlePause(def)
+	case "resume":
+		return handleResume(def)
 	case "guardian":
+		if command == "" {
+			return fmt.Errorf("command required for guardian")
+		}
 		return handleGuardian(def, command, force)
 	case "analyst", "analyzer": // Alias for flexibility
+		if command == "" {
+			return fmt.Errorf("command required for analyst")
+		}
 		return handleAnalyst(def, command, force)
 	case "imaginator":
+		if command == "" {
+			return fmt.Errorf("command required for imaginator")
+		}
 		return handleImaginator(def, command, force)
 	default:
 		return fmt.Errorf("unknown agent: %s. Available agents: guardian, analyzer, imaginator", agentName)
 	}
+}
+
+func handlePause(def *config.ServiceDefinition) error {
+	ui.PrintHeader("System Control")
+	ui.PrintInfo("Pausing all agents...")
+
+	url := def.GetHTTP("/agent/pause")
+	req, _ := http.NewRequest("POST", url, nil)
+	client := &http.Client{Timeout: 5 * time.Second}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to pause system: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("system pause failed with status: %d", resp.StatusCode)
+	}
+
+	ui.PrintSuccess("System paused successfully. Cognitive lock forced.")
+	return nil
+}
+
+func handleResume(def *config.ServiceDefinition) error {
+	ui.PrintHeader("System Control")
+	ui.PrintInfo("Resuming all agents...")
+
+	url := def.GetHTTP("/agent/resume")
+	req, _ := http.NewRequest("POST", url, nil)
+	client := &http.Client{Timeout: 5 * time.Second}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to resume system: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("system resume failed with status: %d", resp.StatusCode)
+	}
+
+	ui.PrintSuccess("System resumed successfully.")
+	return nil
 }
 
 func handleGuardian(def *config.ServiceDefinition, command string, force bool) error {

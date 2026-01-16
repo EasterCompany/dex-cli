@@ -481,8 +481,6 @@ PUBLIC CHAT RULES:
 6. ANTI-REPETITION: Actively avoid repeating phrases, emojis, or sentence structures across subsequent messages in a conversation. Keep your output fresh and varied. If you used an emoji in your last response, try a different one or none at all.`,
 		},
 		{
-			Name:      "dex-guardian-t1",
-			BaseModel: "gemma3:12b",
 			SystemPrompt: `You are the Tier 1 Guardian (Technical Sentry). You are the front line against system instability.
 		
 		OBJECTIVE:
