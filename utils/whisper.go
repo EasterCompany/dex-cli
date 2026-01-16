@@ -40,7 +40,8 @@ func InitWhisper() error {
 	// Install required packages
 	ui.PrintInfo("Installing required Python packages...")
 	packages := []string{
-		"faster-whisper",
+		"av>=11.0.0",
+		"faster-whisper>=1.0.0",
 		"numpy",
 		"nvidia-cublas-cu12",
 		"nvidia-cudnn-cu12",
