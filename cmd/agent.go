@@ -65,9 +65,62 @@ func Agent(args []string) error {
 			return fmt.Errorf("command required for imaginator")
 		}
 		return handleImaginator(def, command, force)
+	case "fabricator":
+		if command == "" {
+			return fmt.Errorf("command required for fabricator")
+		}
+		return handleFabricator(def, command, force)
 	default:
-		return fmt.Errorf("unknown agent: %s. Available agents: guardian, analyzer, imaginator", agentName)
+		return fmt.Errorf("unknown agent: %s. Available agents: guardian, analyzer, imaginator, fabricator", agentName)
 	}
+}
+
+func handleFabricator(def *config.ServiceDefinition, command string, force bool) error {
+	switch command {
+	case "run":
+		ui.PrintHeader("Fabricator Agent")
+		ui.PrintInfo("Triggering Construction Protocol...")
+
+		url := def.GetHTTP("/fabricator/run")
+		req, _ := http.NewRequest("POST", url, nil)
+		client := &http.Client{Timeout: 1 * time.Minute}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("failed to trigger fabricator: %w", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("fabricator run failed with status: %d", resp.StatusCode)
+		}
+
+		ui.PrintSuccess("Fabricator construction protocol triggered successfully.")
+
+	case "reset":
+		ui.PrintHeader("Fabricator Reset")
+		ui.PrintInfo("Resetting Fabricator protocols...")
+
+		url := fmt.Sprintf("%s?tier=construction", def.GetHTTP("/fabricator/reset"))
+		req, _ := http.NewRequest("POST", url, nil)
+		client := &http.Client{Timeout: 10 * time.Second}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("failed to reset fabricator: %w", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("fabricator reset failed with status: %d", resp.StatusCode)
+		}
+
+		ui.PrintSuccess("Fabricator protocols reset successfully.")
+
+	default:
+		return fmt.Errorf("unknown fabricator command: %s", command)
+	}
+	return nil
 }
 
 func handlePause(def *config.ServiceDefinition) error {
