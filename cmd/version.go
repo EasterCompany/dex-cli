@@ -46,18 +46,18 @@ func Version(jsonOutput bool, version, branch, commit, buildDate, buildYear, bui
 
 // FormatVersion constructs the full version string from build-time variables.
 func FormatVersion(version, branch, commit, buildDate, buildHash string) string {
-	// Check if version is already fully formatted (has 8 parts separated by dots)
+	// Check if version is already fully formatted (has 7 parts separated by dots)
 	parts := strings.Split(version, ".")
-	if len(parts) >= 8 {
+	if len(parts) >= 7 {
 		// Already fully formatted (likely from `dex build`)
 		return version
 	}
 
 	// Not fully formatted - build it from the individual components
-	// Format: major.minor.patch.branch.commit.buildDate.arch.buildHash
+	// Format: major.minor.patch.branch.commit.buildDate.arch
 	arch := fmt.Sprintf("%s-%s", runtime.GOOS, runtime.GOARCH)
 	versionClean := strings.TrimPrefix(version, "v")
 
-	return fmt.Sprintf("%s.%s.%s.%s.%s.%s",
-		versionClean, branch, commit, buildDate, arch, buildHash)
+	return fmt.Sprintf("%s.%s.%s.%s.%s",
+		versionClean, branch, commit, buildDate, arch)
 }

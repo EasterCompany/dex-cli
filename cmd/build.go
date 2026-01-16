@@ -303,7 +303,7 @@ func buildFrontendService(ctx context.Context, def config.ServiceDefinition, log
 	buildDate := time.Now().Format("2006-01-02")
 	arch := runtime.GOARCH
 	shortVersionStr := fmt.Sprintf("%d.%d.%d", major, minor, patch)
-	fullVersionStr := fmt.Sprintf("%s.%s.%s.%s.%s.%s", shortVersionStr, branch, commit, buildDate, arch, commit)
+	fullVersionStr := fmt.Sprintf("%s.%s.%s.%s.%s", shortVersionStr, branch, commit, buildDate, arch)
 
 	log(fmt.Sprintf("[%s] Running frontend build script: %s (Version: %s)", def.ShortName, buildScriptPath, fullVersionStr))
 
