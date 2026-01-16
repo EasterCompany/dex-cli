@@ -140,6 +140,7 @@ func Verify() error {
 				"type":      "system.diagnostic.ping",
 				"timestamp": time.Now().Format(time.RFC3339Nano),
 				"ping_id":   pingId,
+				"source":    "dex-verify",
 			},
 		}
 		jsonBody, _ := json.Marshal(body)
