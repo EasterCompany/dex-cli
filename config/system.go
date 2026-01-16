@@ -77,6 +77,8 @@ var RequiredPackages = []Package{
 	{Name: "eslint", Required: true, InstallCommand: "bun install -g eslint", UpgradeCommand: "bun install -g eslint"},
 	{Name: "stylelint", Required: true, InstallCommand: "bun install -g stylelint", UpgradeCommand: "bun install -g stylelint"},
 	{Name: "htmlhint", Required: true, InstallCommand: "bun install -g htmlhint", UpgradeCommand: "bun install -g htmlhint"},
+	{Name: "vitest", Required: true, InstallCommand: "bun install -g vitest", UpgradeCommand: "bun install -g vitest"},
+	{Name: "happy-dom", Required: true, InstallCommand: "bun install -g happy-dom", UpgradeCommand: "bun install -g happy-dom"},
 	{Name: "nvidia-smi", Required: true, MinVersion: "", InstallCommand: "sudo pacman -S --noconfirm nvidia-utils || sudo apt install -y nvidia-utils", UpgradeCommand: "sudo pacman -Syu --noconfirm nvidia-utils || (sudo apt update && sudo apt upgrade -y nvidia-utils)"},
 	{Name: "nvcc", Required: true, MinVersion: "11.0", InstallCommand: "sudo pacman -S cuda || sudo apt install nvidia-cuda-toolkit", UpgradeCommand: "sudo pacman -Syu cuda || (sudo apt update && sudo apt upgrade -y nvidia-cuda-toolkit)"},
 	{Name: "chromium", Required: true, MinVersion: "", InstallCommand: "sudo pacman -S --noconfirm chromium || sudo apt install -y chromium-browser || sudo apt install -y chromium", UpgradeCommand: "sudo pacman -Syu --noconfirm chromium || (sudo apt update && sudo apt upgrade -y chromium-browser)"},

@@ -206,6 +206,16 @@ func buildFrontendService(ctx context.Context, def config.ServiceDefinition, log
 
 	buildScriptPath := filepath.Join(sourcePath, "scripts", "build.sh")
 
+	// 0. Install Dependencies (Bun)
+	if _, err := os.Stat(filepath.Join(sourcePath, "package.json")); err == nil {
+		log(fmt.Sprintf("[%s] Installing dependencies with Bun...", def.ShortName))
+		installCmd := exec.CommandContext(ctx, "bun", "install")
+		installCmd.Dir = sourcePath
+		if out, err := installCmd.CombinedOutput(); err != nil {
+			return false, fmt.Errorf("bun install failed: %w\n%s", err, string(out))
+		}
+	}
+
 	// 0. Format Code (Prettier)
 	if _, err := exec.LookPath("prettier"); err == nil {
 		log(fmt.Sprintf("[%s] Formatting source code with Prettier...", def.ShortName))
@@ -262,6 +272,19 @@ func buildFrontendService(ctx context.Context, def config.ServiceDefinition, log
 
 	if lintFailed {
 		return false, fmt.Errorf("linting failed, check logs for details")
+	}
+
+	// 0.8. Run Tests (Vitest)
+	vitestConfig := filepath.Join(sourcePath, "vitest.config.js")
+	if _, err := os.Stat(vitestConfig); err == nil {
+		log(fmt.Sprintf("[%s] Running tests with Vitest...", def.ShortName))
+		testCmd := exec.CommandContext(ctx, "bun", "run", "vitest", "run")
+		testCmd.Dir = sourcePath
+		if out, err := testCmd.CombinedOutput(); err != nil {
+			log(fmt.Sprintf("[%s] Tests failed: %v\n%s", def.ShortName, err, string(out)))
+			return false, fmt.Errorf("tests failed")
+		}
+		log(fmt.Sprintf("[%s] Tests passed!", def.ShortName))
 	}
 
 	versionStr := fmt.Sprintf("%d.%d.%d", major, minor, patch)

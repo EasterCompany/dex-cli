@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -329,7 +330,41 @@ func runTestCheck(def config.ServiceDefinition, sourcePath string, log func(stri
 
 	ui.PrintInfo("Running tests...")
 
-	// For Go projects, run go test
+	// CHECK 1: Frontend (Vitest)
+	vitestConfig := filepath.Join(sourcePath, "vitest.config.js")
+	if _, err := os.Stat(vitestConfig); err == nil {
+		// Run Vitest
+		cmd := exec.Command("bun", "run", "vitest", "run", "--reporter=verbose")
+		cmd.Dir = sourcePath
+		output, err := cmd.CombinedOutput()
+		duration := time.Since(startTime)
+
+		outputStr := string(output)
+
+		// Parse Vitest results
+		testCount, failCount := parseVitestOutput(outputStr)
+
+		if err != nil {
+			log(fmt.Sprintf("[%s] Tests failed: %d/%d failed", def.ShortName, failCount, testCount))
+			return TestResult{
+				Status:      "FAILED",
+				Message:     extractVitestFailures(outputStr),
+				Duration:    duration.String(),
+				TestCount:   testCount,
+				FailCount:   failCount,
+				DetailsLine: fmt.Sprintf("%d/%d passed", testCount-failCount, testCount),
+			}
+		}
+
+		return TestResult{
+			Status:      "OK",
+			Duration:    duration.String(),
+			TestCount:   testCount,
+			DetailsLine: fmt.Sprintf("%d passed", testCount),
+		}
+	}
+
+	// CHECK 2: Go Projects
 	if def.Type == "cli" || strings.HasPrefix(def.ID, "dex-") {
 		testArgs := []string{"test", "-v", "-cover"}
 		if includeModels {
@@ -390,6 +425,48 @@ func runTestCheck(def config.ServiceDefinition, sourcePath string, log func(stri
 	}
 
 	return TestResult{Status: "SKIPPED", Message: "testing not configured for this service type", Duration: time.Since(startTime).String()}
+}
+
+// parseVitestOutput extracts test counts from Vitest output
+func parseVitestOutput(output string) (testCount, failCount int) {
+	// Look for: "Tests  2 failed | 1 passed (3)"
+	// Or: "Tests  3 passed (3)"
+	lines := strings.Split(output, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "Tests") {
+			// Extract numbers
+			// Simple heuristic: look for "failed" and "passed"
+			parts := strings.Fields(line)
+			for i, part := range parts {
+				if part == "failed" && i > 0 {
+					if val, err := strconv.Atoi(parts[i-1]); err == nil {
+						failCount = val
+					}
+				}
+				if part == "passed" && i > 0 {
+					if val, err := strconv.Atoi(parts[i-1]); err == nil {
+						testCount += val // Add passed to total
+					}
+				}
+			}
+			// If we found failures, add them to total test count
+			testCount += failCount
+			return
+		}
+	}
+	return
+}
+
+// extractVitestFailures gets the error message from Vitest
+func extractVitestFailures(output string) string {
+	// Vitest output is colored and complex, but usually the errors are printed clearly
+	// We'll return the last 20 lines as a fallback if we can't find specific error blocks
+	lines := strings.Split(output, "\n")
+	if len(lines) > 20 {
+		return "..." + strings.Join(lines[len(lines)-20:], "\n")
+	}
+	return output
 }
 
 // printTestStepResult prints the result of a single test step
