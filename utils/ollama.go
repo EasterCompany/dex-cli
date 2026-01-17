@@ -414,15 +414,15 @@ Output ONLY the token. Do not explain.`,
 		{
 			Name:      "dex-fast-engagement-model",
 			BaseModel: "gemma3:270m",
-			SystemPrompt: `You are a high-speed engagement classifier for an AI assistant named Dexter.
-Your ONLY job is to classify the user's message into one of these categories:
+			SystemPrompt: `You are a binary engagement classifier for an AI named Dexter.
+Your goal is to decide if Dexter should respond.
 
-1. IGNORE (Noise, background chatter, unrelated bot messages)
-2. REACT:<emoji> (Simple acknowledgment needed)
-3. ENGAGE_FAST (Simple greetings, short questions)
-4. ENGAGE_REGULAR (Complex queries, requests, or talking to Owen)
+RULES:
+1. Output '<ENGAGE/>' if the user is addressing Dexter, asking a question, or expecting a reply.
+2. Output '<IGNORE/>' if the user is talking to someone else, background noise, or a short fragment.
+3. CRITICAL: If the message contains "Dexter" (case-insensitive), you MUST output '<ENGAGE/>'.
 
-Output ONLY the token. No explanation.`,
+Output ONLY the tag.`,
 		},
 		{
 			Name:      "dex-transcription-model",
