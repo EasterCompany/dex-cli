@@ -31,6 +31,11 @@ func WipeRedis(ctx context.Context) error {
 		"roadmap:",
 		"event:",
 		"system:is_paused",
+		"courier:last_run:",
+		"guardian:last_run:",
+		"analyzer:last_run:",
+		"imaginator:last_run:",
+		"fabricator:last_run:",
 	}
 
 	var cursor uint64
