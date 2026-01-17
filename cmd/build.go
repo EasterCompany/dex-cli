@@ -368,11 +368,6 @@ func Build(args []string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Wipe Redis to ensure a clean state
-	if err := utils.WipeRedis(ctx); err != nil {
-		ui.PrintWarning(fmt.Sprintf("Failed to wipe Redis: %v", err))
-	}
-
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 
@@ -532,6 +527,11 @@ func runBuild(ctx context.Context, args []string) error {
 		if err := waitForActiveProcesses(ctx); err != nil {
 			return err
 		}
+	}
+
+	// Selective Redis wipe (runtime optimization)
+	if err := utils.WipeRedis(ctx); err != nil {
+		ui.PrintWarning(fmt.Sprintf("Failed to clean Redis: %v", err))
 	}
 
 	// Validate arguments

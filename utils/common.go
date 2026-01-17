@@ -15,20 +15,63 @@ import (
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
-// WipeRedis clears the entire Redis database.
+// WipeRedis clears ephemeral runtime state from Redis while preserving persistent data.
 func WipeRedis(ctx context.Context) error {
-	ui.PrintInfo("Wiping Redis database (clearing runtime state)...")
+	ui.PrintInfo("Cleaning Redis runtime state (preserving dossiers and history)...")
 	redisClient, err := cache.GetLocalClient(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to connect to Redis: %w", err)
 	}
 	defer func() { _ = redisClient.Close() }()
 
-	if err := redisClient.FlushAll(ctx).Err(); err != nil {
-		return fmt.Errorf("failed to wipe Redis: %w", err)
+	persistentPrefixes := []string{
+		"user:profile:",
+		"events:user:",
+		"chores:",
+		"roadmap:",
+		"event:",
+		"system:is_paused",
 	}
 
-	ui.PrintSuccess("Redis database wiped.")
+	var cursor uint64
+	deletedCount := 0
+	preservedCount := 0
+
+	for {
+		var keys []string
+		var err error
+		keys, cursor, err = redisClient.Scan(ctx, cursor, "*", 100).Result()
+		if err != nil {
+			return fmt.Errorf("failed to scan Redis keys: %w", err)
+		}
+
+		for _, key := range keys {
+			isPersistent := false
+			for _, prefix := range persistentPrefixes {
+				if strings.HasPrefix(key, prefix) {
+					isPersistent = true
+					break
+				}
+			}
+
+			if isPersistent {
+				preservedCount++
+				continue
+			}
+
+			if err := redisClient.Del(ctx, key).Err(); err != nil {
+				ui.PrintWarning(fmt.Sprintf("Failed to delete key %s: %v", key, err))
+			} else {
+				deletedCount++
+			}
+		}
+
+		if cursor == 0 {
+			break
+		}
+	}
+
+	ui.PrintSuccess(fmt.Sprintf("Redis cleanup complete. Removed %d ephemeral keys, preserved %d persistent items.", deletedCount, preservedCount))
 	return nil
 }
 
