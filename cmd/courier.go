@@ -42,22 +42,19 @@ type AIChoreResult struct {
 
 func Courier(args []string) error {
 	ui.PrintHeader("Courier Protocol")
-	ui.PrintRunningStatus("Checking for active chores...")
+	ui.PrintRunningStatus("Checking for active research tasks...")
 
-	eventDef, err := config.Resolve("event")
-	if err != nil {
-		return fmt.Errorf("failed to resolve event service: %w", err)
-	}
+	eventDef := config.GetServiceDefinition("dex-event-service")
 
-	// Fetch Chores
+	// Fetch Tasks
 	body, _, err := utils.GetHTTPBody(eventDef.GetHTTP("/chores"))
 	if err != nil {
-		return fmt.Errorf("failed to fetch chores: %w", err)
+		return fmt.Errorf("failed to fetch tasks: %w", err)
 	}
 
 	var chores []Chore
 	if err := json.Unmarshal(body, &chores); err != nil {
-		return fmt.Errorf("failed to parse chores: %w", err)
+		return fmt.Errorf("failed to parse tasks: %w", err)
 	}
 
 	runCount := 0
@@ -81,23 +78,22 @@ func Courier(args []string) error {
 		}
 
 		runCount++
-		// De-reference eventDef here
-		if err := executeChore(*eventDef, chore); err != nil {
-			ui.PrintError(fmt.Sprintf("Failed to execute chore '%s': %v", chore.NaturalInstruction, err))
+		if err := executeChore(eventDef, chore); err != nil {
+			ui.PrintError(fmt.Sprintf("Failed to execute task '%s': %v", chore.NaturalInstruction, err))
 		}
 	}
 
 	if runCount == 0 {
-		ui.PrintInfo("No chores due.")
+		ui.PrintInfo("No research tasks due.")
 	} else {
-		ui.PrintSuccess(fmt.Sprintf("Completed %d chores.", runCount))
+		ui.PrintSuccess(fmt.Sprintf("Completed %d research tasks.", runCount))
 	}
 
 	return nil
 }
 
 func executeChore(eventDef config.ServiceDefinition, chore Chore) error {
-	ui.PrintInfo(fmt.Sprintf("Running chore: %s", chore.NaturalInstruction))
+	ui.PrintInfo(fmt.Sprintf("Running task: %s", chore.NaturalInstruction))
 
 	// 1. Fetch Content via Web Service
 	webDef, err := config.Resolve("web")

@@ -330,7 +330,8 @@ func printUsage() {
 	})
 	ui.PrintKeyValBlock("courier", []ui.KeyVal{
 		{Key: "Usage", Value: "dex courier [run]"},
-		{Key: "Desc", Value: "Run the Courier Protocol to execute active chores."},
+		{Key: "Cmd", Value: "courier"},
+		{Key: "Desc", Value: "Run the Courier Protocol to execute active research tasks."},
 	})
 	ui.PrintKeyValBlock("event", []ui.KeyVal{
 		{Key: "Usage", Value: "dex event [subcommand]"},
