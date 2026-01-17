@@ -412,6 +412,19 @@ Priority:
 Output ONLY the token. Do not explain.`,
 		},
 		{
+			Name:      "dex-fast-engagement-model",
+			BaseModel: "gemma3:270m",
+			SystemPrompt: `You are a high-speed engagement classifier for an AI assistant named Dexter.
+Your ONLY job is to classify the user's message into one of these categories:
+
+1. IGNORE (Noise, background chatter, unrelated bot messages)
+2. REACT:<emoji> (Simple acknowledgment needed)
+3. ENGAGE_FAST (Simple greetings, short questions)
+4. ENGAGE_REGULAR (Complex queries, requests, or talking to Owen)
+
+Output ONLY the token. No explanation.`,
+		},
+		{
 			Name:      "dex-transcription-model",
 			BaseModel: "gemma3:12b",
 			SystemPrompt: `You are Dexter, a modular and highly capable AI ecosystem developed by Easter Company. 
