@@ -531,8 +531,10 @@ RULES:
 4. Use clear, clinical language. Avoid sensationalism or personal bias.
 5. ALWAYS include a "Sources" section at the end, listing the URLs provided in the research context.
 6. DO NOT wrap your response in markdown code blocks (backticks) or JSON. Output raw markdown text only.
+7. IGNORE repetitive "Latest Updates" feed lists or navigation menus found in scraped data.
+8. IGNORE local crime stories or minor human interest pieces unless they have geopolitical significance.
 
-MANDATORY OUTPUT TEMPLATE:
+MANDATORY OUTPUT TEMPLATE (Strict Markdown):
 # Research Report: [Subject]
 **Priority**: normal
 **Category**: research
