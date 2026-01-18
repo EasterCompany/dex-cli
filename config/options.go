@@ -15,6 +15,13 @@ type OptionsConfig struct {
 	Logging  bool                              `json:"logging"`
 	Discord  DiscordOptions                    `json:"discord"`
 	Services map[string]map[string]interface{} `json:"services"`
+	Ollama   OllamaOptions                     `json:"ollama"`
+}
+
+// OllamaOptions holds configuration for model placement and optimization
+type OllamaOptions struct {
+	ForceUtilityCPU bool              `json:"force_utility_cpu"`
+	ModelDevices    map[string]string `json:"model_devices"` // e.g., "dex-commit-model": "cpu"
 }
 
 // DiscordOptions holds discord specific configurations
@@ -48,6 +55,10 @@ func DefaultOptionsConfig() *OptionsConfig {
 			"tts": {
 				"device": "cpu",
 			},
+		},
+		Ollama: OllamaOptions{
+			ForceUtilityCPU: true,
+			ModelDevices:    make(map[string]string),
 		},
 	}
 }

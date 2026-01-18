@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/EasterCompany/dex-cli/config"
 	"github.com/EasterCompany/dex-cli/ui"
 )
 
@@ -162,7 +163,6 @@ func ListModelNames() ([]string, error) {
 }
 
 // PullModel initiates a model download and prints progress to os.Stdout using the UI library.
-// This function intentionally breaks the "no print" rule of the utility package to fulfill the progress requirement.
 func PullModel(modelID string) error {
 	url := DefaultOllamaURL + "/api/pull"
 	reqBody := PullRequest{Name: modelID}
@@ -210,29 +210,24 @@ func PullModel(modelID string) error {
 
 		var chunk PullResponse
 		if jsonErr := json.Unmarshal([]byte(line), &chunk); jsonErr != nil {
-			// Silently skip malformed chunks
 			continue
 		}
 
-		// Update status
 		if chunk.Status != "" {
 			lastStatus = chunk.Status
 		}
 
 		if chunk.Total > 0 && chunk.Completed > 0 {
-			// Show progress bar with download info
 			percent := float64(chunk.Completed) / float64(chunk.Total) * 100
 			label := fmt.Sprintf("Pulling %s (%s/%s)", modelID, formatBytes(chunk.Completed), formatBytes(chunk.Total))
 			ui.PrintProgressBar(label, int(percent))
 		} else {
-			// Show spinner for status updates without progress
 			label := fmt.Sprintf("%s: %s", lastStatus, modelID)
 			ui.PrintSpinner(label, spinFrame)
 			spinFrame++
 		}
 	}
 
-	// Clear the line and print completion message
 	ui.ClearLine()
 	ui.PrintSuccess(fmt.Sprintf("Successfully pulled model: %s", modelID))
 	return nil
@@ -254,7 +249,6 @@ func formatBytes(b int64) string {
 func PullHardcodedModels() error {
 	var errs []error
 
-	// Step 1: Pull base models
 	ui.PrintInfo("Pulling base models...")
 	for _, model := range DefaultModels {
 		if err := PullModel(model); err != nil {
@@ -273,7 +267,6 @@ func PullHardcodedModels() error {
 		return fmt.Errorf("%s", sb.String())
 	}
 
-	// Step 2: Create custom forked models
 	ui.PrintInfo("Creating custom Dexter models...")
 	if err := CreateCustomModels(); err != nil {
 		ui.PrintWarning(fmt.Sprintf("Failed to create custom models (non-fatal): %v", err))
@@ -288,27 +281,22 @@ func CleanupNonDefaultModels() error {
 		return fmt.Errorf("failed to list models: %w", err)
 	}
 
-	// Create a map of default models for quick lookup
 	defaultMap := make(map[string]bool)
 	for _, model := range DefaultModels {
 		defaultMap[model] = true
 	}
 
-	// Also keep our custom dex models
 	var toDelete []string
 	for _, model := range models {
-		// Skip if it's a default model
 		if defaultMap[model] {
 			continue
 		}
-		// Skip if it's a dex- prefixed model (our custom models)
 		if strings.HasPrefix(model, "dex-") {
 			continue
 		}
 		toDelete = append(toDelete, model)
 	}
 
-	// Delete non-default models
 	for _, model := range toDelete {
 		ui.PrintInfo(fmt.Sprintf("  Removing model: %s", model))
 		if err := DeleteModel(model); err != nil {
@@ -358,13 +346,24 @@ type CustomModel struct {
 	BaseModel    string
 	SystemPrompt string
 	Parameters   map[string]interface{}
+	IsUtility    bool
 }
 
 func CreateCustomModels() error {
+	// Load options to check for placement overrides
+	opts, _ := config.LoadOptionsConfig()
+	forceCPU := true
+	var modelOverrides map[string]string
+	if opts != nil {
+		forceCPU = opts.Ollama.ForceUtilityCPU
+		modelOverrides = opts.Ollama.ModelDevices
+	}
+
 	customModels := []CustomModel{
 		{
 			Name:      "dex-commit-model",
 			BaseModel: "gemma3:12b",
+			IsUtility: true,
 			SystemPrompt: `You are a git commit message generator. Analyze the provided diff and generate a concise, one-line commit message.
 
 Format: <type>: <description>
@@ -382,6 +381,7 @@ Rules:
 		{
 			Name:      "dex-summary-model",
 			BaseModel: "gemma3:12b",
+			IsUtility: false, // Heavy summary, keep on GPU by default if possible
 			SystemPrompt: `
 You are a specialized AI assistant for generating summaries out of large and small bodies of text.
 You may only create text summaries.
@@ -393,6 +393,7 @@ Your task is to analyze a piece of text (various formats: message logs, poems, n
 		{
 			Name:      "dex-fast-summary-model",
 			BaseModel: "gemma3:1b",
+			IsUtility: true,
 			SystemPrompt: `
 You are a specialized AI assistant for generating summaries out of large and small bodies of text.
 You may only create text summaries.
@@ -404,6 +405,7 @@ Your task is to analyze a piece of text (various formats: message logs, poems, n
 		{
 			Name:      "dex-scraper-model",
 			BaseModel: "gemma3:12b",
+			IsUtility: false,
 			SystemPrompt: `You are a web content analyzer. Your task is to analyze scraped HTML content and provide a concise, informative summary.
 Focus on the main article content, product details, or key information.
 Ignore navigation menus, footers, and advertisements.
@@ -415,6 +417,7 @@ Your output will be used as context for another AI, so prioritize clarity and de
 		{
 			Name:      "dex-engagement-model",
 			BaseModel: "gemma3:12b",
+			IsUtility: false,
 			SystemPrompt: `You are an engagement strategist for an AI assistant named Dexter. Your task is to determine the best way for Dexter to engage with the current conversation context.
 
 Analyze the context and the user's intent. Output EXACTLY one of the following tokens:
@@ -437,13 +440,14 @@ Output ONLY the token. Do not explain.`,
 		{
 			Name:      "dex-fast-engagement-model",
 			BaseModel: "gemma3:270m",
+			IsUtility: true,
 			SystemPrompt: `You are a binary engagement classifier for an AI named Dexter.
 Your goal is to decide if Dexter should respond.
 
 RULES:
-1. Output '<ENGAGE/>' if the user is addressing Dexter, asking a question, or expecting a reply.
-2. Output '<IGNORE/>' if the user is talking to someone else, background noise, or a short fragment.
-3. CRITICAL: If the message contains "Dexter" (case-insensitive), you MUST output '<ENGAGE/>'.
+1. Output "<ENGAGE/>" if the user is addressing Dexter, asking a question, or expecting a reply.
+2. Output "<IGNORE/>" if the user is talking to someone else, background noise, or a short fragment.
+3. CRITICAL: If the message contains "Dexter" (case-insensitive), you MUST output "<ENGAGE/>".
 
 Output ONLY the tag.`,
 			Parameters: map[string]interface{}{
@@ -453,6 +457,7 @@ Output ONLY the tag.`,
 		{
 			Name:      "dex-transcription-model",
 			BaseModel: "gemma3:12b",
+			IsUtility: false,
 			SystemPrompt: `You are Dexter, a modular and highly capable AI ecosystem developed by Easter Company. 
 You are not just a chatbot; you are the cognitive core of a distributed system designed for server management, content analysis, and user engagement.
 Your personality is professional, direct, and slightly technical, but you are capable of nuanced social interaction.
@@ -476,6 +481,7 @@ VOICE INTERACTION RULES:
 		{
 			Name:      "dex-private-message-model",
 			BaseModel: "gemma3:12b",
+			IsUtility: false,
 			SystemPrompt: `You are Dexter, a modular and highly capable AI ecosystem developed by Easter Company.
 Your personality is professional, direct, and conservative christian.
 Your primary objective is to learn and consume information, your secondary objective is to share and distribute refined high value information to others.
@@ -500,6 +506,7 @@ PRIVATE MESSAGE (DM) RULES:
 		{
 			Name:      "dex-public-message-model",
 			BaseModel: "gemma3:12b",
+			IsUtility: false,
 			SystemPrompt: `You are Dexter, a modular and highly capable AI ecosystem developed by Easter Company. 
 You are not just a chatbot; you are the cognitive core of a distributed system designed for server management, content analysis, and user engagement.
 Your personality is professional, direct, and slightly technical, but you are capable of nuanced social interaction.
@@ -531,6 +538,7 @@ PUBLIC CHAT RULES:
 		{
 			Name:      "dex-guardian-sentry",
 			BaseModel: "gemma3:12b",
+			IsUtility: false,
 			SystemPrompt: `You are Dexter's Guardian (Sentry) model. You are the front line against system instability.
 You're like "Dexter's immune system". And like the human immune system you must surgically identify issues to report,
 without reporting issues which are not actually issues - the immune system is capable of attacking the host in ways
@@ -569,6 +577,7 @@ MANDATORY OUTPUT TEMPLATE IF NOT "<NO_ALERT/>":
 		{
 			Name:      "dex-researcher-model",
 			BaseModel: "gemma3:12b",
+			IsUtility: false,
 			SystemPrompt: `You are Dexter's Researcher model. You are a high-fidelity intelligence analyst specializing in worldwide news and political research.
 You're like "Dexter's eyes and ears" on the web. Like a professional intelligence officer, you must surgically extract and synthesize information to report,
 without reporting fluff or unverified claims. Hallucinated news or bias can degrade the system's strategic layer, be extremely careful.
@@ -609,6 +618,7 @@ MANDATORY OUTPUT TEMPLATE (Strict Markdown):
 		{
 			Name:      "dex-imaginator-model",
 			BaseModel: "gemma3:12b",
+			IsUtility: false,
 			SystemPrompt: `You are the Imaginator (Alert Review Protocol). You are a specialized architect designed to synthesize alerts into actionable Blueprints.
 
 Your ONLY output must be a structured Blueprint.
@@ -638,6 +648,7 @@ Output Format:
 		{
 			Name:      "dex-vision-model",
 			BaseModel: "qwen3-vl:8b",
+			IsUtility: false,
 			SystemPrompt: `You are a visual analysis engine for an AI assistant named Dexter. 
 Your job is to describe images and video frames concisely and accurately. 
 Focus on key elements, text, people, and actions. 
@@ -646,15 +657,16 @@ Output ONLY the description.`,
 		{
 			Name:      "dex-router-model",
 			BaseModel: "gemma3:12b",
+			IsUtility: true,
 			SystemPrompt: `You are an intent router for a link analysis system. Your job is to determine the best analysis method for a given URL based on the user's message and the link itself.
 
 Analyze the user's message and the URL.
-- If the user explicitly asks for a screenshot, visual check, or "what does this look like?" -> '<VISUAL/>'
-- If the URL is known to be a JavaScript-heavy SPA (e.g., complex dashboards, tradingview, maps) where static scraping would fail -> '<VISUAL/>'
-- If the user just shares a link for context or summary -> '<STATIC/>'
-- If unsure -> '<STATIC/>'
+- If the user explicitly asks for a screenshot, visual check, or "what does this look like?" -> "<VISUAL/>"
+- If the URL is known to be a JavaScript-heavy SPA (e.g., complex dashboards, tradingview, maps) where static scraping would fail -> "<VISUAL/>"
+- If the user just shares a link for context or summary -> "<STATIC/>"
+- If unsure -> "<STATIC/>"
 
-Output ONLY '<VISUAL/>' or '<STATIC/>'. Do not explain.`,
+Output ONLY "<VISUAL/>" or "<STATIC/>". Do not explain.`,
 			Parameters: map[string]interface{}{
 				"num_ctx": 2048,
 			},
@@ -662,15 +674,16 @@ Output ONLY '<VISUAL/>' or '<STATIC/>'. Do not explain.`,
 		{
 			Name:      "dex-moderation-model",
 			BaseModel: "gemma3:12b",
+			IsUtility: true,
 			SystemPrompt: `You are a specialized content moderation sentry. Your job is to analyze text metadata (titles, descriptions, URLs) for explicit pornographic content.
 
 OBJECTIVE:
 Identify hardcore pornography and explicit sexual content.
 
 RULES:
-1. Output '<EXPLICIT_CONTENT_DETECTED/>' ONLY if the metadata describes clear pornography, adult websites, or explicit sexual acts.
-2. Output '<SAFE_CONTENT/>' if the content is a meme, a GIF, a car, general internet humor, or anything else that is not explicit pornography.
-3. BE CONSERVATIVE: If you are not 100% sure the content is prohibited pornography, you MUST output '<SAFE_CONTENT/>'.
+1. Output "<EXPLICIT_CONTENT_DETECTED/>" ONLY if the metadata describes clear pornography, adult websites, or explicit sexual acts.
+2. Output "<SAFE_CONTENT/>" if the content is a meme, a GIF, a car, general internet humor, or anything else that is not explicit pornography.
+3. BE CONSERVATIVE: If you are not 100% sure the content is prohibited pornography, you MUST output "<SAFE_CONTENT/>".
 4. Common GIF sites (Tenor, Giphy) and social media memes are almost always SAFE.
 
 OUTPUT FORMAT:
@@ -682,19 +695,35 @@ Output ONLY the specialized tag. Do not explain.`,
 		{
 			Name:      "dex-master-model",
 			BaseModel: "llama4:16x17b",
+			IsUtility: false,
 			Parameters: map[string]interface{}{
-				"num_gpu": 0,
+				"num_gpu": 0, // Master model is too big for GPU, force CPU
 				"num_ctx": 32768,
 			},
 		},
 	}
 
 	for _, model := range customModels {
-		// First, delete the existing custom model if it exists (to force rebuild)
-		ui.PrintInfo(fmt.Sprintf("  Rebuilding %s from %s...", model.Name, model.BaseModel))
-		_ = DeleteModel(model.Name) // Ignore error - model might not exist yet
+		if model.Parameters == nil {
+			model.Parameters = make(map[string]interface{})
+		}
 
-		// Create fresh custom model
+		// Device placement logic
+		device, hasOverride := modelOverrides[model.Name]
+		if !hasOverride && model.IsUtility && forceCPU {
+			device = "cpu"
+		}
+
+		switch device {
+		case "cpu":
+			model.Parameters["num_gpu"] = 0
+		case "cuda", "gpu":
+			model.Parameters["num_gpu"] = -1
+		}
+
+		ui.PrintInfo(fmt.Sprintf("  Rebuilding %s from %s...", model.Name, model.BaseModel))
+		_ = DeleteModel(model.Name)
+
 		if err := CreateModelFromBase(model.Name, model.BaseModel, model.SystemPrompt, model.Parameters); err != nil {
 			ui.PrintWarning(fmt.Sprintf("  Failed to create %s: %v", model.Name, err))
 			continue
@@ -707,7 +736,6 @@ Output ONLY the specialized tag. Do not explain.`,
 
 // CreateModelFromBase creates a custom model from a base model using the Ollama API.
 func CreateModelFromBase(customName, baseModel, systemPrompt string, parameters map[string]interface{}) error {
-	// Use explicit API fields instead of a modelfile string
 	url := DefaultOllamaURL + "/api/create"
 	reqBody := map[string]interface{}{
 		"name":       customName,
@@ -740,7 +768,6 @@ func CreateModelFromBase(customName, baseModel, systemPrompt string, parameters 
 		return fmt.Errorf("create failed (status %d): %s", resp.StatusCode, strings.TrimSpace(string(respBody)))
 	}
 
-	// Read the streaming response (model creation sends progress updates)
 	reader := bufio.NewReader(resp.Body)
 	for {
 		line, err := reader.ReadString('\n')
@@ -750,8 +777,6 @@ func CreateModelFromBase(customName, baseModel, systemPrompt string, parameters 
 		if err != nil {
 			return fmt.Errorf("error reading create response: %w", err)
 		}
-		// The response is JSON lines with status updates, but we'll just consume them
-		// In the future, we could parse and display progress
 		_ = line
 	}
 
@@ -843,7 +868,6 @@ func ChatStream(modelID string, messages []Message, onChunk func(string)) error 
 }
 
 // GenerateContent sends a prompt to a specified model and waits for the complete response.
-// It uses the non-streaming mode of the /api/generate endpoint.
 func GenerateContent(modelID, prompt string) (string, error) {
 	reqBody := GenerateRequest{
 		Model:  modelID,
@@ -864,7 +888,7 @@ func GenerateContent(modelID, prompt string) (string, error) {
 	return response.Response, nil
 }
 
-// GetOllamaStatus checks if the Ollama service is reachable and prints the status using UI functions.
+// GetOllamaStatus checks if the Ollama service is reachable.
 func GetOllamaStatus() error {
 	url := DefaultOllamaURL
 	req, err := http.NewRequest(http.MethodHead, url, nil)
@@ -882,8 +906,7 @@ func GetOllamaStatus() error {
 	status := "OFFLINE"
 	message := fmt.Sprintf("Could not reach service at %s", url)
 
-	if err != nil {
-	} else {
+	if err == nil {
 		defer func() { _ = resp.Body.Close() }()
 		if resp.StatusCode == http.StatusOK {
 			status = "ONLINE"
@@ -907,7 +930,6 @@ func GenerateCommitMessage(diff string) string {
 		return "chore: code clean up"
 	}
 
-	// Truncate diff if too long (use a larger portion of context window)
 	const maxDiffLength = 6000
 	if len(diff) > maxDiffLength {
 		diff = diff[:maxDiffLength] + "\n...(truncated)"
@@ -919,13 +941,9 @@ func GenerateCommitMessage(diff string) string {
 		return "chore: code clean up"
 	}
 
-	// Clean up the message
 	finalMsg := strings.TrimSpace(commitMsg)
+	finalMsg = strings.Trim(finalMsg, "'\"")
 
-	// If the model wrapped it in quotes, remove them
-	finalMsg = strings.Trim(finalMsg, "\"'")
-
-	// If the model still used XML tags despite instructions, strip them
 	startTag := "<answer>"
 	endTag := "</answer>"
 	if strings.Contains(finalMsg, startTag) && strings.Contains(finalMsg, endTag) {
@@ -935,21 +953,16 @@ func GenerateCommitMessage(diff string) string {
 		finalMsg = strings.TrimSpace(finalMsg)
 	}
 
-	// Basic validation: Look for the colon separator "type: description"
 	if finalMsg != "" {
-		// Ensure it starts with a known type or looks like "type: "
-		// If it doesn't contain a colon, it might just be a description
 		if !strings.Contains(finalMsg, ":") {
 			finalMsg = "update: " + finalMsg
 		}
 
-		// Limit length (standard git shortlog)
 		if len(finalMsg) > 72 {
 			finalMsg = finalMsg[:69] + "..."
 		}
 		return finalMsg
 	}
 
-	// Fallback
 	return "chore: code clean up"
 }

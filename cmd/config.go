@@ -56,14 +56,24 @@ func setServiceOption(service, key, value string) error {
 		return fmt.Errorf("failed to load options: %w", err)
 	}
 
-	if opts.Services == nil {
-		opts.Services = make(map[string]map[string]interface{})
+	if service == "ollama" {
+		if key == "force_utility_cpu" {
+			opts.Ollama.ForceUtilityCPU = (value == "true")
+		} else {
+			if opts.Ollama.ModelDevices == nil {
+				opts.Ollama.ModelDevices = make(map[string]string)
+			}
+			opts.Ollama.ModelDevices[key] = value
+		}
+	} else {
+		if opts.Services == nil {
+			opts.Services = make(map[string]map[string]interface{})
+		}
+		if opts.Services[service] == nil {
+			opts.Services[service] = make(map[string]interface{})
+		}
+		opts.Services[service][key] = value
 	}
-	if opts.Services[service] == nil {
-		opts.Services[service] = make(map[string]interface{})
-	}
-
-	opts.Services[service][key] = value
 
 	if err := config.SaveOptionsConfig(opts); err != nil {
 		return fmt.Errorf("failed to save options: %w", err)
@@ -79,7 +89,18 @@ func getServiceOption(service, key string) error {
 		return fmt.Errorf("failed to load options: %w", err)
 	}
 
-	if opts.Services != nil && opts.Services[service] != nil {
+	if service == "ollama" {
+		if key == "force_utility_cpu" {
+			fmt.Println(opts.Ollama.ForceUtilityCPU)
+			return nil
+		}
+		if opts.Ollama.ModelDevices != nil {
+			if val, ok := opts.Ollama.ModelDevices[key]; ok {
+				fmt.Println(val)
+				return nil
+			}
+		}
+	} else if opts.Services != nil && opts.Services[service] != nil {
 		if val, ok := opts.Services[service][key]; ok {
 			fmt.Println(val)
 			return nil
