@@ -200,7 +200,7 @@ func EnsureServiceLogFiles() error {
 // EnsureConfigFiles creates and validates all config files.
 func EnsureConfigFiles() error {
 	// Service Map
-	_, err := LoadServiceMapConfig()
+	userMap, err := LoadServiceMapConfig()
 	if err != nil {
 		if os.IsNotExist(err) {
 			fmt.Println("Creating default service-map.json...")
@@ -209,6 +209,14 @@ func EnsureConfigFiles() error {
 			}
 		} else {
 			return fmt.Errorf("failed to load service-map.json: %w", err)
+		}
+	} else {
+		// File exists, check if it needs healing (missing new services)
+		if healed := healServiceMapConfig(userMap, DefaultServiceMapConfig()); healed {
+			fmt.Println("Healing service-map.json: Added missing services.")
+			if err := SaveServiceMapConfig(userMap); err != nil {
+				return fmt.Errorf("failed to save healed service-map.json: %w", err)
+			}
 		}
 	}
 
@@ -249,6 +257,39 @@ func EnsureConfigFiles() error {
 	}
 
 	return nil
+}
+
+// healServiceMapConfig adds missing services from default to user config.
+// It modifies userMap directly. Returns true if changes were made.
+func healServiceMapConfig(userMap *ServiceMapConfig, defaultMap *ServiceMapConfig) bool {
+	healed := false
+	if userMap.Services == nil {
+		userMap.Services = make(map[string][]ServiceEntry)
+	}
+
+	for category, defaultServices := range defaultMap.Services {
+		if _, exists := userMap.Services[category]; !exists {
+			userMap.Services[category] = defaultServices
+			healed = true
+			continue
+		}
+
+		// Check for missing individual services within the category
+		for _, defSvc := range defaultServices {
+			found := false
+			for _, userSvc := range userMap.Services[category] {
+				if userSvc.ID == defSvc.ID {
+					found = true
+					break
+				}
+			}
+			if !found {
+				userMap.Services[category] = append(userMap.Services[category], defSvc)
+				healed = true
+			}
+		}
+	}
+	return healed
 }
 
 // healOptionsConfig merges the default config into the user's config to add missing fields.
