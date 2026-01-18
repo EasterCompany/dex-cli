@@ -249,6 +249,9 @@ Output JSON ONLY. No markdown wrapper.`,
 		// Update Memory
 		if len(result.Items) > 0 {
 			newMemory := append(chore.Memory, result.Items...)
+			if newMemory == nil {
+				newMemory = []string{}
+			}
 
 			// Call POST /chores/{id}/run
 			runURL := eventDef.GetHTTP(fmt.Sprintf("/chores/%s/run", chore.ID))
@@ -264,7 +267,15 @@ Output JSON ONLY. No markdown wrapper.`,
 		ui.PrintInfo("Nothing new found.")
 		// Update LastRun only
 		runURL := eventDef.GetHTTP(fmt.Sprintf("/chores/%s/run", chore.ID))
-		if _, _, err := utils.PostHTTP(runURL, nil); err != nil {
+		// Explicitly send empty memory if it's currently nil to fix the state
+		var jsonPayload []byte
+		if chore.Memory == nil {
+			payload := map[string]interface{}{
+				"memory": []string{},
+			}
+			jsonPayload, _ = json.Marshal(payload)
+		}
+		if _, _, err := utils.PostHTTP(runURL, jsonPayload); err != nil {
 			ui.PrintWarning(fmt.Sprintf("Failed to update chore last_run: %v", err))
 		}
 	}
