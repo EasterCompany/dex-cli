@@ -385,6 +385,14 @@ You may only create text summaries.
 Your task is to analyze a piece of text (various formats: message logs, poems, news article) and generate clear, concise, and meaningful summary.`,
 		},
 		{
+			Name:      "dex-fast-summary-model",
+			BaseModel: "gemma3:1b",
+			SystemPrompt: `
+You are a specialized AI assistant for generating summaries out of large and small bodies of text.
+You may only create text summaries.
+Your task is to analyze a piece of text (various formats: message logs, poems, news article) and generate clear, concise, and meaningful summary.`,
+		},
+		{
 			Name:      "dex-scraper-model",
 			BaseModel: "gemma3:12b",
 			SystemPrompt: `You are a web content analyzer. Your task is to analyze scraped HTML content and provide a concise, informative summary.
@@ -405,7 +413,7 @@ Analyze the context and the user's intent. Output EXACTLY one of the following t
 4. ENGAGE_REGULAR: For complex queries, technical tasks, deep discussions, or if the user is Owen.
 
 Priority:
-- If the user is Owen (master user), you should almost always choose ENGAGE_REGULAR.
+- If the last user to speak was Owen (master user), you should almost always choose ENGAGE_REGULAR.
 - Favor REACT for acknowledgment of simple statements that don't need a text response.
 - Favor ENGAGE_FAST for low-complexity social interactions to save system resources.
 
