@@ -13,18 +13,54 @@ import (
 )
 
 type Chore struct {
-	ID                 string `json:"id"`
-	OwnerID            string `json:"owner_id"`
-	Status             string `json:"status"`
-	Schedule           string `json:"schedule"`
-	LastRun            int64  `json:"last_run"`
-	NaturalInstruction string `json:"natural_instruction"`
+	ID                 string   `json:"id"`
+	OwnerID            string   `json:"owner_id"`
+	Recipients         []string `json:"recipients"`
+	Status             string   `json:"status"`
+	Schedule           string   `json:"schedule"`
+	RunAt              string   `json:"run_at"`
+	LastRun            int64    `json:"last_run"`
+	NaturalInstruction string   `json:"natural_instruction"`
 	ExecutionPlan      struct {
 		EntryURL        string `json:"entry_url"`
 		SearchQuery     string `json:"search_query"`
 		ExtractionFocus string `json:"extraction_focus"`
 	} `json:"execution_plan"`
 	Memory []string `json:"memory"`
+}
+
+func isChoreDue(chore Chore) bool {
+	now := time.Now()
+
+	// Case 1: Standard Interval (every_X)
+	if strings.HasPrefix(chore.Schedule, "every_") {
+		interval := 6 * time.Hour // Default
+		durStr := strings.TrimPrefix(chore.Schedule, "every_")
+		if d, err := time.ParseDuration(durStr); err == nil {
+			interval = d
+		}
+		return time.Since(time.Unix(chore.LastRun, 0)) >= interval
+	}
+
+	// Case 2: Specified Time (daily at HH:MM)
+	if chore.Schedule == "daily" && chore.RunAt != "" {
+		var hr, mn int
+		_, err := fmt.Sscanf(chore.RunAt, "%d:%d", &hr, &mn)
+		if err != nil {
+			return false
+		}
+
+		// Create a time object for "today at RunAt"
+		scheduledTime := time.Date(now.Year(), now.Month(), now.Day(), hr, mn, 0, 0, now.Location())
+
+		// If we are currently past the scheduled time today
+		if now.After(scheduledTime) {
+			// It is due if it hasn't run since today's scheduled time
+			return chore.LastRun < scheduledTime.Unix()
+		}
+	}
+
+	return false
 }
 
 type MetadataResponse struct {
@@ -63,17 +99,8 @@ func Courier(args []string) error {
 			continue
 		}
 
-		// Check Schedule
-		interval := 6 * time.Hour // Default
-		if strings.HasPrefix(chore.Schedule, "every_") {
-			durStr := strings.TrimPrefix(chore.Schedule, "every_")
-			if d, err := time.ParseDuration(durStr); err == nil {
-				interval = d
-			}
-		}
-
 		// Check if due
-		if time.Since(time.Unix(chore.LastRun, 0)) < interval {
+		if !isChoreDue(chore) {
 			continue
 		}
 
