@@ -70,9 +70,44 @@ func Agent(args []string) error {
 			return fmt.Errorf("command required for fabricator")
 		}
 		return handleFabricator(def, command, force)
+	case "courier":
+		if command == "" {
+			return fmt.Errorf("command required for courier")
+		}
+		return handleCourier(def, command, force)
 	default:
-		return fmt.Errorf("unknown agent: %s. Available agents: guardian, analyzer, imaginator, fabricator", agentName)
+		return fmt.Errorf("unknown agent: %s. Available agents: guardian, analyzer, imaginator, fabricator, courier", agentName)
 	}
+}
+
+func handleCourier(def *config.ServiceDefinition, command string, force bool) error {
+	switch command {
+	case "run":
+		// Just reuse the existing Courier logic for now
+		return Courier([]string{"run"})
+	case "reset":
+		ui.PrintHeader("Courier Reset")
+		ui.PrintInfo("Resetting Courier protocols...")
+
+		url := fmt.Sprintf("%s?protocol=researcher", def.GetHTTP("/agent/reset"))
+		req, _ := http.NewRequest("POST", url, nil)
+		client := &http.Client{Timeout: 10 * time.Second}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("failed to reset courier: %w", err)
+		}
+		defer func() { _ = resp.Body.Close() }()
+
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("courier reset failed with status: %d", resp.StatusCode)
+		}
+
+		ui.PrintSuccess("Courier protocols reset successfully.")
+	default:
+		return fmt.Errorf("unknown courier command: %s", command)
+	}
+	return nil
 }
 
 func handleFabricator(def *config.ServiceDefinition, command string, force bool) error {

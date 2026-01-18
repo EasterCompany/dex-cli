@@ -165,9 +165,6 @@ func main() {
 	case "agent":
 		runCommand(func() error { return cmd.Agent(os.Args[2:]) })
 
-	case "courier":
-		runCommand(func() error { return cmd.Courier(os.Args[2:]) })
-
 	case "serve": // New serve command
 		runCommand(func() error { return cmd.Serve(os.Args[2:], version, branch, commit, buildDate) })
 
@@ -325,13 +322,8 @@ func printUsage() {
 	ui.PrintSubHeader("INTELLIGENCE & ANALYSIS")
 	ui.PrintKeyValBlock("agent", []ui.KeyVal{
 		{Key: "Usage", Value: "dex agent <name> [run|reset] [-f|--force]"},
-		{Key: "Desc", Value: "Manage Dexter Agents (guardian, analyzer)."},
+		{Key: "Agents", Value: "guardian, analyzer, imaginator, fabricator, courier"},
 		{Key: "Flags", Value: "--force: Bypass checks (e.g., idle/cooldown for guardian)."},
-	})
-	ui.PrintKeyValBlock("courier", []ui.KeyVal{
-		{Key: "Usage", Value: "dex courier [run]"},
-		{Key: "Cmd", Value: "courier"},
-		{Key: "Desc", Value: "Run the Courier Protocol to execute active research tasks."},
 	})
 	ui.PrintKeyValBlock("event", []ui.KeyVal{
 		{Key: "Usage", Value: "dex event [subcommand]"},
