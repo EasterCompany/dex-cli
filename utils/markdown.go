@@ -13,24 +13,32 @@ func StandardizeReport(input string) string {
 		return ""
 	}
 
-	// 1. Convert '#' headers to **BOLD UPPERCASE**
-	// This prevents the backend parser from splitting the report prematurely.
+	// 1. Remove Numbered Prefixes from lines that look like headers
+	// E.g. "1. Political Landscape" -> "Political Landscape"
+	reNumbering := regexp.MustCompile(`(?m)^\d+\.\s+`)
+	output := reNumbering.ReplaceAllString(input, "")
+
+	// 2. Convert '#' headers to **BOLD UPPERCASE** and ensure compact spacing
+	// Spacing: \n\n**HEADER**\n (No blank line after header)
 	reHeaders := regexp.MustCompile(`(?m)^#+\s+(.*)$`)
-	output := reHeaders.ReplaceAllStringFunc(input, func(m string) string {
+	output = reHeaders.ReplaceAllStringFunc(output, func(m string) string {
 		title := reHeaders.FindStringSubmatch(m)[1]
-		return "\n**" + strings.ToUpper(strings.TrimSpace(title)) + "**\n"
+		return "\n\n**" + strings.ToUpper(strings.TrimSpace(title)) + "**\n"
 	})
 
-	// 2. Identify potential headers ending in ':' and bold them if not already
-	// E.g. "Summary:" -> "**Summary:**"
+	// 3. Identify potential headers ending in ':' and bold them if not already
 	reColons := regexp.MustCompile(`(?m)^([^#\n\*]{2,60}:)$`)
-	output = reColons.ReplaceAllString(output, "\n**$1**\n")
+	output = reColons.ReplaceAllString(output, "\n\n**$1**\n")
 
-	// 3. Ensure a blank line before bullet points if they follow text
+	// 4. Remove trailing commas from headers (LLM JSON artifact cleanup)
+	reCommaHeader := regexp.MustCompile(`(?m)(\*\*.*:?)\s*,\s*$`)
+	output = reCommaHeader.ReplaceAllString(output, "$1")
+
+	// 5. Ensure a blank line before bullet points if they follow text
 	reLists := regexp.MustCompile(`([^\n])\n- `)
 	output = reLists.ReplaceAllString(output, "$1\n\n- ")
 
-	// 4. Whitespace Normalization
+	// 6. Whitespace Normalization
 	lines := strings.Split(output, "\n")
 	var finalLines []string
 	for _, line := range lines {
@@ -42,6 +50,5 @@ func StandardizeReport(input string) string {
 	reExcessive := regexp.MustCompile(`\n{3,}`)
 	output = reExcessive.ReplaceAllString(output, "\n\n")
 
-	// 5. Final cleanup
 	return strings.TrimSpace(output)
 }

@@ -251,9 +251,11 @@ Your Task:
 3. IGNORE any items represented by these IDs/Strings (Already Seen): %v.
 4. FIND MULTIPLE ITEMS: If more than one relevant item exists, list as many as possible (up to 10). Do not stop at the first match.
 5. Structure your report using Discord-friendly Markdown:
-   - Use bold uppercase for section titles (e.g., **SUMMARY**).
+   - Use '###' for major section headers.
+   - Do NOT use numbered lists (1, 2, 3) for sections.
+   - Ensure there is NO blank line between a header and its content.
+   - Use double-newlines only to separate one section from the next.
    - Use '-' for bullet points.
-   - Use double-newlines between every section and paragraph.
 6. Return a JSON object ONLY.
 
 Format:
