@@ -312,6 +312,10 @@ Output JSON ONLY. No markdown wrapper.`,
 			postBody := map[string]interface{}{
 				"user_id": chore.OwnerID,
 				"content": msgContent,
+				"metadata": map[string]interface{}{
+					"response_model": "dex-scraper-model",
+					"response_raw":   result.Summary,
+				},
 			}
 			jsonBody, _ := json.Marshal(postBody)
 
