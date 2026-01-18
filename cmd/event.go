@@ -52,7 +52,7 @@ func handleGuardianReset(args []string) error {
 		return err
 	}
 
-	url := fmt.Sprintf("%s?protocol=%s", def.GetHTTP("/guardian/reset"), protocol)
+	url := fmt.Sprintf("%s?protocol=%s", def.GetHTTP("/agent/reset"), protocol)
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
 		return err

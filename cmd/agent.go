@@ -101,7 +101,7 @@ func handleFabricator(def *config.ServiceDefinition, command string, force bool)
 		ui.PrintHeader("Fabricator Reset")
 		ui.PrintInfo("Resetting Fabricator protocols...")
 
-		url := fmt.Sprintf("%s?tier=construction", def.GetHTTP("/fabricator/reset"))
+		url := fmt.Sprintf("%s?protocol=construction", def.GetHTTP("/agent/reset"))
 		req, _ := http.NewRequest("POST", url, nil)
 		client := &http.Client{Timeout: 10 * time.Second}
 
@@ -277,7 +277,7 @@ func handleGuardian(def *config.ServiceDefinition, command string, force bool) e
 		ui.PrintHeader("Guardian Reset")
 		ui.PrintInfo("Resetting Guardian protocols...")
 
-		url := fmt.Sprintf("%s?tier=all", def.GetHTTP("/guardian/reset"))
+		url := fmt.Sprintf("%s?protocol=all", def.GetHTTP("/agent/reset"))
 		req, _ := http.NewRequest("POST", url, nil)
 		client := &http.Client{Timeout: 10 * time.Second}
 
@@ -326,7 +326,7 @@ func handleAnalyst(def *config.ServiceDefinition, command string, force bool) er
 		ui.PrintHeader("Analyst Reset")
 		ui.PrintInfo("Resetting Analyst protocols...")
 
-		url := def.GetHTTP("/analyzer/reset")
+		url := fmt.Sprintf("%s?protocol=synthesis", def.GetHTTP("/agent/reset"))
 		req, _ := http.NewRequest("POST", url, nil)
 		client := &http.Client{Timeout: 10 * time.Second}
 
@@ -375,7 +375,7 @@ func handleImaginator(def *config.ServiceDefinition, command string, force bool)
 		ui.PrintHeader("Imaginator Reset")
 		ui.PrintInfo("Resetting Imaginator protocols...")
 
-		url := fmt.Sprintf("%s?tier=alert_review", def.GetHTTP("/guardian/reset"))
+		url := fmt.Sprintf("%s?protocol=alert_review", def.GetHTTP("/agent/reset"))
 		req, _ := http.NewRequest("POST", url, nil)
 		client := &http.Client{Timeout: 10 * time.Second}
 
