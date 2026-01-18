@@ -1007,40 +1007,40 @@ func gitAddCommitPush(def config.ServiceDefinition, incrementType string, major,
 		return fmt.Errorf("git status failed for %s:\n%s", def.ShortName, string(statusOutput))
 	}
 
-	// If no changes, skip commit and push
-	if strings.TrimSpace(string(statusOutput)) == "" {
-		ui.PrintInfo(fmt.Sprintf("[%s] No changes to commit", def.ShortName))
-		return nil
-	}
-
-	// Get the diff for commit message generation
-	diffCmd := exec.Command("git", "diff", "--cached")
-	diffCmd.Dir = sourcePath
-	diffOutput, err := diffCmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("git diff failed for %s:\n%s", def.ShortName, string(diffOutput))
-	}
-
-	// Generate commit message using the Ollama model
-	commitMsg := utils.GenerateCommitMessage(string(diffOutput))
-
-	// Commit with generated message
-	commitCmd := exec.Command("git", "commit", "-m", commitMsg)
-	commitCmd.Dir = sourcePath
-	if output, err := commitCmd.CombinedOutput(); err != nil {
-		if !strings.Contains(string(output), "nothing to commit") {
-			return fmt.Errorf("git commit failed for %s:\n%s", def.ShortName, string(output))
+	// Commit and Push only if there are changes
+	if strings.TrimSpace(string(statusOutput)) != "" {
+		// Get the diff for commit message generation
+		diffCmd := exec.Command("git", "diff", "--cached")
+		diffCmd.Dir = sourcePath
+		diffOutput, err := diffCmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("git diff failed for %s:\n%s", def.ShortName, string(diffOutput))
 		}
-	}
 
-	// Push changes
-	pushCmd := exec.Command("git", "push")
-	pushCmd.Dir = sourcePath
-	if output, err := pushCmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("git push failed for %s:\n%s", def.ShortName, string(output))
+		// Generate commit message using the Ollama model
+		commitMsg := utils.GenerateCommitMessage(string(diffOutput))
+
+		// Commit with generated message
+		commitCmd := exec.Command("git", "commit", "-m", commitMsg)
+		commitCmd.Dir = sourcePath
+		if output, err := commitCmd.CombinedOutput(); err != nil {
+			if !strings.Contains(string(output), "nothing to commit") {
+				return fmt.Errorf("git commit failed for %s:\n%s", def.ShortName, string(output))
+			}
+		}
+
+		// Push changes
+		pushCmd := exec.Command("git", "push")
+		pushCmd.Dir = sourcePath
+		if output, err := pushCmd.CombinedOutput(); err != nil {
+			return fmt.Errorf("git push failed for %s:\n%s", def.ShortName, string(output))
+		}
+	} else {
+		ui.PrintInfo(fmt.Sprintf("[%s] No changes to commit, skipping commit/push phase", def.ShortName))
 	}
 
 	// Create and push tag for ALL builds (to track version history)
+	// Tagging happens even if no commit was made (e.g. forced build or version bump only)
 	tagName := fmt.Sprintf("%d.%d.%d", major, minor, patch)
 	ui.PrintInfo(fmt.Sprintf("[%s] Creating tag %s...", def.ShortName, tagName))
 
