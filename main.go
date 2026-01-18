@@ -165,6 +165,9 @@ func main() {
 	case "agent":
 		runCommand(func() error { return cmd.Agent(os.Args[2:]) })
 
+	case "study":
+		runCommand(func() error { return cmd.Study(os.Args[2:]) })
+
 	case "serve": // New serve command
 		runCommand(func() error { return cmd.Serve(os.Args[2:], version, branch, commit, buildDate) })
 
@@ -324,6 +327,11 @@ func printUsage() {
 		{Key: "Usage", Value: "dex agent <name> [run|reset] [-f|--force]"},
 		{Key: "Agents", Value: "guardian, analyzer, imaginator, fabricator, courier"},
 		{Key: "Flags", Value: "--force: Bypass checks (e.g., idle/cooldown for guardian)."},
+	})
+	ui.PrintKeyValBlock("study", []ui.KeyVal{
+		{Key: "Usage", Value: "dex study [add|list]"},
+		{Key: "Desc", Value: "Manage architectural research papers and studies."},
+		{Key: "Example", Value: "dex study add \"VRAM Optimization\""},
 	})
 	ui.PrintKeyValBlock("event", []ui.KeyVal{
 		{Key: "Usage", Value: "dex event [subcommand]"},
