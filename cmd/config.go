@@ -13,27 +13,83 @@ func Config(args []string) error {
 	for _, arg := range args {
 		if arg == "--help" || arg == "-h" {
 			ui.PrintHeader("Config Command Help")
-			ui.PrintInfo("Usage: dex config <service> [field...]")
-			ui.PrintInfo("       dex config reset")
-			fmt.Println()
-			ui.PrintInfo("Description:")
-			ui.PrintInfo("  View or manage service configurations.")
-			ui.PrintInfo("  <service>   The short name of the service (e.g., 'event', 'discord').")
-			ui.PrintInfo("  [field...]  Optional path to a specific field in the config JSON.")
-			ui.PrintInfo("              If omitted, the full configuration is displayed.")
-			ui.PrintInfo("  reset       Reset service-map.json to default configuration.")
+			ui.PrintInfo("Usage:")
+			ui.PrintInfo("  dex config <service> [field...]   View service-map.json configuration.")
+			ui.PrintInfo("  dex config get <service> <key>    Get a runtime option value.")
+			ui.PrintInfo("  dex config set <service> <key> <val> Set a runtime option value.")
+			ui.PrintInfo("  dex config reset                  Reset service-map.json to defaults.")
 			return nil
 		}
 	}
 
-	if len(args) > 0 && args[0] == "reset" {
+	if len(args) == 0 {
+		return fmt.Errorf("config command requires arguments")
+	}
+
+	subcommand := args[0]
+
+	if subcommand == "reset" {
 		return resetConfig()
 	}
 
-	if len(args) < 1 {
-		return fmt.Errorf("config command requires at least one argument: the service short name (e.g., 'dex config event') or 'reset'")
+	if subcommand == "set" {
+		if len(args) < 4 {
+			return fmt.Errorf("usage: dex config set <service> <key> <value>")
+		}
+		return setServiceOption(args[1], args[2], args[3])
 	}
 
+	if subcommand == "get" {
+		if len(args) < 3 {
+			return fmt.Errorf("usage: dex config get <service> <key>")
+		}
+		return getServiceOption(args[1], args[2])
+	}
+
+	// Legacy behavior: View service-map.json
+	return viewServiceConfig(args)
+}
+
+func setServiceOption(service, key, value string) error {
+	opts, err := config.LoadOptionsConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load options: %w", err)
+	}
+
+	if opts.Services == nil {
+		opts.Services = make(map[string]map[string]interface{})
+	}
+	if opts.Services[service] == nil {
+		opts.Services[service] = make(map[string]interface{})
+	}
+
+	opts.Services[service][key] = value
+
+	if err := config.SaveOptionsConfig(opts); err != nil {
+		return fmt.Errorf("failed to save options: %w", err)
+	}
+
+	ui.PrintSuccess(fmt.Sprintf("Set %s.%s = %s", service, key, value))
+	return nil
+}
+
+func getServiceOption(service, key string) error {
+	opts, err := config.LoadOptionsConfig()
+	if err != nil {
+		return fmt.Errorf("failed to load options: %w", err)
+	}
+
+	if opts.Services != nil && opts.Services[service] != nil {
+		if val, ok := opts.Services[service][key]; ok {
+			fmt.Println(val)
+			return nil
+		}
+	}
+
+	return fmt.Errorf("option not set")
+}
+
+func viewServiceConfig(args []string) error {
 	serviceShortName := args[0]
 	fieldPath := args[1:]
 

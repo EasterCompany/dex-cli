@@ -9,11 +9,12 @@ import (
 
 // OptionsConfig represents the structure of options.json
 type OptionsConfig struct {
-	Doc     string         `json:"_doc"`
-	Editor  string         `json:"editor"`
-	Theme   string         `json:"theme"`
-	Logging bool           `json:"logging"`
-	Discord DiscordOptions `json:"discord"`
+	Doc      string                            `json:"_doc"`
+	Editor   string                            `json:"editor"`
+	Theme    string                            `json:"theme"`
+	Logging  bool                              `json:"logging"`
+	Discord  DiscordOptions                    `json:"discord"`
+	Services map[string]map[string]interface{} `json:"services"`
 }
 
 // DiscordOptions holds discord specific configurations
@@ -39,6 +40,14 @@ func DefaultOptionsConfig() *OptionsConfig {
 			DebugChannelID:      "YOUR_DISCORD_DEBUG_CHANNEL_ID_HERE",
 			MasterUser:          "313071000877137920",
 			DefaultVoiceChannel: "1427777517414125578",
+		},
+		Services: map[string]map[string]interface{}{
+			"stt": {
+				"device": "cpu",
+			},
+			"tts": {
+				"device": "cpu",
+			},
 		},
 	}
 }

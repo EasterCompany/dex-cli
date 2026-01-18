@@ -314,6 +314,23 @@ func healOptionsConfig(userOpts *OptionsConfig, defaultOpts *OptionsConfig) bool
 		userOpts.Discord.DebugChannelID = defaultOpts.Discord.DebugChannelID
 	}
 
+	// Check Services
+	if userOpts.Services == nil {
+		userOpts.Services = make(map[string]map[string]interface{})
+	}
+	for svcName, defConfig := range defaultOpts.Services {
+		if _, exists := userOpts.Services[svcName]; !exists {
+			userOpts.Services[svcName] = defConfig
+		} else {
+			// Merge nested map (ensure keys exist if missing)
+			for k, v := range defConfig {
+				if _, ok := userOpts.Services[svcName][k]; !ok {
+					userOpts.Services[svcName][k] = v
+				}
+			}
+		}
+	}
+
 	// Server Map
 	_, serverMapErr := LoadServerMapConfig()
 	if serverMapErr != nil {
