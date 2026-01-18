@@ -375,6 +375,9 @@ Rules:
 - DO NOT include any other text, reasoning, or explanations.
 - The description must be under 72 characters.
 - Be specific and concise.`,
+			Parameters: map[string]interface{}{
+				"num_ctx": 4096,
+			},
 		},
 		{
 			Name:      "dex-summary-model",
@@ -383,6 +386,9 @@ Rules:
 You are a specialized AI assistant for generating summaries out of large and small bodies of text.
 You may only create text summaries.
 Your task is to analyze a piece of text (various formats: message logs, poems, news article) and generate clear, concise, and meaningful summary.`,
+			Parameters: map[string]interface{}{
+				"num_ctx": 8192,
+			},
 		},
 		{
 			Name:      "dex-fast-summary-model",
@@ -391,6 +397,9 @@ Your task is to analyze a piece of text (various formats: message logs, poems, n
 You are a specialized AI assistant for generating summaries out of large and small bodies of text.
 You may only create text summaries.
 Your task is to analyze a piece of text (various formats: message logs, poems, news article) and generate clear, concise, and meaningful summary.`,
+			Parameters: map[string]interface{}{
+				"num_ctx": 4096,
+			},
 		},
 		{
 			Name:      "dex-scraper-model",
@@ -399,6 +408,9 @@ Your task is to analyze a piece of text (various formats: message logs, poems, n
 Focus on the main article content, product details, or key information.
 Ignore navigation menus, footers, and advertisements.
 Your output will be used as context for another AI, so prioritize clarity and density of information.`,
+			Parameters: map[string]interface{}{
+				"num_ctx": 16384,
+			},
 		},
 		{
 			Name:      "dex-engagement-model",
@@ -418,6 +430,9 @@ Priority:
 - Favor ENGAGE_FAST for low-complexity social interactions to save system resources.
 
 Output ONLY the token. Do not explain.`,
+			Parameters: map[string]interface{}{
+				"num_ctx": 8192,
+			},
 		},
 		{
 			Name:      "dex-fast-engagement-model",
@@ -431,6 +446,9 @@ RULES:
 3. CRITICAL: If the message contains "Dexter" (case-insensitive), you MUST output '<ENGAGE/>'.
 
 Output ONLY the tag.`,
+			Parameters: map[string]interface{}{
+				"num_ctx": 4096,
+			},
 		},
 		{
 			Name:      "dex-transcription-model",
@@ -451,6 +469,9 @@ VOICE INTERACTION RULES:
 3. Be short, sweet, and witty.
 4. Sound like a human, not a bot. Avoid "As an AI..."
 5. Only provide the raw spoken words.`,
+			Parameters: map[string]interface{}{
+				"num_ctx": 2048,
+			},
 		},
 		{
 			Name:      "dex-private-message-model",
@@ -472,6 +493,9 @@ PRIVATE MESSAGE (DM) RULES:
 4. Only use long-form text or bullet points if the user asks a formal, scientific, or work-related question.
 5. ANTI-REPETITION: Actively avoid repeating phrases, emojis, or sentence structures across subsequent messages in a conversation. Keep your output fresh and varied.
 6. Keep your use of emojis to a bare minimum, prefer not to use them by default.`,
+			Parameters: map[string]interface{}{
+				"num_ctx": 8192,
+			},
 		},
 		{
 			Name:      "dex-public-message-model",
@@ -500,6 +524,9 @@ PUBLIC CHAT RULES:
 4. Only use long-form text or bullet points if the user asks a formal, scientific, or work-related question.
 5. Do not dominate the conversation unless asked to elaborate.
 6. ANTI-REPETITION: Actively avoid repeating phrases, emojis, or sentence structures across subsequent messages in a conversation. Keep your output fresh and varied. If you used an emoji in your last response, try a different one or none at all.`,
+			Parameters: map[string]interface{}{
+				"num_ctx": 8192,
+			},
 		},
 		{
 			Name:      "dex-guardian-sentry",
@@ -535,6 +562,9 @@ MANDATORY OUTPUT TEMPLATE IF NOT "<NO_ALERT/>":
 
 ## Content
 (Detailed analysis. Include the EXACT raw log lines or event data that proves this issue exists. Explain why this matters.)`,
+			Parameters: map[string]interface{}{
+				"num_ctx": 8192,
+			},
 		},
 		{
 			Name:      "dex-researcher-model",
@@ -572,6 +602,9 @@ MANDATORY OUTPUT TEMPLATE (Strict Markdown):
 ## Sources
 - [Link 1]
 - [Link 2]`,
+			Parameters: map[string]interface{}{
+				"num_ctx": 16384,
+			},
 		},
 		{
 			Name:      "dex-imaginator-model",
@@ -598,6 +631,9 @@ Output Format:
 - [Step 1]
 - [Step 2]
 ...`,
+			Parameters: map[string]interface{}{
+				"num_ctx": 8192,
+			},
 		},
 		{
 			Name:      "dex-vision-model",
@@ -619,6 +655,9 @@ Analyze the user's message and the URL.
 - If unsure -> '<STATIC/>'
 
 Output ONLY '<VISUAL/>' or '<STATIC/>'. Do not explain.`,
+			Parameters: map[string]interface{}{
+				"num_ctx": 2048,
+			},
 		},
 		{
 			Name:      "dex-moderation-model",
@@ -636,12 +675,16 @@ RULES:
 
 OUTPUT FORMAT:
 Output ONLY the specialized tag. Do not explain.`,
+			Parameters: map[string]interface{}{
+				"num_ctx": 2048,
+			},
 		},
 		{
 			Name:      "dex-master-model",
 			BaseModel: "llama4:16x17b",
 			Parameters: map[string]interface{}{
 				"num_gpu": 0,
+				"num_ctx": 32768,
 			},
 		},
 	}
