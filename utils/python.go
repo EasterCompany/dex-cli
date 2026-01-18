@@ -24,6 +24,18 @@ func getPythonPaths(version string) (envDir, pythonExecutable, pipExecutable, po
 	return
 }
 
+// UpgradePip upgrades pip in the specified environment.
+func UpgradePip(pipExecutable string, silent bool) error {
+	if !silent {
+		ui.PrintInfo("Ensuring pip is up-to-date...")
+	}
+	cmd := exec.Command(pipExecutable, "install", "--upgrade", "pip")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to upgrade pip: %w", err)
+	}
+	return nil
+}
+
 // bootstrapSpecificVenv sets up a specific python version environment.
 func bootstrapSpecificVenv(version string, silent bool) error {
 	envDir, pythonExecutable, pipExecutable, _, err := getPythonPaths(version)
@@ -36,6 +48,8 @@ func bootstrapSpecificVenv(version string, silent bool) error {
 		if !silent {
 			ui.PrintInfo(fmt.Sprintf("Python %s environment already configured.", version))
 		}
+		// Always ensure pip is up to date when bootstrapping/verifying
+		_ = UpgradePip(pipExecutable, silent)
 		return nil
 	}
 
@@ -58,20 +72,23 @@ func bootstrapSpecificVenv(version string, silent bool) error {
 		return fmt.Errorf("failed to create virtual environment for %s: %w", version, err)
 	}
 
+	// 4. Upgrade pip immediately after creation
+	if err := UpgradePip(pipExecutable, silent); err != nil {
+		return err
+	}
+
 	if !silent {
-		ui.PrintSuccess(fmt.Sprintf("Virtual environment for %s created.", version))
 		ui.PrintInfo(fmt.Sprintf("Installing poetry in %s environment...", version))
 	}
 
-	// 4. Install Poetry into the virtual environment.
+	// 5. Install Poetry into the virtual environment.
 	cmd = exec.Command(pipExecutable, "install", "poetry")
-	// cmd.Stdout = os.Stdout // Keep silent unless verbose? or maybe verify logs
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to install poetry in %s environment: %w", version, err)
 	}
 
 	if !silent {
-		ui.PrintSuccess(fmt.Sprintf("Poetry installed in %s environment.", version))
+		ui.PrintSuccess(fmt.Sprintf("Virtual environment for %s ready.", version))
 	}
 
 	return nil
