@@ -13,54 +13,103 @@ import (
 )
 
 type Chore struct {
-	ID                 string   `json:"id"`
-	OwnerID            string   `json:"owner_id"`
-	Recipients         []string `json:"recipients"`
-	Status             string   `json:"status"`
-	Schedule           string   `json:"schedule"`
-	RunAt              string   `json:"run_at"`
-	LastRun            int64    `json:"last_run"`
-	NaturalInstruction string   `json:"natural_instruction"`
-	ExecutionPlan      struct {
-		EntryURL        string `json:"entry_url"`
-		SearchQuery     string `json:"search_query"`
+	ID string `json:"id"`
+
+	OwnerID string `json:"owner_id"`
+
+	Recipients []string `json:"recipients"`
+
+	Status string `json:"status"`
+
+	Schedule string `json:"schedule"`
+
+	RunAt string `json:"run_at"`
+
+	Timezone string `json:"timezone"`
+
+	LastRun int64 `json:"last_run"`
+
+	NaturalInstruction string `json:"natural_instruction"`
+
+	ExecutionPlan struct {
+		EntryURL string `json:"entry_url"`
+
+		SearchQuery string `json:"search_query"`
+
 		ExtractionFocus string `json:"extraction_focus"`
 	} `json:"execution_plan"`
+
 	Memory []string `json:"memory"`
 }
 
 func isChoreDue(chore Chore) bool {
+
 	now := time.Now()
 
 	// Case 1: Standard Interval (every_X)
+
 	if strings.HasPrefix(chore.Schedule, "every_") {
+
 		interval := 6 * time.Hour // Default
+
 		durStr := strings.TrimPrefix(chore.Schedule, "every_")
+
 		if d, err := time.ParseDuration(durStr); err == nil {
+
 			interval = d
+
 		}
+
 		return time.Since(time.Unix(chore.LastRun, 0)) >= interval
+
 	}
 
 	// Case 2: Specified Time (daily at HH:MM)
+
 	if chore.Schedule == "daily" && chore.RunAt != "" {
-		var hr, mn int
-		_, err := fmt.Sscanf(chore.RunAt, "%d:%d", &hr, &mn)
-		if err != nil {
-			return false
+
+		loc := time.Local
+
+		if chore.Timezone != "" {
+
+			if l, err := time.LoadLocation(chore.Timezone); err == nil {
+
+				loc = l
+
+			}
+
 		}
 
-		// Create a time object for "today at RunAt"
-		scheduledTime := time.Date(now.Year(), now.Month(), now.Day(), hr, mn, 0, 0, now.Location())
+		nowInLoc := now.In(loc)
+
+		var hr, mn int
+
+		_, err := fmt.Sscanf(chore.RunAt, "%d:%d", &hr, &mn)
+
+		if err != nil {
+
+			return false
+
+		}
+
+		// Create a time object for "today at RunAt" in the specific location
+
+		scheduledTime := time.Date(nowInLoc.Year(), nowInLoc.Month(), nowInLoc.Day(), hr, mn, 0, 0, loc)
 
 		// If we are currently past the scheduled time today
-		if now.After(scheduledTime) {
+
+		if nowInLoc.After(scheduledTime) {
+
 			// It is due if it hasn't run since today's scheduled time
+
 			return chore.LastRun < scheduledTime.Unix()
+
 		}
+
 	}
 
 	return false
+
 }
 
 type MetadataResponse struct {
