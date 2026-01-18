@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -19,6 +20,7 @@ func Study(args []string) error {
 		fmt.Println()
 		ui.PrintInfo("Commands:")
 		ui.PrintInfo("  add <title>  Scaffold a new research paper")
+		ui.PrintInfo("  edit <slug>   Open a study in your default editor")
 		ui.PrintInfo("  list         List all existing research papers")
 		return nil
 	}
@@ -29,6 +31,11 @@ func Study(args []string) error {
 			return fmt.Errorf("usage: dex study add \"Paper Title\"")
 		}
 		return studyAdd(args[1:])
+	case "edit":
+		if len(args) < 2 {
+			return fmt.Errorf("usage: dex study edit <slug>")
+		}
+		return studyEdit(args[1:])
 	case "list":
 		return studyList()
 	default:
@@ -63,6 +70,7 @@ func studyAdd(args []string) error {
 	}
 
 	// Create content
+
 	dateStr := time.Now().Format("02 January 2006")
 	content := fmt.Sprintf(`# %s
 
@@ -106,6 +114,41 @@ func studyAdd(args []string) error {
 	ui.PrintInfo("Run 'dex build' after editing to update the website.")
 
 	return nil
+}
+
+func studyEdit(args []string) error {
+	slug := args[0]
+	// Standardize slug (remove .md extension if provided)
+	slug = strings.TrimSuffix(slug, ".md")
+
+	feDef := config.GetServiceDefinition("easter-company")
+	feSource, err := config.ExpandPath(feDef.Source)
+	if err != nil {
+		return err
+	}
+
+	filePath := filepath.Join(feSource, "static", "docs", "studies", slug+".md")
+
+	// Verify existence
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		return fmt.Errorf("study not found: %s", slug)
+	}
+
+	// Determine editor
+	editor := os.Getenv("EDITOR")
+	if editor == "" {
+		editor = "nvim"
+	}
+
+	ui.PrintInfo(fmt.Sprintf("Opening %s in %s...", slug, editor))
+
+	// Launch editor
+	cmd := exec.Command(editor, filePath)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
 }
 
 func studyList() error {

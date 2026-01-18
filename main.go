@@ -329,9 +329,9 @@ func printUsage() {
 		{Key: "Flags", Value: "--force: Bypass checks (e.g., idle/cooldown for guardian)."},
 	})
 	ui.PrintKeyValBlock("study", []ui.KeyVal{
-		{Key: "Usage", Value: "dex study [add|list]"},
+		{Key: "Usage", Value: "dex study [add|edit|list]"},
 		{Key: "Desc", Value: "Manage architectural research papers and studies."},
-		{Key: "Example", Value: "dex study add \"VRAM Optimization\""},
+		{Key: "Example", Value: "dex study edit chat-cognitive-loop"},
 	})
 	ui.PrintKeyValBlock("event", []ui.KeyVal{
 		{Key: "Usage", Value: "dex event [subcommand]"},
