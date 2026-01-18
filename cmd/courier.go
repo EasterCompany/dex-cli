@@ -302,27 +302,65 @@ Output JSON ONLY. No markdown wrapper.`,
 			"priority": "low",
 		})
 
-		// Send Discord Notification
+		// Send Discord Notifications to all recipients
 		discordDef, err := config.Resolve("discord")
 		if err == nil && discordDef != nil {
 			msgContent := fmt.Sprintf("📦 **Courier Update**\n\nTask: *%s*\n\n%s\n\n[Source Link](%s)", chore.NaturalInstruction, result.Summary, targetURL)
 
-			// Use POST /post with user_id
-			postURL := discordDef.GetHTTP("/post")
-			postBody := map[string]interface{}{
-				"user_id": chore.OwnerID,
-				"content": msgContent,
-				"metadata": map[string]interface{}{
-					"response_model": "dex-scraper-model",
-					"response_raw":   result.Summary,
-				},
-			}
-			jsonBody, _ := json.Marshal(postBody)
+			// Logic: Sort recipients - Channels first, then Users
+			channels := []string{}
+			users := []string{}
 
-			if _, _, err := utils.PostHTTP(postURL, jsonBody); err != nil {
-				ui.PrintWarning(fmt.Sprintf("Failed to send DM: %v", err))
-			} else {
-				ui.PrintSuccess("Sent DM to owner.")
+			recipients := chore.Recipients
+			if len(recipients) == 0 && chore.OwnerID != "" {
+				recipients = []string{chore.OwnerID}
+			}
+
+			for _, r := range recipients {
+				if strings.HasPrefix(r, "channel:") {
+					channels = append(channels, strings.TrimPrefix(r, "channel:"))
+				} else {
+					users = append(users, r)
+				}
+			}
+
+			// 1. Deliver to Channels
+			for _, channelID := range channels {
+				ui.PrintRunningStatus(fmt.Sprintf("Delivering to channel %s...", channelID))
+				postURL := discordDef.GetHTTP("/post")
+				postBody := map[string]interface{}{
+					"channel_id": channelID,
+					"content":    msgContent,
+					"metadata": map[string]interface{}{
+						"response_model": "dex-scraper-model",
+						"response_raw":   result.Summary,
+					},
+				}
+				jsonBody, _ := json.Marshal(postBody)
+				if _, _, err := utils.PostHTTP(postURL, jsonBody); err != nil {
+					ui.PrintWarning(fmt.Sprintf("Failed to post to channel %s: %v", channelID, err))
+				}
+			}
+
+			// 2. Deliver to Users (DMs)
+			for _, userID := range users {
+				if userID == "dexter" {
+					continue // Already sent notification event
+				}
+				ui.PrintRunningStatus(fmt.Sprintf("Delivering DM to user %s...", userID))
+				postURL := discordDef.GetHTTP("/post")
+				postBody := map[string]interface{}{
+					"user_id": userID,
+					"content": msgContent,
+					"metadata": map[string]interface{}{
+						"response_model": "dex-scraper-model",
+						"response_raw":   result.Summary,
+					},
+				}
+				jsonBody, _ := json.Marshal(postBody)
+				if _, _, err := utils.PostHTTP(postURL, jsonBody); err != nil {
+					ui.PrintWarning(fmt.Sprintf("Failed to send DM to user %s: %v", userID, err))
+				}
 			}
 		}
 
