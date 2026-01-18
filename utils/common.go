@@ -26,16 +26,18 @@ func WipeRedis(ctx context.Context) error {
 
 	persistentPrefixes := []string{
 		"user:profile:",
-		"events:user:",
+		"events:", // Preserves events:timeline, events:type:*, events:channel:*, events:user:*
 		"chores:",
 		"roadmap:",
-		"event:",
+		"event:", // Preserves individual event data
 		"system:is_paused",
 		"courier:last_run:",
 		"guardian:last_run:",
 		"analyzer:last_run:",
 		"imaginator:last_run:",
 		"fabricator:last_run:",
+		"discord-audio:", // Persist audio buffers if needed (short TTL anyway)
+		"handled:event:", // Persist race-condition locks
 	}
 
 	var cursor uint64
