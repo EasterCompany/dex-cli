@@ -68,17 +68,7 @@ func EnsureDirectoryStructure() error {
 		}
 	}
 
-	// Ensure ~/EasterCompany exists
-	easterCompanyPath, err := ExpandPath(EasterCompanyRoot)
-	if err != nil {
-		return fmt.Errorf("failed to expand EasterCompany root path: %w", err)
-	}
-
-	if err := os.MkdirAll(easterCompanyPath, 0o755); err != nil {
-		return fmt.Errorf("failed to create EasterCompany directory: %w", err)
-	}
-
-	// Ensure linter/formatter configs exist in ~/EasterCompany
+	// Ensure linter/formatter configs exist in ~/EasterCompany (ONLY if directory exists)
 	if err := EnsureLinterConfigs(); err != nil {
 		return fmt.Errorf("failed to ensure linter configs: %w", err)
 	}
