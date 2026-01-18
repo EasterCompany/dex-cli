@@ -78,9 +78,110 @@ func EnsureDirectoryStructure() error {
 		return fmt.Errorf("failed to create EasterCompany directory: %w", err)
 	}
 
+	// Ensure linter/formatter configs exist in ~/EasterCompany
+	if err := EnsureLinterConfigs(); err != nil {
+		return fmt.Errorf("failed to ensure linter configs: %w", err)
+	}
+
 	// Ensure log files exist for all services (including Upstash/OS)
 	if err := EnsureServiceLogFiles(); err != nil {
 		return fmt.Errorf("failed to ensure service log files: %w", err)
+	}
+
+	return nil
+}
+
+// EnsureLinterConfigs produces/overwrites standard config files in ~/EasterCompany
+func EnsureLinterConfigs() error {
+	root, err := ExpandPath(EasterCompanyRoot)
+	if err != nil {
+		return err
+	}
+
+	// Only proceed if the directory actually exists (prevent unwanted creation in user mode)
+	if _, err := os.Stat(root); os.IsNotExist(err) {
+		return nil
+	}
+
+	configs := map[string]string{
+		".htmlhintrc": `{
+  "tagname-lowercase": true,
+  "attr-lowercase": true,
+  "attr-value-double-quotes": true,
+  "doctype-first": false,
+  "tag-pair": true,
+  "spec-char-escape": true,
+  "id-unique": true,
+  "src-not-empty": true,
+  "attr-no-duplication": true,
+  "title-require": true
+}
+`,
+		".prettierrc": `{
+  "tabWidth": 2,
+  "useTabs": false,
+  "semi": true,
+  "singleQuote": true,
+  "trailingComma": "es5",
+  "printWidth": 100,
+  "bracketSpacing": true,
+  "arrowParens": "always",
+  "endOfLine": "lf"
+}
+`,
+		".stylelintrc.json": `{
+  "rules": {
+    "color-no-invalid-hex": true,
+    "block-no-empty": true,
+    "unit-no-unknown": true,
+    "property-no-unknown": [
+      true,
+      {
+        "ignoreProperties": ["text-fill-color"]
+      }
+    ],
+    "selector-pseudo-class-no-unknown": true
+  }
+}
+`,
+		"eslint.config.mjs": `export default [
+  {
+    ignores: [
+      '**/dist/',
+      '**/bin/',
+      '**/node_modules/',
+      '**/oceaster.github.io/',
+      '**/*.min.js',
+      'easter.company/static/',
+      '**/*.ts',
+    ],
+  },
+  {
+    files: ['**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: {
+        browser: true,
+        node: true,
+        es2021: true,
+      },
+    },
+    rules: {
+      'no-unused-vars': 'warn',
+      'no-undef': 'warn',
+    },
+  },
+];
+`,
+	}
+
+	for filename, content := range configs {
+		path := filepath.Join(root, filename)
+		// ALWAYS overwrite to ensure latest standards are enforced
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			return fmt.Errorf("failed to write %s: %w", filename, err)
+		}
 	}
 
 	return nil
