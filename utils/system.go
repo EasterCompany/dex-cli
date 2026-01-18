@@ -54,7 +54,8 @@ func InstallSystemdService(service config.ServiceDefinition) error {
 		sourcePath, _ := config.ExpandPath(service.Source)
 
 		// Serve directly from source root (GitHub Pages style)
-		data.ExecStart = fmt.Sprintf("%s serve --dir %s --port %s", dexPath, sourcePath, service.Port)
+		// We use --no-event to prevent the static server from spamming logs with access events
+		data.ExecStart = fmt.Sprintf("%s --no-event serve --dir %s --port %s", dexPath, sourcePath, service.Port)
 
 	case "be": // Backend (Python or other)
 		sourcePath, _ := config.ExpandPath(service.Source)
