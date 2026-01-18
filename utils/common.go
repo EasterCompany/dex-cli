@@ -35,6 +35,7 @@ func WipeRedis(ctx context.Context) error {
 		"guardian:last_run:",
 		"analyzer:last_run:",
 		"imaginator:last_run:",
+		"imaginator:processed_alerts", // Persist processed alerts logic
 		"fabricator:last_run:",
 		"discord-audio:", // Persist audio buffers if needed (short TTL anyway)
 		"handled:event:", // Persist race-condition locks
