@@ -250,13 +250,17 @@ Your Task:
 2. CRITICAL: IGNORE all advertisements, sponsored listings, navigation menus (Home, About), generic footers, and tracking links.
 3. IGNORE any items represented by these IDs/Strings (Already Seen): %v.
 4. FIND MULTIPLE ITEMS: If more than one relevant item exists, list as many as possible (up to 10). Do not stop at the first match.
-5. Return a JSON object ONLY.
+5. Structure your report using Discord-friendly Markdown:
+   - Use bold uppercase for section titles (e.g., **SUMMARY**).
+   - Use '-' for bullet points.
+   - Use double-newlines between every section and paragraph.
+6. Return a JSON object ONLY.
 
 Format:
 {
   "found": true/false,
   "items": ["unique_id_1", "unique_id_2"], // List of NEW unique identifiers (titles, links, or IDs) found.
-  "summary": "Detailed message with bullet points and markdown links: \n- [Item Title](Item URL) - brief snippet\n- ..." // Detailed report including direct links to relevant findings.
+  "summary": "Detailed message report..." // Detailed report including direct links to relevant findings.
 }
 If no new items are found, set "found": false and "items": [].
 
@@ -290,6 +294,9 @@ Output JSON ONLY. No markdown wrapper.`,
 			return fmt.Errorf("failed to parse LLM response: %s", response)
 		}
 	}
+
+	// Standardize Markdown formatting for the report summary
+	result.Summary = utils.StandardizeReport(result.Summary)
 
 	// 4. Handle Result
 	if result.Found {
